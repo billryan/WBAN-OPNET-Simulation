@@ -67,6 +67,17 @@ static double Symbols2ms (int SizeInSymbols, double datarateinbits){
 	return (res);
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	allocation_slot_length2ms
+ *
+ * Description:	Calculate the size of a frame from Allocation Slot Length to milliseconds
+ *
+ *           allocation_slot_length : integer
+ *--------------------------------------------------------------------------------*/
+
+// static double allocation_slot_length2ms (int allocation_slot_length){
+// 	return double((pAllocationSlotMin + allocation_slot_length * pAllocationSlotResolution)/1000.0);
+// }
 
 /*--------------------------------------------------------------------------------
  * Function:	Symbols2Sec
