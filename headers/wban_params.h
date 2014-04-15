@@ -1,5 +1,5 @@
 /** PHY Layer constatns		**/
-#define aMaxPHYPacketSize_Octet 	127					// size of PSDU
+#define aMaxPHYPacketSize_Octet 	127								// size of PSDU
 #define aMaxPHYPacketSize_Bits 		(8*aMaxPHYPacketSize_Octet)		// 1016 bits
 #define aMaxPHYPacketSize_Symbols 	(2*aMaxPHYPacketSize_Octet)		// 254 Symbols
 #define aTurnaroundTime_Symbol 		12
@@ -14,6 +14,13 @@
 #define aUnitBackoffPeriod	20
 #define aMaxFrameRetries	3
 #define aMaxMACFrameSize_Bits  (aMaxPHYPacketSize_Bits-MAC_HEADER_SIZE)	//MAC Frame Payload (MSDU) size
+// 802.15.6 related 
+#define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
+//the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
+#define pAllocationSlotMin 500 //500 us for NB PHY
+#define pAllocationSlotResolution 500 //500 us for NB PHY
+#define allocationSlotLength 19 //for NB PHY, L=19 means that 10 ms per slot
+#define allocationSlotLength_ms 10 //10 ms default
 
 // constants related to Intra-Frame Spacing IFS 
 #define aMaxSIFSFrameSize_Bits	(18*8)
@@ -22,7 +29,9 @@
 
 #define aGTSDescPersistenceTime	4
 #define aMinCAPLength	440	//Symbols
-
+/* 802.15.6 related MAC parameters */
+static int CWmin[8] = { 16, 16, 8, 8, 4, 4, 2, 1 };
+static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 
 /** MAC Layer attributes		**/
 #define macAckWaitDuration 54	// The max number of symbols to wait for an ACK
@@ -48,12 +57,22 @@
 
 // WPAN bit rate [bps]
 #define WPAN_DATA_RATE 250000.0
+// WBAN bit rate [bps]
+#define WBAN_DATA_RATE 971400.0
 
 // broadcast address corresponds to 0xFFFF
 #define BROADCAST_ADDRESS 65535
 
 // temporary address of PAN coordinator (Traffic Destination MAC Adrress)
 #define	PAN_COORDINATOR_ADDRESS	-1
+
+// Abbreviated addressing related to 802.15.6  
+#define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
+#define UNCONNECTED_NID 1 // For unicast from/to unconnected nodes in a BAN
+#define BROADCAST_NID 255 //For broadcast to all nodes and hubs
+//#define HID 31 				//Hub identifier for a BAN
+#define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
+#define UNCONNECTED -1 //unconnected status
 
 #define Symbol2Bits 4
 
@@ -72,3 +91,23 @@
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
 
+/** APP Layer constants		**/
+enum USER_PRIORITY {
+	UP0 = 0,
+	UP1 = 1,
+	UP2 = 2,
+	UP3 = 3,
+	UP4 = 4,
+	UP5 = 5,
+	UP6 = 6,
+	UP7 = 7
+};
+
+enum MacStates {
+	MAC_SETUP = 1000,
+	MAC_RAP = 1001,
+	MAC_FREE_TX_ACCESS = 1002,
+	MAC_FREE_RX_ACCESS = 1003,
+	MAC_BEACON_WAIT = 1009,
+	MAC_SLEEP = 1010
+};

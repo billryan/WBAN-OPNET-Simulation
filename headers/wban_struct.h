@@ -23,6 +23,47 @@ typedef struct {
 	int pan_id;		
 } wpan_node_attributes;
 
+/* define the general node parameters */
+typedef struct {
+	Objid	parent_id; // ID of the node
+	Objid	objid;	// ID of the module which received the packets
+	Objid   my_battery; // Battery module ID
+	Objid   gts_traffic_source; //GTS Traffic Source module ID
+	int		mac_address; // mac address of the node
+
+	char name [20];
+	double	x; // X coordinate of the node 
+	double	y; // Y coordinate of the node
+	double altitude; // The altitude of the node
+
+	Boolean is_PANcoordinator; // state if the node is a PAN Coordinator or not
+	Boolean is_BANhub; // state if the node is a Hub or not
+	char Device_Mode[20]; // Can be a End Device or a PAN Coordinator
+	char is_hub[10]; /* mode of the device: Hub or Node */
+	int node_id; // node ID
+	int connectedHID;
+	int connectedNID;
+	int unconnectedNID;
+	int PANcoordinator_mac_address; // the MAC address of the WPAN coordinator
+	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
+	
+	Boolean is_GTS_Permit;	// if PANCoordinator accepts GTS request	
+	PrgT_List* GTS_list_PC;	// list of allocated GTS slots on the PANCoordinator node
+	
+
+	int beacon_order;
+	int superframe_order;
+	int pan_id;		
+	//802.15.6 related
+	int sender_address;
+	int beacon_period_length;
+	int allocation_slot_length;
+	int rap1_start;
+	int rap1_end;
+	int rap2_start;
+	int rap2_end;
+} wban_node_attributes;
+
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
 typedef struct {
 	int start_slot;	// the starting superframe slot of the appropriate GTS
@@ -54,6 +95,18 @@ typedef struct {
 	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wpan_csma_attributes;
+
+/* define the backoff parameters */
+typedef struct {
+	int MAX_CSMA_BACKOFF; // maximum number of Backoff (macMaxCSMABackoffs)
+	int macMinBE; // Minimum Backoff Exponent
+	int NB; // current number of backoff
+	int BE; // Backoff exponent
+	int CW; // Contention Window
+	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
+	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
+} wban_csma_attributes;
+
 
 
 /*
