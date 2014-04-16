@@ -63,8 +63,8 @@ static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 // broadcast address corresponds to 0xFFFF
 #define BROADCAST_ADDRESS 65535
 
-// temporary address of PAN coordinator (Traffic Destination MAC Adrress)
-#define	PAN_COORDINATOR_ADDRESS	-1
+// temporary ID of HUB (Traffic Destination ID)
+#define	HUB_ID	-1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
