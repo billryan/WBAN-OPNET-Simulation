@@ -71,6 +71,7 @@ static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 #define UNCONNECTED_NID 1 // For unicast from/to unconnected nodes in a BAN
 #define BROADCAST_NID 255 //For broadcast to all nodes and hubs
 //#define HID 31 				//Hub identifier for a BAN
+int current_free_connected_NID = 32; // start assigning connected NID from ID 32
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
 
