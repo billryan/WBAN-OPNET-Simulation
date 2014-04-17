@@ -28,22 +28,24 @@ typedef struct {
 	Objid	parent_id; // ID of the node
 	Objid	objid;	// ID of the module which received the packets
 	Objid   my_battery; // Battery module ID
-	Objid   gts_traffic_source; //GTS Traffic Source module ID
-	int		mac_address; // mac address of the node
 
-	char name [20];
+	char 	name [20];
+	int		sender_address; // sender address of the node, 48 bits, for beacon frame
+	int		sender_id; // Sender ID of the node
+	int		recipient_id; // Recipient ID of the node
+	int 	node_id; // node ID
+	int 	ban_id;	// ban ID
+	int 	connectedHID;
+	int 	connectedNID;
+
 	double	x; // X coordinate of the node 
 	double	y; // Y coordinate of the node
 	double altitude; // The altitude of the node
 
 	Boolean is_PANcoordinator; // state if the node is a PAN Coordinator or not
 	Boolean is_BANhub; // state if the node is a Hub or not
-	char Device_Mode[20]; // Can be a End Device or a PAN Coordinator
-	char is_hub[10]; /* mode of the device: Hub or Node */
-	int node_id; // node ID
-	int connectedHID;
-	int connectedNID;
-	int unconnectedNID;
+	char Device_Mode[20]; // Can be a Node or a Hub
+	
 	int PANcoordinator_mac_address; // the MAC address of the WPAN coordinator
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
 	
@@ -53,15 +55,17 @@ typedef struct {
 
 	int beacon_order;
 	int superframe_order;
-	int pan_id;		
-	//802.15.6 related
-	int sender_address;
+	
+	//beacon related
+
 	int beacon_period_length;
 	int allocation_slot_length;
 	int rap1_start;
 	int rap1_end;
 	int rap2_start;
 	int rap2_end;
+	int inactive_duration;
+	
 } wban_node_attributes;
 
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
