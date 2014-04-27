@@ -1,3 +1,6 @@
+#ifndef BAN_MATH_H
+#define BAN_MATH_H
+
 /*--------------------------------------------------------------------------------
  * Function:	exponent
  *
@@ -112,6 +115,21 @@ static double Bits2Sec (double sizeinbits, double datarateinbits){
 	return (res);
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	TX_TIME
+ *
+ * Description:	Calculate the transmission time of a packet
+ *
+ *           SizeInBits : double, datarateinKbits : double
+ *--------------------------------------------------------------------------------*/
+
+static double TX_TIME (double sizeinbits, double datarateinKbits){
+	
+	double res;
+	res = (sizeinbits/(1000 * datarateinKbits));
+	return (res);
+}
+
 
 /*--------------------------------------------------------------------------------
  * Function:	min_int
@@ -215,3 +233,5 @@ static int compare_doubles (double a, double b) {
 			return -1;
 	}
 }
+
+#endif
