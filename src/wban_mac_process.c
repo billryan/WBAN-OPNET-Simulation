@@ -4,6 +4,9 @@ wban_node_attributes	\node_attr;
 /* the Medium Access Attributes */
 wban_mac_attributes	\mac_attr;
 
+/* the MAP Attributes */
+wban_map_attributes \map_attr;
+
 /* the attributes of csma/ca (backoff, BE, ...) */
 wban_csma_attributes	\csma;
 
@@ -131,9 +134,15 @@ int current_first_free_slot = -1;
 int unconnectedNID;
 int sequence_num_beaconG = 0; //sequence number for beacon frame, global variable
 enum MAC_STATES mac_state = MAC_SETUP; //initialize MAC states with MAC_SETUP
+
+int max_packet_tries;
+int current_packet_txs;
+int current_packet_CS_fails; // not enough time to tx in current phase(EAP,RAP,CAP,etc...)
+
 static int CWmin[8] = { 16, 16, 8, 8, 4, 4, 2, 1 };
 static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 double beacon_frame_tx_time;
+double phase_end_timeG; // end time in various Phase
 
 /* State machine conditions */
 #define IAM_BAN_HUB (node_attr.is_BANhub == OPC_TRUE)
@@ -352,7 +361,7 @@ static void wban_mac_init() {
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
 
 	op_ima_obj_attr_get (mac_attr_comp_id, "Batterie Life Extension", &mac_attr.Battery_Life_Extension);
-	op_ima_obj_attr_get (mac_attr_comp_id, "Max Packet Tries", &mac_attr.max_packet_tries);
+	op_ima_obj_attr_get (mac_attr_comp_id, "Max Packet Tries", &max_packet_tries);
 	op_ima_obj_attr_get (mac_attr_comp_id, "MGMT Buffer Size", &mac_attr.MGMT_buffer_size);
 	
 	mac_attr.wait_ack = OPC_FALSE;
@@ -439,6 +448,8 @@ static void wban_mac_init() {
 	// csma.retries_nbr = 0;
 	// csma.CCA_CHANNEL_IDLE = OPC_TRUE;
 
+	current_packet_txs = 0;
+	current_packet_CS_fails = 0;
 	//print_mac_attributes ();
 	
 	//wpan_log_file_init ();	

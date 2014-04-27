@@ -75,12 +75,13 @@ typedef struct {
 typedef struct {
 	double start_time;	// start of the using of the MAP1
 	double stop_time;	// end of the using of MAP1
-	int length;	 // asked length of the MAP1 [superframe slots]
-	int direction;	// direction of the transmission (device->PANCoord (transmit)=0, PANCoord->device(receive)=1)
+	int length;	 // asked length of the MAP [superframe slots]
+	int direction;	// direction of the transmission (node->Hub (transmit)=0, Hub->node(receive)=1)
 	int start_slot;	// start slot given by Hub and received from the beacon frame
 	Boolean MAP1_ACTIVE; //true if the MAP1 slot(s) is active
+	Boolean TX_state; // true if in TX state
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
-} wban_map1_attributes;
+} wban_map_attributes;
 
 
 
@@ -146,6 +147,7 @@ typedef struct {
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
+	Boolean IN_MAP_PHASE; //true if in MAP phase
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
 	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
