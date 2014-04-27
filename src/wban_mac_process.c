@@ -142,12 +142,14 @@ int current_packet_CS_fails; // not enough time to tx in current phase(EAP,RAP,C
 static int CWmin[8] = { 16, 16, 8, 8, 4, 4, 2, 1 };
 static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 double beacon_frame_tx_time;
+double phase_start_timeG; // start time in various Phase
 double phase_end_timeG; // end time in various Phase
+double backoff_start_time;
 
 /* State machine conditions */
 #define IAM_BAN_HUB (node_attr.is_BANhub == OPC_TRUE)
 
-#define IAM_WAITING_ACK (mac_attr.wait_ack==OPC_TRUE)
+#define IAM_WAITING_ACK (mac_attr.wait_ack == OPC_TRUE)
 
 #define BACKOFF_EXPIRED (op_intrpt_type () == OPC_INTRPT_SELF && op_intrpt_code () == BACKOFF_EXPIRATION_CODE) 
 #define	DEFAULT_INTRPT	(op_intrpt_type () == OPC_INTRPT_SELF && op_intrpt_code () == DEFAULT_CODE) 

@@ -17,6 +17,7 @@ typedef struct {
 	int	sender_address; // sender address of the node, 48 bits, for beacon frame
 
 	int ban_id;	// ban ID
+	int hub_id; //Hub ID
 	int unconnectedNID; // temporary unconnected NID
 
 	Boolean is_BANhub; // state if the node is a Hub or not
@@ -99,10 +100,11 @@ typedef struct {
 /* define the backoff parameters */
 typedef struct {
 	int MAX_CSMA_BACKOFF; // maximum number of Backoff (macMaxCSMABackoffs)
-	int macMinBE; // Minimum Backoff Exponent
 	int NB; // current number of backoff
 	int BE; // Backoff exponent
 	int CW; // Contention Window
+	Boolean CW_double;
+	int backoff_counter;
 	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wban_csma_attributes;
@@ -165,6 +167,7 @@ typedef struct {
 	int max_packet_tries;
 	int MGMT_buffer_size;
 	Boolean wait_ack;	// acknowledged packet?
+	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;
 

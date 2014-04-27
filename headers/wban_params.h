@@ -104,7 +104,7 @@
 
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
-
+#define I_ACK_PPDU_SIZE_BITS (80+121)
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,
