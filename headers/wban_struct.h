@@ -1,27 +1,5 @@
-
-/* define the general node parameters */
-typedef struct {
-	Objid	parent_id; // ID of the node
-	Objid	objid;	// ID of the module which received the packets
-	Objid   my_battery; // Battery module ID
-	Objid   gts_traffic_source; //GTS Traffic Source module ID
-	int		mac_address; // mac address of the node
-	char name [20];
-	double	x; // X coordinate of the node 
-	double	y; // Y coordinate of the node
-	double altitude; // The altitude of the node
-	Boolean is_PANcoordinator; // state if the node is a PAN Coordinator or not
-	char Device_Mode[20]; // Can be a End Device or a PAN Coordinator
-	int PANcoordinator_mac_address; // the MAC address of the WPAN coordinator
-	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
-	
-	Boolean is_GTS_Permit;	// if PANCoordinator accepts GTS request	
-	PrgT_List* GTS_list_PC;	// list of allocated GTS slots on the PANCoordinator node
-	
-	int beacon_order;
-	int superframe_order;
-	int pan_id;		
-} wpan_node_attributes;
+#ifndef BAN_STRUCT_H
+#define BAN_STRUCT_H
 
 /* define the general node parameters */
 typedef struct {
@@ -30,33 +8,27 @@ typedef struct {
 	Objid   my_battery; // Battery module ID
 
 	char 	name [20];
-	int		sender_address; // sender address of the node, 48 bits, for beacon frame
-	int		sender_id; // Sender ID of the node
-	int		recipient_id; // Recipient ID of the node
-	int 	node_id; // node ID
-	int 	ban_id;	// ban ID
-	int 	connectedHID;
-	int 	connectedNID;
-
-	double	x; // X coordinate of the node 
+	double	x; // X coordinate of the node
 	double	y; // Y coordinate of the node
 	double altitude; // The altitude of the node
+	
+	double data_rate; // WBAN Data Rate
 
-	Boolean is_PANcoordinator; // state if the node is a PAN Coordinator or not
+	int	sender_address; // sender address of the node, 48 bits, for beacon frame
+
+	int ban_id;	// ban ID
+	int unconnectedNID; // temporary unconnected NID
+
 	Boolean is_BANhub; // state if the node is a Hub or not
 	char Device_Mode[20]; // Can be a Node or a Hub
 	
-	int PANcoordinator_mac_address; // the MAC address of the WPAN coordinator
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
-	
-	Boolean is_GTS_Permit;	// if PANCoordinator accepts GTS request	
-	PrgT_List* GTS_list_PC;	// list of allocated GTS slots on the PANCoordinator node
-	
+	int traffic_destination_id;	// the destination ID for Traffic Source data transmission
+} wban_node_attributes;
 
-	int beacon_order;
-	int superframe_order;
-	
-	//beacon related
+/* define the beacon frame parameters */
+typedef struct {
+	int	sender_address; // 48 bits
 
 	int beacon_period_length;
 	int allocation_slot_length;
@@ -65,8 +37,19 @@ typedef struct {
 	int rap2_start;
 	int rap2_end;
 	int inactive_duration;
-	
-} wban_node_attributes;
+} beacon_attributes;
+
+/* define the connection request parameters */
+typedef struct {
+	int recipient_address;
+	int	sender_address; // 48 bits
+	int requested_wakeup_phase;
+	int requested_wakeup_period;
+
+	int allocation_id;
+	int minimum_length;
+	int allocation_length;
+} connection_request_attributes;
 
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
 typedef struct {
@@ -87,6 +70,18 @@ typedef struct {
 	Boolean GTS_ACTIVE; //true if the GTS slot(s) is active
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wpan_gts_attributes;
+
+/* define the MAP1 parameters of the node */
+typedef struct {
+	double start_time;	// start of the using of the MAP1
+	double stop_time;	// end of the using of MAP1
+	int length;	 // asked length of the MAP1 [superframe slots]
+	int direction;	// direction of the transmission (device->PANCoord (transmit)=0, PANCoord->device(receive)=1)
+	int start_slot;	// start slot given by Hub and received from the beacon frame
+	Boolean MAP1_ACTIVE; //true if the MAP1 slot(s) is active
+	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
+} wban_map1_attributes;
+
 
 
 /* define the backoff parameters */
@@ -123,27 +118,52 @@ typedef struct {
 
 /* define the superframe structure parameters */
 typedef struct {
-	int slot_duration; // the slot duration in symbol
-	int SD; // the superframe duration in symbol
-	int BI; // the beacon interval in symbol
-	int sleep_period; // the inactive portion in symbol
-	int current_slot; // the current slot in the active portion of the superframe from 0 to 15
+	int slot_duration; // the slot duration in slots
+	double slot_length2sec; // one slot length in sec
+	int SD; // the superframe duration in slots
+	int BI; // the beacon interval in slots
+	int sleep_period; // the inactive portion in slots
+	int current_slot; // the current slot in the active portion of the superframe from 0 to beacon_period_length-1
+	int current_first_free_slot;
+
+	int beacon_period_length; // beacon period length in slots -all
+	int rap1_start;
+	int rap1_end;
+	int rap2_start;
+	int rap2_end;
+	int inactive_duration;
+
+	double beacon_frame_tx_time;
+	double eap1_length2sec;
+	double rap1_length2sec;
+	double map1_length2sec;
+	double eap2_length2sec;
+	double rap2_length2sec;
+	double map2_length2sec;
+
 	double BI_Boundary; // Specfiy the time at which the beacon frame has been created to synchronize all node to this time reference
-	int Final_CAP_Slot; // Final slot in the CAP
+	
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
-	Boolean CFP_ACTIVE;	// Contention Free Period (GTS) is active
+	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
 	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
-} wpan_superframe_strucuture;
-
-
+} wban_superframe_strucuture;
 
 /* define the MAC parameters */
 typedef struct {
+	Objid	objid;	// ID of the module which received the packets
 	Boolean Battery_Life_Extension; // if no BE = macMinBE, if yes BE = min(2,macMinBE);
+
+	int	sender_id; // Sender ID of the node
+	int	recipient_id; // Recipient ID of the node
+	int ban_id;	// ban ID
+
+	int max_packet_tries;
+	int MGMT_buffer_size;
 	Boolean wait_ack;	// acknowledged packet?
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
-} wpan_mac_attributes;
+} wban_mac_attributes;
 
+#endif

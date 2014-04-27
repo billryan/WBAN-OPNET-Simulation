@@ -1,3 +1,6 @@
+#ifndef BAN_PARAMS_H
+#define BAN_PARAMS_H
+
 /** PHY Layer constatns		**/
 #define aMaxPHYPacketSize_Octet 	127								// size of PSDU
 #define aMaxPHYPacketSize_Bits 		(8*aMaxPHYPacketSize_Octet)		// 1016 bits
@@ -16,27 +19,34 @@
 #define aMaxMACFrameSize_Bits  (aMaxPHYPacketSize_Bits-MAC_HEADER_SIZE)	//MAC Frame Payload (MSDU) size
 // 802.15.6 related 
 #define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
+#define aMaxBeaconPeriodLength_Slots 256 //0-256 Slots
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
-#define pAllocationSlotMin 500 //500 us for NB PHY
-#define pAllocationSlotResolution 500 //500 us for NB PHY
+#define pAllocationSlotMin 500 //500 μs for NB PHY
+#define pAllocationSlotResolution 500 //500 μs for NB PHY
 #define allocationSlotLength 19 //for NB PHY, L=19 means that 10 ms per slot
-#define allocationSlotLength_ms 10 //10 ms default
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution)/1000.0) //10 ms default
 
 // constants related to Intra-Frame Spacing IFS 
 #define aMaxSIFSFrameSize_Bits	(18*8)
 #define aMinLIFSPeriod	40
 #define aMinSIFSPeriod	12
 
-#define aGTSDescPersistenceTime	4
-#define aMinCAPLength	440	//Symbols
+// 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
+// Symbol Rate
+#define SYMBOL_RATE 600.0 // Ksps
+#define pSIFS 75 // μs
+
+// CSMA/CA
+// pCSMASlotLength = pCCATime + pCSMAMACPHYTime
+// pCCATime = 63 / Symbol Rate
+// pCSMAMACPHYTime = 40 μs
+#define pCCATime (63 / SYMBOL_RATE) // ms
+#define pCSMAMACPHYTime 40 // 40 μs
+#define pCSMASlotLength2Sec (pCCATime * 0.001 + pCSMAMACPHYTime * 0.000001)
 /* 802.15.6 related MAC parameters */
-static int CWmin[8] = { 16, 16, 8, 8, 4, 4, 2, 1 };
-static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 
 /** MAC Layer attributes		**/
 #define macAckWaitDuration 54	// The max number of symbols to wait for an ACK
-
-
 
 /** Frame Types Definitions according to the standard IEEE 802.15.4 2003 - p.112, Tab.65 **/
 #define BEACON_FRAME_TYPE 0
@@ -65,15 +75,18 @@ static int CWmax[8] = { 64, 32, 32, 16, 16, 8, 8, 4};
 
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
+#define PAN_COORDINATOR_ADDRESS -1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
 #define UNCONNECTED_NID 1 // For unicast from/to unconnected nodes in a BAN
 #define BROADCAST_NID 255 //For broadcast to all nodes and hubs
 //#define HID 31 				//Hub identifier for a BAN
-int current_free_connected_NID = 32; // start assigning connected NID from ID 32
+//int unconnectedNID; // start assigning unconnectedNID from ID 1
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
+
+
 
 #define Symbol2Bits 4
 
@@ -104,7 +117,7 @@ enum USER_PRIORITY {
 	UP7 = 7
 };
 
-enum MacStates {
+enum MAC_STATES {
 	MAC_SETUP = 1000,
 	MAC_RAP = 1001,
 	MAC_FREE_TX_ACCESS = 1002,
@@ -112,3 +125,39 @@ enum MacStates {
 	MAC_BEACON_WAIT = 1009,
 	MAC_SLEEP = 1010
 };
+
+enum AcknowledgementPolicy_type {
+    N_ACK_POLICY = 1,
+    I_ACK_POLICY = 2,
+    L_ACK_POLICY = 3,
+    B_ACK_POLICY = 4
+};
+
+enum Frame_type {
+    MANAGEMENT = 1,
+    CONTROL = 2,
+    DATA = 3
+};
+
+enum Frame_subtype {
+    RESERVED = 0,
+    BEACON = 1,
+    SECURITY_ASSOCIATION = 2,
+    SECURITY_DISASSOCIATION = 3,
+    PTK = 4,
+    GTK = 5,
+    CONNECTION_REQUEST = 6,
+    CONNECTION_ASSIGNMENT = 7,
+    DISCONNECTION = 8,
+    COMMAND = 9,
+    I_ACK = 10,
+    B_ACK = 11,
+    I_ACK_POLL = 12,
+    B_ACK_POLL = 13,
+    POLL = 14,
+    T_POLL = 15,
+    WAKEUP = 16,
+    BEACON2 = 17
+};
+
+#endif
