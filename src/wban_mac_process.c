@@ -51,7 +51,7 @@ Boolean	\waiting_for_first_beacon;
 /* Input and output streams		*/
 #define STRM_FROM_RADIO_TO_MAC	0
 #define STRM_FROM_MAC_TO_RADIO	0
-#define STRM_FROM_UP_TO_MAC		1
+#define STRM_FROM_TRAFFIC_UP_TO_MAC		1
 #define STRM_FROM_MAC_TO_SINK	1
 
 
@@ -304,7 +304,7 @@ static void wban_mac_init() {
 //	Objid csma_attr_id;
 	Objid mac_attr_comp_id;
 	Objid mac_attr_id;
-//	Objid traffic_source_up_id;
+	Objid traffic_source_up_id;
 	//Objid queue_objid;
 	//Objid subq_objid;
 	
@@ -340,7 +340,13 @@ static void wban_mac_init() {
 	if (node_attr.sender_address == -2) {
 		node_attr.sender_address = node_attr.objid;
 	}
-
+	
+	/* obtain object ID of the Traffic Source node */
+	traffic_source_up_id = op_id_from_name(node_attr.objid, OPC_OBJTYPE_PROC, "Traffic Source_UP");
+	
+	/* obtain destination ID for data transmission  */
+	op_ima_obj_attr_get (traffic_source_up_id, "Destination ID", &node_attr.traffic_dest_id);	
+	
 	/* get the MAC settings */
 	op_ima_obj_attr_get (mac_attr.objid, "MAC Attributes", &mac_attr_id);
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
@@ -439,7 +445,6 @@ static void wban_mac_init() {
 		
 	//fprint_mac_attributes();
 	
-	printf("Debug the wban_mac_init Function.\n");
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -682,7 +687,76 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 	FRET(OPC_FALSE);
 }
 
- 
+
+/*--------------------------------------------------------------------------------
+ * Function: wban_encapsulate_and_enqueue_data_frame
+ *
+ * Description:	encapsulates the MSDU into a MAC frame and enqueues it.      
+ *             
+ * Input:	msdu - MSDU (MAC Frame Payload)
+ *			ack - 
+ *			dest_id - the destionation ID for packet
+ *--------------------------------------------------------------------------------*/
+
+static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum AcknowledgementPolicy_type ackPolicy, int dest_id) {
+	Packet* data_frame_msdu;
+	Packet* data_frame_mpdu;	
+	int seq_num;
+	int user_priority;
+
+	/* Stack tracing enrty point */
+	FIN(wban_encapsulate_and_enqueue_data_frame);
+
+	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
+	op_pk_nfd_get (data_frame_up, "User Priority", &user_priority);
+	op_pk_nfd_get (data_frame_up, "App Sequence Number", &seq_num);
+
+	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
+	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
+
+	/* generate the sequence number for the packet */
+	// seq_num = wban_update_sequence_number();
+
+	op_pk_nfd_set (data_frame_mpdu, "Ack Policy", ackPolicy);
+	op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
+	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
+	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
+	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
+
+	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
+	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
+
+	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
+	op_pk_nfd_set (data_frame_mpdu, "Sender ID", mac_attr.sender_id);
+	op_pk_nfd_set (data_frame_mpdu, "BAN ID", mac_attr.ban_id);
+	
+	op_pk_nfd_set_pkt (data_frame_mpdu, "MAC Frame Payload", data_frame_msdu); // wrap data_frame_msdu (MSDU) in MAC Frame (MPDU)
+
+	/* put it into the queue with priority waiting for transmission */
+	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
+	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_PRIO) == OPC_QINS_OK) {
+		if (enable_log) {
+			fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ackPolicy);
+			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %s] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ackPolicy);
+		}
+	} else {
+		if (enable_log) {
+			fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
+			printf (" [Node %s] t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
+		}
+		
+		/* destroy the packet */
+		op_pk_destroy (data_frame_mpdu);
+	}
+
+	/* try to send the packet */
+	op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+
 /*--------------------------------------------------------------------------------
  * Function:	wban_extract_beacon_frame
  *
@@ -943,7 +1017,6 @@ static void wban_schedule_next_beacon() {
 		printf (" [Node %s] t=%f  -> Schedule Next Beacon at %f - End of RAP1 : %f\n\n", node_attr.name, op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec, SF.BI_Boundary+(SF.rap1_end+1)*SF.slot_length2sec);
 	}
 
-	
 	/* Stack tracing exit point */
 	FOUT;	
 }
@@ -1004,73 +1077,6 @@ static void wban_send_connection_request_frame () {
 }
 
 
-/*--------------------------------------------------------------------------------
- * Function: wban_encapsulate_and_enqueue_data_frame
- *
- * Description:	encapsulates the MSDU into a MAC frame and enqueues it.      
- *             
- * Input:	msdu - MSDU (MAC Frame Payload)
- *			ack - 
- *			dest_id - the destionation ID for packet
- *--------------------------------------------------------------------------------*/
-
-static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum AcknowledgementPolicy_type ackPolicy, int dest_id) {
-	Packet* data_frame_msdu;
-	Packet* data_frame_mpdu;	
-	int seq_num;
-	int user_priority;
-
-	/* Stack tracing enrty point */
-	FIN(wban_encapsulate_and_enqueue_data_frame);
-
-	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
-	op_pk_nfd_get (data_frame_up, "User Priority", &user_priority);
-	op_pk_nfd_get (data_frame_up, "App Sequence Number", &seq_num);
-
-	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
-	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
-
-	/* generate the sequence number for the packet */
-	// seq_num = wban_update_sequence_number();
-
-	op_pk_nfd_set (data_frame_mpdu, "Ack Policy", ackPolicy);
-	op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
-	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
-	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
-	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
-
-	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
-	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
-
-	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
-	op_pk_nfd_set (data_frame_mpdu, "Sender ID", mac_attr.sender_id);
-	op_pk_nfd_set (data_frame_mpdu, "BAN ID", mac_attr.ban_id);
-	
-	op_pk_nfd_set_pkt (data_frame_mpdu, "MAC Frame Payload", data_frame_msdu); // wrap data_frame_msdu (MSDU) in MAC Frame (MPDU)
-
-	/* put it into the queue with priority waiting for transmission */
-	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
-	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_PRIO) == OPC_QINS_OK) {
-		if (enable_log) {
-			fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ackPolicy);
-			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %s] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ackPolicy);
-		}
-	} else {
-		if (enable_log) {
-			fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
-			printf (" [Node %s] t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
-		}
-		
-		/* destroy the packet */
-		op_pk_destroy (data_frame_mpdu);
-	}
-
-	/* try to send the packet */
-	op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
-	
-	/* Stack tracing exit point */
-	FOUT;
-}
 
 
 /*--------------------------------------------------------------------------------
