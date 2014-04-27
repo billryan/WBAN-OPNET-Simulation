@@ -23,7 +23,7 @@ typedef struct {
 	char Device_Mode[20]; // Can be a Node or a Hub
 	
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
-	int traffic_destination_id;	// the destination ID for Traffic Source data transmission
+	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
 } wban_node_attributes;
 
 /* define the beacon frame parameters */

@@ -1117,15 +1117,15 @@ static int wban_update_sequence_number() {
 static void wban_mac_interrupt_process() {
 	
 	Packet* frame_MPDU;
-//	Packet* frame_MPDU_copy;
-//	Packet* frame_MPDU_to_send;
-//	Packet* frame_PPDU;
-//	Packet* ack_MPDU;
-//	double tx_time;
-//	int ack_request;
-//	int seq_num;
-//	int dest_address;
-	
+	Packet* frame_MPDU_copy;
+	Packet* frame_MPDU_to_send;
+	Packet* frame_PPDU;
+	Packet* ack_MPDU;
+	double tx_time;
+	int ack_request;
+	int seq_num;
+	int dest_address;
+
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
 	
