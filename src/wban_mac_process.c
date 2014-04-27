@@ -311,8 +311,8 @@ static void wban_mac_init() {
 	Objid beacon_attr_id;
 	Objid conn_req_attr_comp_id;
 	Objid conn_req_attr_id;
-//	Objid csma_attr_comp_id;
-//	Objid csma_attr_id;
+	Objid csma_attr_comp_id;
+	Objid csma_attr_id;
 	Objid mac_attr_comp_id;
 	Objid mac_attr_id;
 	Objid traffic_source_up_id;
@@ -501,383 +501,6 @@ static void wban_log_file_init() {
 }
 
 /*--------------------------------------------------------------------------------
- * Function:	wban_parse_incoming_frame
- *
- * Description:	parse the incoming packet and make the adequate processing
- *
- * No parameters
- *--------------------------------------------------------------------------------*/
-
-static void wban_parse_incoming_frame() {
-
-	Packet* frame_MPDU;
-	Packet* rcv_frame;
-	int Stream_ID;
-	int ban_id;
-	int recipient_id;
-	int sender_id;
-	int ack_policy_fd;
-	int eap_indicator_fd;
-	int frame_type_fd;
-	int frame_subtype_fd;
-	int beacon2_enabled_fd;
-	int sequence_number_fd;
-	int inactive_fd;
-	//int source_address;
-	//int dest_address;
-	double packet_size;
-
-	/* Stack tracing enrty point */
-	FIN(wban_parse_incoming_frame);
-
-	/* get the packet from the input stream	*/
-	Stream_ID = op_intrpt_strm();
-	rcv_frame = op_pk_get (Stream_ID);	
-	
-	frame_type_fd = 0;
-	/* check from what input stream the packet is received and do the right processing	*/		
-	switch (Stream_ID) {
-		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
-		{
-
-			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
-			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
-
-			/*update the battery*/
-			packet_size = (double) op_pk_total_size_get(rcv_frame);
-			wpan_battery_update_rx (packet_size, frame_type_fd);
-			
-			op_pk_nfd_get (frame_MPDU, "BAN ID", &ban_id);
-			op_pk_nfd_get (frame_MPDU, "Recipient ID", &recipient_id);
-			op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
-
-			// filter the incoming BAN packet - not implemented entirely
-    		if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
-    			FOUT;
-    		}
-
-			/*acquire "Frame Type" field*/
-			op_pk_nfd_get (frame_MPDU, "Frame Type", &frame_type_fd);
-			op_pk_nfd_get (frame_MPDU, "Frame Subtype", &frame_subtype_fd);
-			op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy_fd);
-			op_pk_nfd_get (frame_MPDU, "EAP Indicator", &eap_indicator_fd);
-			op_pk_nfd_get (frame_MPDU, "B2", &beacon2_enabled_fd);
-			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
-			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
-
-			op_pk_destroy (rcv_frame);
-			
-			switch (frame_type_fd) {
-				case DATA: /* Handle data packets */
-					if (enable_log) {
-						fprintf (log,"t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
-						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
-					}
-					wban_extract_data_frame (frame_MPDU);
-					break;
-				case MANAGEMENT: /* Handle management packets */
-			 		if (enable_log) {
-						fprintf (log,"t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
-						printf (" [Node %s] t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
-					}
-					switch (frame_subtype_fd) {
-						case BEACON: 
-							if (enable_log) {
-								fprintf (log,"t=%f  -> Beacon Frame Reception From @%d \n\n", op_sim_time(), sender_id);
-								printf (" [Node %s] t=%f  -> Beacon Frame Reception From @%d \n\n", node_attr.name, op_sim_time(), sender_id);
-							}
-							wban_extract_beacon_frame (frame_MPDU);
-							break;
-						case SECURITY_ASSOCIATION: 
-							// not implemented
-							break;
-						case SECURITY_DISASSOCIATION:
-							// not implemented
-							break;
-						case PTK:
-							// not implemented
-							break;
-						case GTK:
-							// not implemented
-							break;
-						case CONNECTION_REQUEST:
-							// not implemented
-							break;
-						case CONNECTION_ASSIGNMENT:
-							// not implemented
-							break;
-						case DISCONNECTION:
-							// not implemented
-							break;
-						case COMMAND:
-							// not implemented
-							break;
-					}
-					break;
-				case  CONTROL: /* Handle control packets */
-					switch (frame_subtype_fd) {
-						case I_ACK:
-							// not implemented
-							break;
-						case B_ACK:
-							// not implemented
-							break;
-						case I_ACK_POLL:
-							// not implemented
-							break;
-						case B_ACK_POLL:
-							// not implemented
-							break;
-						case POLL:
-							// not implemented
-							break;
-						case T_POLL:
-							// not implemented
-							break;
-					}
-				default:	/*OTHER FRAME TYPES*/
-					break;
-			}
-			break;
-		};
-	
-		default :
-		{
-		};
-	}
-
-	/* Stack tracing exit point */
-	FOUT;
-}
-
-
-/*------------------------------------------------------------------------------
- * Function:	is_packet_for_me
- *
- * Description:	filter the incoming BAN packet
- *              
- *
- * Input: frame_MPDU - the pointer to the frame (MPDU) which 
- * Output: TRUE if the packet is for me
- *--------------------------------------------------------------------------------*/
-
-static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id, int sender_id)
-{
-	/* Stack tracing enrty point */
-	FIN(is_packet_for_me);
-	
-
-	if (node_attr.ban_id != ban_id) {
-		if (enable_log) {
-			fprintf (log,"The packet from BAN ID %d is not the same with my BAN ID %d.\n", ban_id, node_attr.ban_id);
-			printf (" [Node %s] The packet from BAN ID %d is not the same with my BAN ID %d.\n", node_attr.name, ban_id, node_attr.ban_id);
-		}
-
-		/* Stack tracing exit point */
-		FRET(OPC_FALSE);
-	}
-
-	/*Check if the frame is loop*/
-	if (mac_attr.sender_id == sender_id) {
-		if (enable_log) {
-			fprintf(log,"t=%f  -> Loop: DISCARD FRAME \n\n",op_sim_time());
-			printf (" [Node %s] t=%f  -> Loop: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
-		}
-		op_pk_destroy (frame_MPDU);
-
-		/* Stack tracing exit point */
-		FRET(OPC_FALSE);
-	}
-
-	if ((mac_attr.sender_id == recipient_id) || (BROADCAST_NID == recipient_id)) {
-		/* Stack tracing exit point */
-		FRET(OPC_TRUE);
-	} else {
-		/* Stack tracing exit point */
-		FRET(OPC_FALSE);
-	}
-	/* Stack tracing exit point */
-	FRET(OPC_FALSE);
-}
-
-
-/*--------------------------------------------------------------------------------
- * Function: wban_encapsulate_and_enqueue_data_frame
- *
- * Description:	encapsulates the MSDU into a MAC frame and enqueues it.      
- *             
- * Input:	msdu - MSDU (MAC Frame Payload)
- *			ack - 
- *			dest_id - the destionation ID for packet
- *--------------------------------------------------------------------------------*/
-
-static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum AcknowledgementPolicy_type ackPolicy, int dest_id) {
-	Packet* data_frame_msdu;
-	Packet* data_frame_mpdu;	
-	int seq_num;
-	int user_priority;
-
-	/* Stack tracing enrty point */
-	FIN(wban_encapsulate_and_enqueue_data_frame);
-
-	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
-	op_pk_nfd_get (data_frame_up, "User Priority", &user_priority);
-	op_pk_nfd_get (data_frame_up, "App Sequence Number", &seq_num);
-
-	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
-	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
-
-	/* generate the sequence number for the packet */
-	// seq_num = wban_update_sequence_number();
-
-	op_pk_nfd_set (data_frame_mpdu, "Ack Policy", ackPolicy);
-	op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
-	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
-	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
-	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
-
-	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
-	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
-
-	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
-	op_pk_nfd_set (data_frame_mpdu, "Sender ID", mac_attr.sender_id);
-	op_pk_nfd_set (data_frame_mpdu, "BAN ID", mac_attr.ban_id);
-	
-	op_pk_nfd_set_pkt (data_frame_mpdu, "MAC Frame Payload", data_frame_msdu); // wrap data_frame_msdu (MSDU) in MAC Frame (MPDU)
-
-	/* put it into the queue with priority waiting for transmission */
-	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
-	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_PRIO) == OPC_QINS_OK) {
-		if (enable_log) {
-			fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ackPolicy);
-			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %s] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ackPolicy);
-		}
-	} else {
-		if (enable_log) {
-			fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
-			printf (" [Node %s] t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
-		}
-		
-		/* destroy the packet */
-		op_pk_destroy (data_frame_mpdu);
-	}
-
-	/* try to send the packet */
-	op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
-	
-	/* Stack tracing exit point */
-	FOUT;
-}
-
-
-/*--------------------------------------------------------------------------------
- * Function:	wban_extract_beacon_frame
- *
- * Description:	extract the beacon frame from the MAC frame received from the network
- *              and schedule the next beacon frame
- *
- * Input :  mac_frame - the received MAC frame
- *--------------------------------------------------------------------------------*/
-
-static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
-
-	Packet* beacon_MSDU_rx;
-	int rcv_sender_id;
-	double beacon_frame_creation_time;
-	double beacon_TX_time;
-	int sequence_number_fd;
-	int eap_indicator_fd;
-	int beacon2_enabled_fd;
-	
-	/* Stack tracing enrty point */
-	FIN(wban_extract_beacon_frame);
-
-	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
-	
-	// if I'm a End Device, I get the information and synchronize myself
-	if (!node_attr.is_BANhub) {
-		op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
-		op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
-		op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
-		op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
-
-		if (node_attr.ban_id + 15 != rcv_sender_id) {
-			if (enable_log) {
-				fprintf(log,"t=%f  -> Beacon Frame Reception  - but not from Hub. \n",op_sim_time());	
-				printf(" [Node %s] t=%f  -> Beacon Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
-			}
-
-			/* Stack tracing exit point */
-			FOUT;
-		} else {
-			if (enable_log) {
-				printf (" [Node %s] t=%f  -> Beacon Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
-				printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
-			}
-		}
-		op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.sender_address);
-		op_pk_nfd_get (beacon_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
-		op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 End", &beacon_attr.rap1_end);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 Start", &beacon_attr.rap2_start);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 End", &beacon_attr.rap2_end);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 Start", &beacon_attr.rap1_start);
-		op_pk_nfd_get (beacon_MSDU_rx, "Inactive Duration", &beacon_attr.inactive_duration);
-
-		// update with actual Hub address - since we fixed it on init
-		// if (my_attributes.traffic_destination_address == PAN_COORDINATOR_ADDRESS)
-		// 	my_attributes.traffic_destination_address = my_attributes.PANcoordinator_mac_address;
-		
-		beacon_frame_creation_time = op_pk_creation_time_get (beacon_MSDU_rx);
-
-		beacon_TX_time = Bits2Sec(op_pk_total_size_get(beacon_MPDU_rx), node_attr.data_rate);
-		
-		// update the superframe parameters
-		SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
-		SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
-		SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
-
-		SF.slot_length2sec = allocationSlotLength2ms / 1000.0; // transfer allocation slot length from ms to sec.
-		SF.rap1_start = beacon_attr.rap1_start;
-		SF.rap1_end = beacon_attr.rap1_end;
-		SF.rap2_start = beacon_attr.rap2_start;
-		SF.rap2_end = beacon_attr.rap2_end;
-		SF.current_slot = 0;
-		SF.current_first_free_slot = beacon_attr.rap1_end + 1;
-
-		SF.BI_Boundary = beacon_frame_creation_time;
-		beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_MPDU_rx), node_attr.data_rate);
-		SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
-		SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
-		SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
-
-		op_pk_destroy (beacon_MSDU_rx);
-		op_pk_destroy (beacon_MPDU_rx);
-
-		if (UNCONNECTED == mac_attr.sender_id) {
-			/* We will try to connect to this BAN  if our scheduled access length
-			 * is NOT set to unconnected (-1). If it is set to 0, it means we are
-			 * establishing a sleeping pattern and waking up only to hear beacons
-			 * and are only able to transmit in RAP periods.
-			 */
-			if (conn_req_attr.allocation_length > 0) {
-				// we are unconnected, and we need to connect to obtain scheduled access
-				// we will create and send a connection request
-			}
-		}
-		if (SF.rap1_start > 0) {
-
-		}
-		op_intrpt_schedule_self (op_sim_time(), DEFAULT_CODE);
-		op_intrpt_schedule_self (op_sim_time(), START_OF_EAP1_PERIOD_CODE);
-	
-		wban_schedule_next_beacon();
-	}
-	/* Stack tracing exit point */
-	FOUT;	
-}
-
-/*--------------------------------------------------------------------------------
  * Function:	wban_send_beacon_frame
  *
  * Description:	Create a beacon frame and send it to the Radio  
@@ -1034,63 +657,51 @@ static void wban_schedule_next_beacon() {
 	FOUT;	
 }
 
-/*--------------------------------------------------------------------------------
- * Function:	wban_send_connection_request_frame
+/*------------------------------------------------------------------------------
+ * Function:	is_packet_for_me
  *
- * Description:	Create a connection request frame and send it to the Radio (wban_mac) 
+ * Description:	filter the incoming BAN packet
+ *              
  *
- * No parameters
+ * Input: frame_MPDU - the pointer to the frame (MPDU) which 
+ * Output: TRUE if the packet is for me
  *--------------------------------------------------------------------------------*/
-
-static void wban_send_connection_request_frame () {
-	Packet* connection_request_MSDU;
-	Packet* connection_request_MPDU;
-	Packet* connection_request_PPDU;
-
+static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id, int sender_id) {
 	/* Stack tracing enrty point */
-	FIN(wban_send_connection_request_frame);
-
-	/* create a connection request frame */
-	connection_request_MSDU = op_pk_create_fmt ("wban_connection_request_frame_format");
+	FIN(is_packet_for_me);
 	
-	/* set the fields of the connection_request frame */
-	op_pk_nfd_set (connection_request_MSDU, "Allocation Length", conn_req_attr.allocation_length);
+	if (node_attr.ban_id != ban_id) {
+		if (enable_log) {
+			fprintf (log,"The packet from BAN ID %d is not the same with my BAN ID %d.\n", ban_id, node_attr.ban_id);
+			printf (" [Node %s] The packet from BAN ID %d is not the same with my BAN ID %d.\n", node_attr.name, ban_id, node_attr.ban_id);
+		}
 
-	/* create a MAC frame (MPDU) that encapsulates the connection_request payload (MSDU) */
-	connection_request_MPDU = op_pk_create_fmt ("wban_mac_pkt_format");
+		/* Stack tracing exit point */
+		FRET(OPC_FALSE);
+	}
 
-	op_pk_nfd_set (connection_request_MPDU, "Ack Policy", I_ACK_POLICY);
-	op_pk_nfd_set (connection_request_MPDU, "EAP Indicator", 1); // EAP1 enabled
-	op_pk_nfd_set (connection_request_MPDU, "Frame Subtype", CONNECTION_REQUEST);
-	op_pk_nfd_set (connection_request_MPDU, "Frame Type", MANAGEMENT);
-	op_pk_nfd_set (connection_request_MPDU, "B2", 1); // beacon2 enabled
+	/*Check if the frame is loop*/
+	if (mac_attr.sender_id == sender_id) {
+		if (enable_log) {
+			fprintf(log,"t=%f  -> Loop: DISCARD FRAME \n\n",op_sim_time());
+			printf (" [Node %s] t=%f  -> Loop: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
+		}
+		op_pk_destroy (frame_MPDU);
 
-	op_pk_nfd_set (connection_request_MPDU, "Sequence Number", 0);
-	op_pk_nfd_set (connection_request_MPDU, "Inactive", beacon_attr.inactive_duration); // connection_request and connection_request2 frame used
+		/* Stack tracing exit point */
+		FRET(OPC_FALSE);
+	}
 
-	op_pk_nfd_set (connection_request_MPDU, "Recipient ID", mac_attr.recipient_id);
-	op_pk_nfd_set (connection_request_MPDU, "Sender ID", mac_attr.sender_id);
-	op_pk_nfd_set (connection_request_MPDU, "BAN ID", mac_attr.ban_id);
-	
-	op_pk_nfd_set_pkt (connection_request_MPDU, "MSDU", connection_request_MSDU); // wrap connection_request payload (MSDU) in MAC Frame (MPDU)
-
-	/* create PHY frame (PPDU) that encapsulates connection_request MAC frame (MPDU) */
-	connection_request_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
-
-	op_pk_nfd_set (connection_request_PPDU, "RATE", node_attr.data_rate);
-	/* wrap connection_request MAC frame (MPDU) in PHY frame (PPDU) */
-	op_pk_nfd_set_pkt (connection_request_PPDU, "PSDU", connection_request_MPDU);
-	op_pk_nfd_set (connection_request_PPDU, "LENGTH", ((double) op_pk_total_size_get(connection_request_MPDU))/8); //[bytes]	
-	
-	wpan_battery_update_tx ((double) op_pk_total_size_get(connection_request_PPDU));
-	//op_pk_send (connection_request_PPDU, STRM_FROM_MAC_TO_RADIO);
-	
+	if ((mac_attr.sender_id == recipient_id) || (BROADCAST_NID == recipient_id)) {
+		/* Stack tracing exit point */
+		FRET(OPC_TRUE);
+	} else {
+		/* Stack tracing exit point */
+		FRET(OPC_FALSE);
+	}
 	/* Stack tracing exit point */
-	FOUT;
+	FRET(OPC_FALSE);
 }
-
-
-
 
 /*--------------------------------------------------------------------------------
  * Function:	wban_update_sequence_number()
@@ -1099,7 +710,6 @@ static void wban_send_connection_request_frame () {
  *
  * No parameters  
  *--------------------------------------------------------------------------------*/
-
 static int wban_update_sequence_number() {
 	
 	int seq_num;
@@ -1118,270 +728,6 @@ static int wban_update_sequence_number() {
 	FRET(seq_num);
 }
 
-
-/*--------------------------------------------------------------------------------
- * Function: wban_mac_interrupt_process
- *
- * Description:	processes all the interrupts that occurs in an unforced state      
- *             
- * No parameters  
- *--------------------------------------------------------------------------------*/
-
-static void wban_mac_interrupt_process() {
-	
-	Packet* frame_MPDU;
-	Packet* frame_MPDU_copy;
-	Packet* frame_MPDU_to_send;
-	Packet* frame_PPDU;
-	Packet* ack_MPDU;
-	double tx_time;
-	int ack_request;
-	int seq_num;
-	int dest_address;
-
-	/* Stack tracing enrty point */
-	FIN(wban_mac_interrupt_process);
-	
-	switch (op_intrpt_type()) {
-	
-		case OPC_INTRPT_STRM: // incomming packet
-		{
-			wban_parse_incoming_frame ();	// parse the incoming packet
-			break;
-		};/*end of OPC_INTRPT_STRM */
-	
-		case OPC_INTRPT_SELF:
-		{
-			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
-				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
-				{
-					if (enable_log) {
-						fprintf (log,"t=%f  -> ++++++++++ END OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time());
-						printf (" [Node %s] t=%f  -> ++++++++++  END OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
-					}
-					
-					if (IAM_BAN_HUB) {
-						// SF.Final_CAP_Slot = Final_CAP_slot_next; /* value for the next superframe. End Device will obtain this value from beacon */
-						wban_send_beacon_frame();
-					}
-					break;
-				};/*end of BEACON_INTERVAL_CODE */
-
-				case TRY_PACKET_TRANSMISSION_CODE :
-				{
-					/* do nothing */
-					break;
-				};
-			
-				case CCA_START_CODE: /*At the start of the CCA */
-				{
-					/* do check if the channel is idle at the start of cca */
-					/* at the start the channel is assumed idle, any change to busy, the CCA will report a busy channel */
-				
-					/* check at the beginning of CCA, if the channel is busy */
-					csma.CCA_CHANNEL_IDLE = OPC_TRUE;
-					if (op_stat_local_read (RX_BUSY_STAT) == 1.0)
-						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-					
-					if (enable_log) {
-						fprintf (log,"t=%f  -------- START CCA CW = %d ------>  CHANNEL IDLE = %s  \n\n",op_sim_time(),csma.CW, boolean2string(csma.CCA_CHANNEL_IDLE));
-						printf (" [Node %s] t=%f  -------- START CCA CW = %d ------>  CHANNEL IDLE = %s  \n\n",node_attr.name,op_sim_time(), csma.CW, boolean2string(csma.CCA_CHANNEL_IDLE));
-					}
-	
-					if (csma.CW == 2) {
-						op_stat_write(statistic_vector.ch_busy_cca1, 1-csma.CCA_CHANNEL_IDLE);
-						op_stat_write(statistic_vector.ch_idle_cca1, csma.CCA_CHANNEL_IDLE);
-					} else {
-						op_stat_write(statistic_vector.ch_busy_cca2, 1-csma.CCA_CHANNEL_IDLE);
-						op_stat_write(statistic_vector.ch_idle_cca2, csma.CCA_CHANNEL_IDLE);
-					}
-					break;
-				};/*end of CCA_START_CODE */
-			
-				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
-				{
-					//wpan_cca_expire ();
-					break;
-				};
-			
-				case START_TRANSMISSION_CODE: /* successful end of backoff and CCA or GTS period */
-				{	
-					/*backoff_start_time is initialized in the "init_backoff" state*/
-					op_stat_write(statistic_vector.mac_delay, op_sim_time()-backoff_start_time);
-					op_stat_write(statistic_global_vector.mac_delay, op_sim_time()-backoff_start_time);
-					
-					/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
-					frame_MPDU = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_HEAD);
-		
-					break;
-				}; /*end of START_TRANSMISSION_CODE */
-			
-				case WAITING_ACK_END_CODE:	/* the timer for waiting an ACK has expired, the packet must be retransmitted */
-				{
-					
-					break;				
-				}; /*end of WAITING_ACK_END_CODE */
-			
-				case ACK_SUCCESS_CODE:
-				{
-				
-					break;		
-				};	/*end of ACK_SUCCESS_CODE */
-			
-				case ACK_FAILURE_CODE:	/* ACK was not received in time*/
-				{
-					mac_attr.wait_ack = OPC_FALSE;
-					
-					break;				
-		
-				};	/*end of ACK_FAILURE_CODE */
-			
-				case SUCCESS_CODE :	// packet was succesffully sent to the network: |PACKET| or |PACKET|+|IFS|
-				{
-					if (enable_log) { 
-						fprintf(log,"t=%f  -> !!!!!!!!! PACKET TRANSMISSION FINISHED WITH SUCCESS !!!!!!!!!  \n\n",op_sim_time());
-						printf(" [Node %s] t=%f  !!!!!!!!! PACKET TRANSMISSION FINISHED WITH SUCCESS !!!!!!!!! \n\n",node_attr.name, op_sim_time());
-					}
-					break;
-				};	/*end of SUCCESS_CODE */
-			
-				case FAILURE_CODE: 
-				{	
-					if (enable_log) {
-						fprintf(log,"t=%f  -> TRANSMISSION FAILURE    \n\n",op_sim_time());
-						printf(" [Node %s] t=%f  -> TRANSMISSION FAILURE \n\n",node_attr.name,op_sim_time());
-					}
-				
-					if (csma.retries_nbr < aMaxFrameRetries) {
-						if (enable_log) {
-							fprintf(log,"t=%f  -> TRANSMISSION FAILURE - TRY TO RETRANSMIT  (number of retries = %d) \n\n", op_sim_time(), csma.retries_nbr);
-							printf("\n [Node %s] t=%f  -> TRANSMISSION FAILURE - TRY TO RETRANSMIT  (number of retries = %d) <- \n\n", node_attr.name, op_sim_time(), csma.retries_nbr);
-						}
-						op_stat_write(statistic_vector.dropped_packets, 0.0);
-						op_stat_write(statistic_global_vector.dropped_packets, 0.0);						
-						
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);	// try to send the same packet once more
-						
-					} else { /* csma.retries_nbr >= aMaxFrameRetries */
-						if (enable_log) {
-							fprintf(log,"t=%f  -> TRANSMISSION FAILURE (number of retries = %d = aMaxFrameRetries)  <- \n", op_sim_time(), csma.retries_nbr);
-							printf(" [Node %s] t=%f  -> TRANSMISSION FAILURE (number of retries = %d = aMaxFrameRetries) <- \n",node_attr.name, op_sim_time(), csma.retries_nbr);
-							fprintf(log," !!!!!!!!! DROP PACKET AT THE HEAD !!!!!!!!! \n\n");
-							printf(" !!!!!!!!! DROP PACKET AT THE HEAD OF QUEUE!!!!!!!!! \n\n");
-						}
-						
-						op_stat_write(statistic_vector.dropped_packets, 1.0);
-						op_stat_write(statistic_global_vector.dropped_packets, 1.0);
-						
-						frame_MPDU = op_subq_pk_remove(SUBQ_DATA,OPC_QPOS_HEAD); // remove MAC frame (MPDU) at the head of subqueue
-						//op_pk_nfd_get(frame_MPDU, "Ack Request", &ack_request);
-						op_pk_destroy(frame_MPDU);						
-	
-						op_stat_write(statistic_vector.retransmission_attempts, csma.retries_nbr);
-						csma.retries_nbr = 0;
-							
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);	// try to send next packet					
-					}
-					
-					break;
-				}; /*end of FAILURE_CODE */
-				
-				
-				
-				
-				default:
-				{
-				};	
-				
-			} /*end of switch (op_intrpt_code())*/ 
-			
-			break;
-		};/*end of OPC_INTRPT_SELF */
-		
-		case OPC_INTRPT_ENDSIM:
-		{
-			if (enable_log) {
-				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
-				printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
-				
-				fclose(log);
-			}
-
-			break;
-		};	/*end of OPC_INTRPT_ENDSIM */
-		
-		case OPC_INTRPT_STAT: // statistic interrupt from PHY layer
-		{
-			switch (op_intrpt_stat()) {	/*begin switch (op_intrpt_stat())*/ 
-				
-				case RX_BUSY_STAT :	/* Case of the end of the BUSY RECEIVER STATISTIC */
-				{
-					/* if during the CCA the channel was busy for a while, then csma.CCA_CHANNEL_IDLE = OPC_FALSE*/
-					if (op_stat_local_read(RX_BUSY_STAT) == 1.0)
-						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-				
-					/*Try to send a packet if any*/
-					if (op_stat_local_read (TX_BUSY_STAT) == 0.0)
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
-					
-					break;
-				}
-				
-				case TX_BUSY_STAT :
-				{
-					if (op_stat_local_read (TX_BUSY_STAT) == 0.0)
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
-					
-					break;
-				}
-				
-				case RX_COLLISION_STAT :
-				{
-					if (enable_log){
-						fprintf(log,"t=%f  -> $$$$$ COLLISION $$$$$$$  \n\n",op_sim_time());
-						printf(" [Node %s] t=%f  -> COLLISION TIME  \n",node_attr.name, op_sim_time());
-					}
-					
-					break;
-				}
-			}/*end switch (op_intrpt_stat())*/
-			
-			break;
-		};/*end of OPC_INTRPT_STAT */
-		
-		default :
-		{
-		};
-		
-	} /*end switch (op_intrpt_type())*/
-	
-	/* Stack tracing exit point */
-	FOUT;
-}
-
-
-/*-----------------------------------------------------------------------------
- * Function:	wban_extract_data_frame
- *
- * Description:	extract the data frame from the MAC frame received from the network
- *              
- * Input :  frame_MPDU - the received MAC frame
- *-----------------------------------------------------------------------------*/
-
-static void wban_extract_data_frame(Packet* frame_MPDU) {
-
-	//int Ack_Request;
-	//int seq_num;
-	
-	/* Stack tracing enrty point */
-	FIN(wban_extract_data_frame);
-	
-	/* check if any ACK is requested */
-	
-	/* Stack tracing exit point */
-	FOUT;	
-}
-
 /*-----------------------------------------------------------------------------
  * Function:	queue_status
  *
@@ -1389,7 +735,6 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
  *              
  * No parameters
  *-----------------------------------------------------------------------------*/
-
 static void queue_status() {
 	
 	Objid queue_objid;
@@ -1460,7 +805,6 @@ static void wpan_battery_update_tx(double pksize) {
 	FOUT;
 }
 
-
 /*--------------------------------------------------------------------------------
  * Function:	wpan_battery_update_rx
  *
@@ -1486,4 +830,254 @@ static void wpan_battery_update_rx(double pksize, int frame_type) {
 	
 	/* Stack tracing exit point */
 	FOUT;
+}
+
+/*--------------------------------------------------------------------------------
+ * Function: wban_encapsulate_and_enqueue_data_frame
+ *
+ * Description:	encapsulates the MSDU into a MAC frame and enqueues it.      
+ *             
+ * Input:	msdu - MSDU (MAC Frame Payload)
+ *			ack - 
+ *			dest_id - the destionation ID for packet
+ *--------------------------------------------------------------------------------*/
+static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum AcknowledgementPolicy_type ackPolicy, int dest_id) {
+	Packet* data_frame_msdu;
+	Packet* data_frame_mpdu;	
+	int seq_num;
+	int user_priority;
+
+	/* Stack tracing enrty point */
+	FIN(wban_encapsulate_and_enqueue_data_frame);
+
+	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
+	op_pk_nfd_get (data_frame_up, "User Priority", &user_priority);
+	op_pk_nfd_get (data_frame_up, "App Sequence Number", &seq_num);
+
+	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
+	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
+
+	/* generate the sequence number for the packet */
+	// seq_num = wban_update_sequence_number();
+
+	op_pk_nfd_set (data_frame_mpdu, "Ack Policy", ackPolicy);
+	op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
+	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
+	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
+	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
+
+	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
+	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
+
+	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
+	op_pk_nfd_set (data_frame_mpdu, "Sender ID", mac_attr.sender_id);
+	op_pk_nfd_set (data_frame_mpdu, "BAN ID", mac_attr.ban_id);
+	
+	op_pk_nfd_set_pkt (data_frame_mpdu, "MAC Frame Payload", data_frame_msdu); // wrap data_frame_msdu (MSDU) in MAC Frame (MPDU)
+
+	/* put it into the queue with priority waiting for transmission */
+	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
+	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_PRIO) == OPC_QINS_OK) {
+		if (enable_log) {
+			fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ackPolicy);
+			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %s] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ackPolicy);
+		}
+	} else {
+		if (enable_log) {
+			fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
+			printf (" [Node %s] t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
+		}
+		
+		/* destroy the packet */
+		op_pk_destroy (data_frame_mpdu);
+	}
+
+	/* try to send the packet */
+	op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	wban_extract_beacon_frame
+ *
+ * Description:	extract the beacon frame from the MAC frame received from the network
+ *              and schedule the next beacon frame
+ *
+ * Input :  mac_frame - the received MAC frame
+ *--------------------------------------------------------------------------------*/
+
+static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
+
+	Packet* beacon_MSDU_rx;
+	int rcv_sender_id;
+	double beacon_frame_creation_time;
+	double beacon_TX_time;
+	int sequence_number_fd;
+	int eap_indicator_fd;
+	int beacon2_enabled_fd;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_extract_beacon_frame);
+
+	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
+	
+	// if I'm a End Device, I get the information and synchronize myself
+	if (!node_attr.is_BANhub) {
+		op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
+		op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
+		op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
+		op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
+
+		if (node_attr.ban_id + 15 != rcv_sender_id) {
+			if (enable_log) {
+				fprintf(log,"t=%f  -> Beacon Frame Reception  - but not from Hub. \n",op_sim_time());	
+				printf(" [Node %s] t=%f  -> Beacon Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
+			}
+
+			/* Stack tracing exit point */
+			FOUT;
+		} else {
+			if (enable_log) {
+				printf (" [Node %s] t=%f  -> Beacon Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
+				printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
+			}
+		}
+		op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.sender_address);
+		op_pk_nfd_get (beacon_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
+		op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
+		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 End", &beacon_attr.rap1_end);
+		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 Start", &beacon_attr.rap2_start);
+		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 End", &beacon_attr.rap2_end);
+		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 Start", &beacon_attr.rap1_start);
+		op_pk_nfd_get (beacon_MSDU_rx, "Inactive Duration", &beacon_attr.inactive_duration);
+
+		// update with actual Hub address - since we fixed it on init
+		// if (my_attributes.traffic_destination_address == PAN_COORDINATOR_ADDRESS)
+		// 	my_attributes.traffic_destination_address = my_attributes.PANcoordinator_mac_address;
+		
+		beacon_frame_creation_time = op_pk_creation_time_get (beacon_MSDU_rx);
+
+		beacon_TX_time = Bits2Sec(op_pk_total_size_get(beacon_MPDU_rx), node_attr.data_rate);
+		
+		// update the superframe parameters
+		SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
+		SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
+		SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
+
+		SF.slot_length2sec = allocationSlotLength2ms / 1000.0; // transfer allocation slot length from ms to sec.
+		SF.rap1_start = beacon_attr.rap1_start;
+		SF.rap1_end = beacon_attr.rap1_end;
+		SF.rap2_start = beacon_attr.rap2_start;
+		SF.rap2_end = beacon_attr.rap2_end;
+		SF.current_slot = 0;
+		SF.current_first_free_slot = beacon_attr.rap1_end + 1;
+
+		SF.BI_Boundary = beacon_frame_creation_time;
+		beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_MPDU_rx), node_attr.data_rate);
+		SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
+		SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
+		SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
+
+		op_pk_destroy (beacon_MSDU_rx);
+		op_pk_destroy (beacon_MPDU_rx);
+
+		if (UNCONNECTED == mac_attr.sender_id) {
+			/* We will try to connect to this BAN  if our scheduled access length
+			 * is NOT set to unconnected (-1). If it is set to 0, it means we are
+			 * establishing a sleeping pattern and waking up only to hear beacons
+			 * and are only able to transmit in RAP periods.
+			 */
+			if (conn_req_attr.allocation_length > 0) {
+				// we are unconnected, and we need to connect to obtain scheduled access
+				// we will create and send a connection request
+			}
+		}
+		if (SF.rap1_start > 0) {
+
+		}
+		op_intrpt_schedule_self (op_sim_time(), DEFAULT_CODE);
+		op_intrpt_schedule_self (op_sim_time(), START_OF_EAP1_PERIOD_CODE);
+	
+		wban_schedule_next_beacon();
+	}
+	/* Stack tracing exit point */
+	FOUT;	
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	wban_send_connection_request_frame
+ *
+ * Description:	Create a connection request frame and send it to the Radio (wban_mac) 
+ *
+ * No parameters
+ *--------------------------------------------------------------------------------*/
+static void wban_send_connection_request_frame () {
+	Packet* connection_request_MSDU;
+	Packet* connection_request_MPDU;
+	Packet* connection_request_PPDU;
+
+	/* Stack tracing enrty point */
+	FIN(wban_send_connection_request_frame);
+
+	/* create a connection request frame */
+	connection_request_MSDU = op_pk_create_fmt ("wban_connection_request_frame_format");
+	
+	/* set the fields of the connection_request frame */
+	op_pk_nfd_set (connection_request_MSDU, "Allocation Length", conn_req_attr.allocation_length);
+
+	/* create a MAC frame (MPDU) that encapsulates the connection_request payload (MSDU) */
+	connection_request_MPDU = op_pk_create_fmt ("wban_mac_pkt_format");
+
+	op_pk_nfd_set (connection_request_MPDU, "Ack Policy", I_ACK_POLICY);
+	op_pk_nfd_set (connection_request_MPDU, "EAP Indicator", 1); // EAP1 enabled
+	op_pk_nfd_set (connection_request_MPDU, "Frame Subtype", CONNECTION_REQUEST);
+	op_pk_nfd_set (connection_request_MPDU, "Frame Type", MANAGEMENT);
+	op_pk_nfd_set (connection_request_MPDU, "B2", 1); // beacon2 enabled
+
+	op_pk_nfd_set (connection_request_MPDU, "Sequence Number", 0);
+	op_pk_nfd_set (connection_request_MPDU, "Inactive", beacon_attr.inactive_duration); // connection_request and connection_request2 frame used
+
+	op_pk_nfd_set (connection_request_MPDU, "Recipient ID", mac_attr.recipient_id);
+	op_pk_nfd_set (connection_request_MPDU, "Sender ID", mac_attr.sender_id);
+	op_pk_nfd_set (connection_request_MPDU, "BAN ID", mac_attr.ban_id);
+	
+	op_pk_nfd_set_pkt (connection_request_MPDU, "MSDU", connection_request_MSDU); // wrap connection_request payload (MSDU) in MAC Frame (MPDU)
+
+	/* create PHY frame (PPDU) that encapsulates connection_request MAC frame (MPDU) */
+	connection_request_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
+
+	op_pk_nfd_set (connection_request_PPDU, "RATE", node_attr.data_rate);
+	/* wrap connection_request MAC frame (MPDU) in PHY frame (PPDU) */
+	op_pk_nfd_set_pkt (connection_request_PPDU, "PSDU", connection_request_MPDU);
+	op_pk_nfd_set (connection_request_PPDU, "LENGTH", ((double) op_pk_total_size_get(connection_request_MPDU))/8); //[bytes]	
+	
+	wpan_battery_update_tx ((double) op_pk_total_size_get(connection_request_PPDU));
+	//op_pk_send (connection_request_PPDU, STRM_FROM_MAC_TO_RADIO);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*-----------------------------------------------------------------------------
+ * Function:	wban_extract_data_frame
+ *
+ * Description:	extract the data frame from the MAC frame received from the network
+ *              
+ * Input :  frame_MPDU - the received MAC frame
+ *-----------------------------------------------------------------------------*/
+
+static void wban_extract_data_frame(Packet* frame_MPDU) {
+
+	//int Ack_Request;
+	//int seq_num;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_extract_data_frame);
+	
+	/* check if any ACK is requested */
+	
+	/* Stack tracing exit point */
+	FOUT;	
 }
