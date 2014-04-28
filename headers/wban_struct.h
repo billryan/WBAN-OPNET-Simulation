@@ -105,6 +105,11 @@ typedef struct {
 	int CW; // Contention Window
 	Boolean CW_double;
 	int backoff_counter;
+	double backoff_time;
+	double backoff_timer; // for calculating next backoff_time
+	double backoff_expiration_time;
+	Boolean RESUME_BACKOFF_TIMER;
+	Boolean CCA_DEFERRED;
 	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wban_csma_attributes;
@@ -145,7 +150,10 @@ typedef struct {
 	double map2_length2sec;
 
 	double BI_Boundary; // Specfiy the time at which the beacon frame has been created to synchronize all node to this time reference
-	
+	double eap1_start2sec;
+	double rap1_start2sec;
+	double rap2_start2sec;
+
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
@@ -170,5 +178,20 @@ typedef struct {
 	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;
+
+/* define the packet to be sent parameters */
+typedef struct 
+{
+	Objid objid;
+	int	sender_id; // Sender ID of the node
+	int	recipient_id; // Recipient ID of the node
+	int ack_policy;
+	int seq_num;
+	int total_bits; // length of PPDU
+	int ack_bits; // length of ack PPDU
+	int user_priority;
+	int frame_type;
+	int frame_subtype;
+} packet_to_be_sent_attributes;
 
 #endif

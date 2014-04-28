@@ -75,7 +75,6 @@
 
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
-#define PAN_COORDINATOR_ADDRESS -1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
