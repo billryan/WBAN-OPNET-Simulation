@@ -105,6 +105,7 @@ typedef struct {
 	int CW; // Contention Window
 	Boolean CW_double;
 	int backoff_counter;
+	Boolean backoff_counter_lock;
 	double backoff_time;
 	double backoff_timer; // for calculating next backoff_time
 	double backoff_expiration_time;
@@ -174,7 +175,6 @@ typedef struct {
 
 	int max_packet_tries;
 	int MGMT_buffer_size;
-	Boolean wait_ack;	// acknowledged packet?
 	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;

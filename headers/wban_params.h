@@ -47,6 +47,7 @@
 
 /** MAC Layer attributes		**/
 #define macAckWaitDuration 54	// The max number of symbols to wait for an ACK
+#define mTimeOut 30 // 30 μs
 
 /** Frame Types Definitions according to the standard IEEE 802.15.4 2003 - p.112, Tab.65 **/
 #define BEACON_FRAME_TYPE 0
