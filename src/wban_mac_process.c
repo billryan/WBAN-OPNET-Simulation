@@ -63,6 +63,7 @@ static void wban_mac_init() {
 	/* get the MAC settings */
 	op_ima_obj_attr_get (mac_attr.objid, "MAC Attributes", &mac_attr_id);
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
+	csma.backoff_counter = 0; // initialize back-off counter with 0
 
 	op_ima_obj_attr_get (mac_attr_comp_id, "Batterie Life Extension", &mac_attr.Battery_Life_Extension);
 	op_ima_obj_attr_get (mac_attr_comp_id, "Max Packet Tries", &max_packet_tries);
@@ -581,8 +582,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		SF.rap1_end = beacon_attr.rap1_end;
 		SF.rap2_start = beacon_attr.rap2_start;
 		SF.rap2_end = beacon_attr.rap2_end;
-		SF.current_slot = 0;
-		SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
 		SF.BI_Boundary = beacon_frame_creation_time;
 		beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_MPDU_rx)+121, node_attr.data_rate);
@@ -593,6 +592,10 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
 		SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
 		SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
+
+		/* for node we should calculate the slot boundary */
+		SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);;
+		SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
 		op_pk_destroy (beacon_MSDU_rx);
 		op_pk_destroy (beacon_MPDU_rx);
@@ -631,7 +634,8 @@ static void wban_schedule_next_beacon() {
 	/* Use EAP1 Phase */
 	if (SF.rap1_start > 0) {
 		/* The SF.eap1_start2sec may behind current time op_sim_time() */
-		op_intrpt_schedule_self (max_double(op_sim_time(), SF.eap1_start2sec), START_OF_EAP1_PERIOD_CODE);
+		SF.eap1_start2sec = max_double(op_sim_time(), SF.eap1_start2sec);
+		op_intrpt_schedule_self (SF.eap1_start2sec, START_OF_EAP1_PERIOD_CODE);
 	}
 	if ((SF.rap1_start > 0) && (SF.rap1_length2sec > 0)) {
 		op_intrpt_schedule_self (SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
@@ -717,7 +721,7 @@ static void wban_send_connection_request_frame () {
  *--------------------------------------------------------------------------------*/
 static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum AcknowledgementPolicy_type ack_policy, int dest_id) {
 	Packet* data_frame_msdu;
-	Packet* data_frame_mpdu;	
+	Packet* data_frame_mpdu;
 	int seq_num;
 	int user_priority;
 
@@ -852,12 +856,28 @@ static void wban_mac_interrupt_process() {
 					break;
 				};
 
+				case START_OF_EAP1_PERIOD_CODE: /* start of EAP1 Period */
+				{
+					mac_state = MAC_EAP1;
+					phase_start_timeG = SF.eap1_start2sec;
+					phase_end_timeG = SF.rap1_start2sec;
+					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.SLEEP = OPC_FALSE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF THE EAP1 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}
+
+					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
+					break;
+				};/* end of START_OF_EAP1_PERIOD_CODE */
+
 				case START_OF_RAP1_PERIOD_CODE: /* start of RAP1 Period */
 				{
 					mac_state = MAC_RAP1;
-					SF.current_slot = SF.rap1_start;
-					phase_start_timeG = SF.BI_Boundary + SF.rap1_start*SF.slot_length2sec;
-					phase_end_timeG = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
+					phase_start_timeG = SF.rap1_start2sec;
+					phase_end_timeG = SF.rap1_start2sec + SF.rap1_length2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.SLEEP = OPC_FALSE;
 				
@@ -866,30 +886,26 @@ static void wban_mac_interrupt_process() {
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
 				
-					/* if a backoff timer was paused during the previous CAP, it is resumed in this CAP*/
-					if (SF.RESUME_BACKOFF_TIMER == OPC_TRUE) {						
-						if (enable_log) {
-							fprintf (log,"t=%f  -> RESUME A BACKOFF [%f] + BACKOFF BOUNDARY [%f] = EXPIRE AT %f sec  %f\n\n", op_sim_time(), SF.backoff_timer, wban_backoff_period_boundary_get(), wban_backoff_period_boundary_get()+SF.backoff_timer);
-							printf (" [Node %s] t=%f  ->  RESUME A BACKOFF [%f] + BACKOFF BOUNDARY [%f] = EXPIRE AT %f sec    \n\n", node_attr.name, op_sim_time(), SF.backoff_timer, wban_backoff_period_boundary_get(), wban_backoff_period_boundary_get()+SF.backoff_timer);
-						}
-						
-						op_intrpt_schedule_self (wban_backoff_period_boundary_get()+SF.backoff_timer, BACKOFF_EXPIRATION_CODE);
-					}
-	
-					/* if a CCA is deferred, it shall be resumed at the begining of the CAP of the superframe*/
-					if (SF.CCA_DEFERRED == OPC_TRUE) {
-						if (enable_log) {
-							fprintf (log,"t=%f  -> RESUME THE CCA OPERATION (CCA WAS DEFERRED IN LAST CAP)  \n\n", op_sim_time());
-							printf(" [Node %s] t=%f  -> RESUME THE CCA OPERATION (CCA WAS DEFERRED IN LAST CAP)    \n\n", node_attr.name, op_sim_time());
-						}
-					
-						SF.CCA_DEFERRED = OPC_FALSE;
-						//wpan_cca_perform (3);
+					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
+					break;
+				};/* end of START_OF_RAP1_PERIOD_CODE */
+
+				case START_OF_RAP2_PERIOD_CODE: /* start of RAP1 Period */
+				{
+					mac_state = MAC_RAP2;
+					phase_start_timeG = SF.rap2_start2sec;
+					phase_end_timeG = SF.rap2_start2sec + SF.rap2_length2sec;
+					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.SLEEP = OPC_FALSE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
 				
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
-				};/* end of START_OF_CAP_PERIOD_CODE */
+				};/* end of START_OF_RAP1_PERIOD_CODE */
 
 				case TRY_PACKET_TRANSMISSION_CODE :
 				{
@@ -1310,7 +1326,7 @@ static void wban_attempt_TX() {
 		case MAC_MAP2: 
 			SF.IN_MAP_PHASE = OPC_TRUE;
 			break;
-		default:       FOUT; // nono of the valid state above
+		default: FOUT; // nono of the valid state above
 	}
 
 	if (!(op_intrpt_type () == OPC_INTRPT_SELF && op_intrpt_code () == TRY_PACKET_TRANSMISSION_CODE)) {
@@ -1338,7 +1354,6 @@ static void wban_attempt_TX() {
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "Recipient ID", mac_attr.recipient_id);
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "Sender ID", mac_attr.sender_id);
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "BAN ID", mac_attr.ban_id);
-			node_attr.traffic_dest_id = node_attr.hub_id;
 			packet_to_be_sent.recipient_id = mac_attr.recipient_id;
 			packet_to_be_sent.sender_id = mac_attr.sender_id;
 		}
@@ -1380,16 +1395,15 @@ static void wban_attempt_TX_CSMA(int user_priority) {
 	csma.CW_double = OPC_FALSE;
 	csma.backoff_counter = 0;
 
-	backoff_start_time = op_sim_time();
 	wban_backoff_delay_set(user_priority);
 
 	if(!can_fit_TX(&packet_to_be_sent)) {
 		current_packet_CS_fails++;
-		csma.CCA_DEFERRED = OPC_TRUE;
+		csma.backoff_counter_lock = OPC_TRUE;
 
 		FOUT;
 	} else {
-		csma.CCA_DEFERRED = OPC_FALSE;
+		csma.backoff_counter_lock = OPC_FALSE;
 	}
 	//CCA
 	op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
@@ -1408,7 +1422,6 @@ static void wban_attempt_TX_CSMA(int user_priority) {
  *             
  * No parameters  
  *--------------------------------------------------------------------------------*/
-
 static double wban_backoff_period_boundary_get() {
 	double backoff_period_index;
 	double next_backoff_period_boundary;
@@ -1433,91 +1446,34 @@ static double wban_backoff_period_boundary_get() {
 /*--------------------------------------------------------------------------------
  * Function:	wban_backoff_delay_set()
  *
- * Description:	set the backoff timer to a random value
+ * Description:	set the backoff timer to a random value and generate interupt BACKOFF_EXPIRATION_CODE
  *             
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_backoff_delay_set( int user_priority) {
-	int backoff_unit;
-	int backoff_max;
-	// double backoff_time;
-	// int backoff_period_index;
-	// double backoff_period_boundary_time;
-	// double backoff_expiration_time;
 	double phase_remaining_time;
 	
 	/* Stack tracing enrty point */
 	FIN(wban_backoff_delay_set);
 	
-	backoff_max = csma.CW;
-	backoff_unit = floor (op_dist_uniform (backoff_max+1)); // Randon number of backoffunits
+	csma.backoff_counter = floor (op_dist_uniform(csma.CW) + 1); // Randon number of backoffunits
 	// op_stat_write(statistic_vector.backoff_units, backoff_unit);
 	
-	csma.backoff_counter = backoff_unit;
-	csma.backoff_time = (double) (backoff_unit * pCSMASlotLength2Sec);
+	csma.backoff_time = (double) (csma.backoff_counter * pCSMASlotLength2Sec);
 	// op_stat_write(statistic_vector.backoff_delay, csma.backoff_time);
+	csma.backoff_expiration_time = wban_backoff_period_boundary_get() + csma.backoff_time;
 	
-	/*check if the backoff time will exceed the remaining time in the Current Phase */
-	/* phase_start_timeG                      
-	          |-----|-----|-----|--t--|-----|
-	                                  ^
-	                                  |
-	                         next backoff period index
-     */
-	// backoff_period_index = (int)ceil((op_sim_time()-phase_start_timeG)/pCSMASlotLength2Sec);
-	// backoff_period_boundary_time = phase_start_timeG + backoff_period_index * pCSMASlotLength2Sec;
-	// backoff_expiration_time = backoff_period_boundary_time + backoff_time;
 	phase_remaining_time = phase_end_timeG - wban_backoff_period_boundary_get();
-	//cap_length
-	
-	/* the backoff is accepted if it expires at most pCSMASlotLength2Sec before the end of Current Phase */	
-	// if (compare_doubles((phase_remaining_time - pCSMASlotLength2Sec), backoff_time) >=0) {	// THERE IS A PROBLEM WITH EQUALITY IN DOUBLE
-	
-	// 	if (enable_log) {
-	// 		fprintf(log,"t=%f  -> ENTERS BACKOFF  - RANDOM BACKOFF = %d; EXPIRATION AT %f  \n\n", op_sim_time(), backoff_unit, backoff_expiration_time);
-	// 		printf(" [Node %s] t=%f  -> ENTERS BACKOFF  - RANDOM BACKOFF = % d; EXPIRATION AT %f  \n\n", node_attr.name, op_sim_time(), backoff_unit, backoff_expiration_time);
-	// 	}
-
-	// 	SF.RESUME_BACKOFF_TIMER = OPC_FALSE;
-	// 	SF.backoff_timer = -1;
-	// 	//op_intrpt_priority_set (OPC_INTRPT_SELF, BACKOFF_EXPIRATION_CODE, 15);
-	// 	op_intrpt_schedule_self (backoff_expiration_time, BACKOFF_EXPIRATION_CODE);			
-	// }
-	// else {	/* if the remaining period of the CAP is lower than the backoff period the timer must wake up at the CAP of the next superframe */
-		
-	// 	if (enable_log) {
-	// 		fprintf(log,"t=%f  -> BACKOFF PAUSED UNTIL THE NEXT PHASE/SUPERFRAME  \n\n", op_sim_time());	
-	// 		printf(" [Node %s] t=%f  -> BACKOFF PAUSED UNTIL THE NEXT PHASE/SUPERFRAME  \n", node_attr.name, op_sim_time());
-	// 	}
-
-	// 	SF.RESUME_BACKOFF_TIMER = OPC_TRUE;
-	// 	SF.backoff_timer = backoff_time - phase_remaining_time;
-	// 	backoff_expiration_time = -1;
-	// 	op_stat_write (statistic_vector.deferred_cca_backoff, SF.RESUME_BACKOFF_TIMER);
-	// }		
-	
-	if (can_fit_TX(&packet_to_be_sent)) {
-		csma.RESUME_BACKOFF_TIMER = OPC_FALSE;
-		csma.CCA_DEFERRED = OPC_FALSE;
-		csma.backoff_timer = -1;
-		op_intrpt_schedule_self (csma.backoff_expiration_time, BACKOFF_EXPIRATION_CODE);
-	} else {
-		csma.RESUME_BACKOFF_TIMER = OPC_TRUE;
-		csma.backoff_timer = csma.backoff_time - phase_remaining_time;
-		csma.backoff_expiration_time = -1;
-		// current_packet_CS_fails++;
-	}
+	op_intrpt_schedule_self (csma.backoff_expiration_time, BACKOFF_EXPIRATION_CODE);
 
 	if (enable_log) {	
 		printf ("-------------------------- BACKOFF -----------------------------------\n");
 		printf (" [Node %s] ENTERS BACKOFF STATUT AT %f\n", node_attr.name, op_sim_time());
 		printf ("  Beacon Boundary = %f\n", SF.BI_Boundary);
 		printf ("  CW = %d\n", csma.CW);
-		printf ("  Random Backoff units = %d\n", backoff_unit);
+		printf ("  Random Backoff counter = %d\n", csma.backoff_counter);
 		printf ("    + Random Backoff time  = %f sec \n", csma.backoff_time);
 		printf ("    + Phase Remaining Length = %f sec \n", phase_remaining_time);
-		printf ("    + RESUME BACKOFF TIME  = %f sec \n", SF.backoff_timer);
-		// printf ("  Backoff Boundary Index = %d\n", backoff_period_index);
 		printf ("  Current Time Slot = %d\n", SF.current_slot);
 		printf ("  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
 		printf ("  Phase End Time     = %f sec \n", phase_end_timeG);
@@ -1529,11 +1485,9 @@ static void wban_backoff_delay_set( int user_priority) {
 		fprintf (log, " [Node %s] ENTERS BACKOFF STATUT AT %f\n", node_attr.name, op_sim_time());
 		fprintf (log, "  Beacon Boundary = %f\n", SF.BI_Boundary);
 		fprintf (log, "  CW = %d\n", csma.CW);
-		fprintf (log, "  Random Backoff units = %d\n", backoff_unit);
+		fprintf (log, "  Random Backoff counter = %d\n", csma.backoff_counter);
 		fprintf (log, "    + Random Backoff time  = %f sec \n", csma.backoff_time);
 		fprintf (log, "    + Phase Remaining Length = %f sec \n", phase_remaining_time);
-		fprintf (log, "    + RESUME BACKOFF TIME  = %f sec \n", SF.backoff_timer);
-		// fprintf (log, "  Backoff Boundary Index = %d\n", backoff_period_index);
 		fprintf (log, "  Current Time Slot = %d\n", SF.current_slot);
 		fprintf (log, "  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
 		fprintf (log, "  Phase End Time     = %f sec \n", phase_end_timeG);
@@ -1567,18 +1521,17 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 		csma.backoff_expiration_time = wban_backoff_period_boundary_get() + csma.backoff_time;
 		phase_remaining_time = phase_end_timeG - wban_backoff_period_boundary_get();
 		/* the backoff is accepted if it expires at most pCSMASlotLength2Sec before the end of Current Phase */
-		if(compare_doubles((phase_remaining_time - pCSMASlotLength2Sec), csma.backoff_time) >=0) {// THERE IS A PROBLEM WITH EQUALITY IN DOUBLE
-			if(packet_to_be_sent_local->ack_policy != N_ACK_POLICY) {
-				if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS* 0.000001)) >=0) {
-					FRET(OPC_TRUE);
-				}
-			} else {
-				if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits), node_attr.data_rate))) >=0) {
-					FRET(OPC_TRUE);
-				}
+		// if(compare_doubles((phase_remaining_time - pCSMASlotLength2Sec), csma.backoff_time) >=0) {// THERE IS A PROBLEM WITH EQUALITY IN DOUBLE
+		// }
+		if(packet_to_be_sent_local->ack_policy != N_ACK_POLICY) {
+			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS* 0.000001)) >=0) {
+				FRET(OPC_TRUE);
+			}
+		} else {
+			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits), node_attr.data_rate))+pSIFS* 0.000001) >=0) {
+				FRET(OPC_TRUE);
 			}
 		}
 	}
-
 	FRET(OPC_FALSE);
 }
