@@ -414,7 +414,6 @@ static void wban_send_beacon_frame () {
 	Packet* beacon_MSDU;
 	Packet* beacon_MPDU;
 	Packet* beacon_PPDU;
-	double beacon_frame_creation_time;
 	extern int sequence_num_beaconG;
 
 	/* Stack tracing enrty point */
@@ -442,8 +441,6 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set (beacon_MSDU, "RAP1 Start", beacon_attr.rap1_start);
 	op_pk_nfd_set (beacon_MSDU, "Inactive Duration", beacon_attr.inactive_duration);
 	
-	beacon_frame_creation_time = op_pk_creation_time_get(beacon_MSDU);
-
 	/* create a MAC frame (MPDU) that encapsulates the beacon payload (MSDU) */
 	beacon_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
@@ -475,7 +472,6 @@ static void wban_send_beacon_frame () {
 
 	wpan_battery_update_tx ((double) op_pk_total_size_get(beacon_PPDU));
 
-	beacon_frame_creation_time = op_pk_creation_time_get (beacon_MPDU);
 	// update the superframe parameters
 	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
 	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
@@ -489,7 +485,7 @@ static void wban_send_beacon_frame () {
 	SF.current_slot = 0;
 	SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
-	SF.BI_Boundary = beacon_frame_creation_time;
+	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
 	beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_PPDU), node_attr.data_rate);
 	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time;
 	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
@@ -508,7 +504,6 @@ static void wban_send_beacon_frame () {
 
 	//op_intrpt_priority_set (OPC_INTRPT_SELF, BEACON_INTERVAL_CODE, -2);
 	wban_schedule_next_beacon (); // Maybe for updating the parameters of superframe
-
 	op_pk_send (beacon_PPDU, STRM_FROM_MAC_TO_RADIO);
 	/* Stack tracing exit point */
 	FOUT;
@@ -523,10 +518,8 @@ static void wban_send_beacon_frame () {
  * Input :  mac_frame - the received MAC frame
  *--------------------------------------------------------------------------------*/
 static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
-
 	Packet* beacon_MSDU_rx;
 	int rcv_sender_id;
-	double beacon_frame_creation_time;
 	double beacon_frame_tx_time;
 	int sequence_number_fd;
 	int eap_indicator_fd;
@@ -571,7 +564,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			node_attr.traffic_dest_id = rcv_sender_id;
 		}
 
-		beacon_frame_creation_time = op_pk_creation_time_get (beacon_MSDU_rx);
 		// update the superframe parameters
 		SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
 		SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
@@ -583,7 +575,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		SF.rap2_start = beacon_attr.rap2_start;
 		SF.rap2_end = beacon_attr.rap2_end;
 
-		SF.BI_Boundary = beacon_frame_creation_time;
+		SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
 		beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_MPDU_rx)+121, node_attr.data_rate);
 		SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time;
 		SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
@@ -631,6 +623,8 @@ static void wban_schedule_next_beacon() {
 	/* Stack tracing enrty point */
 	FIN(wban_schedule_next_beacon);
 
+	/* INCREMENT_SLOT at slot boundary */
+	op_intrpt_schedule_self (SF.BI_Boundary + (SF.current_slot+1)*SF.slot_length2sec, INCREMENT_SLOT);
 	/* Use EAP1 Phase */
 	if (SF.rap1_start > 0) {
 		/* The SF.eap1_start2sec may behind current time op_sim_time() */
@@ -851,7 +845,7 @@ static void wban_mac_interrupt_process() {
 				case INCREMENT_SLOT: {
 					SF.current_slot++;
 					if (SF.current_slot < SF.beacon_period_length - 1) {
-						op_intrpt_schedule_self (op_sim_time() + SF.BI*SF.slot_length2sec, INCREMENT_SLOT);
+						op_intrpt_schedule_self (op_sim_time() + SF.slot_length2sec, INCREMENT_SLOT);
 					}
 					break;
 				};
