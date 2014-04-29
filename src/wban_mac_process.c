@@ -276,9 +276,9 @@ static void wban_parse_incoming_frame() {
 						fprintf (log,"t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
+					wban_extract_data_frame (frame_MPDU);
 					/* send to higher layer for statistics */
 					op_pk_send (frame_MPDU, STRM_FROM_MAC_TO_SINK);
-					wban_extract_data_frame (frame_MPDU);
 					break;
 				case MANAGEMENT: /* Handle management packets */
 			 		if (enable_log) {
@@ -499,7 +499,7 @@ static void wban_send_beacon_frame () {
 	SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
 
 	if (enable_log) {
-		printf("sequence_num_beaconG = %d\n", sequence_num_beaconG);
+		printf("sequence_num_beaconG = %d\n", sequence_num_beaconG - 1);
 		printf("beacon_frame_tx_time = %f\n", beacon_frame_tx_time);
 		fprintf(log,"t=%f  -> Beacon Frame transmission. \n\n", op_sim_time());
 		printf(" [Node %s] t=%f  -> Beacon Frame transmission. \n\n", node_attr.name, op_sim_time());
@@ -813,7 +813,7 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	}
 
 	/* try to send the packet in SF active phase */
-	if (OPC_TRUE != SF.SLEEP) {
+	if ((OPC_FALSE == SF.SLEEP) && (OPC_FALSE == SF.TRANSCEIVER_STAGE)) {
 		op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 	}
 	
@@ -952,7 +952,8 @@ static void wban_mac_interrupt_process() {
 				};/* end of START_OF_RAP1_PERIOD_CODE */
 
 				case TRY_PACKET_TRANSMISSION_CODE :
-				{
+				{	
+					SF.TRANSCEIVER_STAGE = OPC_TRUE;
 					wban_attempt_TX();
 					break;
 				};
@@ -1015,6 +1016,7 @@ static void wban_mac_interrupt_process() {
 						frame_MPDU = op_subq_pk_remove(SUBQ_DATA,OPC_QPOS_HEAD); // remove MAC frame (MPDU) at the head of subqueue
 						//op_pk_nfd_get(frame_MPDU, "Ack Request", &ack_request);
 						op_pk_destroy(frame_MPDU);
+						SF.TRANSCEIVER_STAGE = OPC_FALSE;
 
 						// packetToBeSent = NULL;
 						current_packet_txs = 0;
@@ -1039,6 +1041,7 @@ static void wban_mac_interrupt_process() {
 				case ACK_SUCCESS_CODE:
 				{
 					//collect statistics
+					SF.TRANSCEIVER_STAGE = OPC_FALSE;
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				};	/*end of ACK_SUCCESS_CODE */
@@ -1049,7 +1052,10 @@ static void wban_mac_interrupt_process() {
 					
 					break;
 				};	/*end of ACK_FAILURE_CODE */
-			
+				
+				case N_ACK_PACKET_SENT:
+					SF.TRANSCEIVER_STAGE = OPC_FALSE;
+					break;
 				default:
 				{
 				};	
@@ -1582,13 +1588,25 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 static void wban_send_packet() {
 	// double backoff_period_index;
 	// double next_backoff_period_boundary;
-	double tx_time;
+	double PPDU_tx_time;
 	Packet* frame_MPDU_copy;
 	Packet* frame_PPDU;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_packet);
-	
+
+	frame_MPDU_copy = op_pk_copy(frame_MPDU_to_be_sent); // create copy of queued frame
+
+	/* create PHY frame (PPDU) that encapsulates beacon MAC frame (MPDU) */
+	frame_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
+	op_pk_nfd_set (frame_PPDU, "RATE", node_attr.data_rate);
+	/* wrap MAC frame (MPDU) in PHY frame (PPDU) */
+	op_pk_nfd_set_pkt (frame_PPDU, "PSDU", frame_MPDU_copy);
+	op_pk_nfd_set (frame_PPDU, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU_copy))/8); //[bytes]	
+
+	PPDU_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU), node_attr.data_rate);
+	wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU));
+
 	switch (packet_to_be_sent.frame_type) {
 		case DATA: 
 			break;
@@ -1602,29 +1620,20 @@ static void wban_send_packet() {
 
 	switch (packet_to_be_sent.ack_policy) {
 		case N_ACK_POLICY:
+			op_pk_send(frame_PPDU, STRM_FROM_MAC_TO_RADIO);
+			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time, N_ACK_PACKET_SENT);
 			break;
 		case I_ACK_POLICY:
 			mac_attr.wait_for_ack = OPC_TRUE;
-			frame_MPDU_copy = op_pk_copy(frame_MPDU_to_be_sent); // create copy of queued frame
 
-			/* create PHY frame (PPDU) that encapsulates beacon MAC frame (MPDU) */
-			frame_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
-			op_pk_nfd_set (frame_PPDU, "RATE", node_attr.data_rate);
-			/* wrap MAC frame (MPDU) in PHY frame (PPDU) */
-			op_pk_nfd_set_pkt (frame_PPDU, "PSDU", frame_MPDU_copy);
-			op_pk_nfd_set (frame_PPDU, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU_copy))/8); //[bytes]	
-
-			tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU), node_attr.data_rate);
-			op_intrpt_schedule_self (op_sim_time() + tx_time + (pSIFS+mTimeOut)*0.000001, WAITING_ACK_END_CODE);
+			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + (pSIFS+mTimeOut)*0.000001, WAITING_ACK_END_CODE);
 
 			current_packet_txs++;
 			if (enable_log) {
-				fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, op_sim_time()+tx_time+pSIFS*0.000001,current_packet_txs+current_packet_CS_fails);
-				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, op_sim_time()+tx_time+pSIFS*0.000001,current_packet_txs+current_packet_CS_fails);
+				fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, op_sim_time()+PPDU_tx_time+pSIFS*0.000001,current_packet_txs+current_packet_CS_fails);
+				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, op_sim_time()+PPDU_tx_time+pSIFS*0.000001,current_packet_txs+current_packet_CS_fails);
 			}
-			wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU));
 			op_pk_send(frame_PPDU, STRM_FROM_MAC_TO_RADIO);
-
 			//PPDU_sent_bits = PPDU_sent_bits + ((double)(op_pk_total_size_get(frame_PPDU))/1000.0); // in kbits
 			
 			// op_stat_write(statistic_global_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
