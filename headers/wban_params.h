@@ -47,6 +47,7 @@
 
 /** MAC Layer attributes		**/
 #define macAckWaitDuration 54	// The max number of symbols to wait for an ACK
+#define mTimeOut 30 // 30 μs
 
 /** Frame Types Definitions according to the standard IEEE 802.15.4 2003 - p.112, Tab.65 **/
 #define BEACON_FRAME_TYPE 0
@@ -75,7 +76,6 @@
 
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
-#define PAN_COORDINATOR_ADDRESS -1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
@@ -104,7 +104,7 @@
 
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
-
+#define I_ACK_PPDU_SIZE_BITS (80+121)
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,
@@ -119,11 +119,18 @@ enum USER_PRIORITY {
 
 enum MAC_STATES {
 	MAC_SETUP = 1000,
-	MAC_RAP = 1001,
-	MAC_FREE_TX_ACCESS = 1002,
-	MAC_FREE_RX_ACCESS = 1003,
-	MAC_BEACON_WAIT = 1009,
-	MAC_SLEEP = 1010
+    MAC_EAP1 = 1001,
+    MAC_RAP1 = 1002,
+    MAC_MAP1 = 1003,
+    MAC_EAP2 = 1004,
+    MAC_RAP2 = 1005,
+    MAC_MAP2 = 1006,
+    MAC_CAP = 1007,
+	MAC_RAP = 1017,
+	MAC_FREE_TX_ACCESS = 1012,
+	MAC_FREE_RX_ACCESS = 1013,
+	MAC_BEACON_WAIT = 1019,
+	MAC_SLEEP = 1020
 };
 
 enum AcknowledgementPolicy_type {

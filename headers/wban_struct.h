@@ -17,13 +17,14 @@ typedef struct {
 	int	sender_address; // sender address of the node, 48 bits, for beacon frame
 
 	int ban_id;	// ban ID
+	int hub_id; //Hub ID
 	int unconnectedNID; // temporary unconnected NID
 
 	Boolean is_BANhub; // state if the node is a Hub or not
 	char Device_Mode[20]; // Can be a Node or a Hub
 	
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
-	int traffic_destination_id;	// the destination ID for Traffic Source data transmission
+	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
 } wban_node_attributes;
 
 /* define the beacon frame parameters */
@@ -75,12 +76,13 @@ typedef struct {
 typedef struct {
 	double start_time;	// start of the using of the MAP1
 	double stop_time;	// end of the using of MAP1
-	int length;	 // asked length of the MAP1 [superframe slots]
-	int direction;	// direction of the transmission (device->PANCoord (transmit)=0, PANCoord->device(receive)=1)
+	int length;	 // asked length of the MAP [superframe slots]
+	int direction;	// direction of the transmission (node->Hub (transmit)=0, Hub->node(receive)=1)
 	int start_slot;	// start slot given by Hub and received from the beacon frame
 	Boolean MAP1_ACTIVE; //true if the MAP1 slot(s) is active
+	Boolean TX_state; // true if in TX state
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
-} wban_map1_attributes;
+} wban_map_attributes;
 
 
 
@@ -98,10 +100,17 @@ typedef struct {
 /* define the backoff parameters */
 typedef struct {
 	int MAX_CSMA_BACKOFF; // maximum number of Backoff (macMaxCSMABackoffs)
-	int macMinBE; // Minimum Backoff Exponent
 	int NB; // current number of backoff
 	int BE; // Backoff exponent
 	int CW; // Contention Window
+	Boolean CW_double;
+	int backoff_counter;
+	Boolean backoff_counter_lock;
+	double backoff_time;
+	double backoff_timer; // for calculating next backoff_time
+	double backoff_expiration_time;
+	Boolean RESUME_BACKOFF_TIMER;
+	Boolean CCA_DEFERRED;
 	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wban_csma_attributes;
@@ -142,10 +151,15 @@ typedef struct {
 	double map2_length2sec;
 
 	double BI_Boundary; // Specfiy the time at which the beacon frame has been created to synchronize all node to this time reference
-	
+	double eap1_start2sec;
+	double rap1_start2sec;
+	double rap2_start2sec;
+
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
+	Boolean IN_MAP_PHASE; //true if in MAP phase
+	Boolean TRANSCEIVER_STAGE; // If any packet is for transceiver
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
 	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
@@ -162,8 +176,23 @@ typedef struct {
 
 	int max_packet_tries;
 	int MGMT_buffer_size;
-	Boolean wait_ack;	// acknowledged packet?
+	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;
+
+/* define the packet to be sent parameters */
+typedef struct 
+{
+	Objid objid;
+	int	sender_id; // Sender ID of the node
+	int	recipient_id; // Recipient ID of the node
+	int ack_policy;
+	int seq_num;
+	int total_bits; // length of PPDU
+	int ack_bits; // length of ack PPDU
+	int user_priority;
+	int frame_type;
+	int frame_subtype;
+} packet_to_be_sent_attributes;
 
 #endif
