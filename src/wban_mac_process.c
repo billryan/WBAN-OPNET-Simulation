@@ -974,23 +974,27 @@ static void wban_mac_interrupt_process() {
 					}
 
 					if (enable_log) {
-						fprintf (log,"t=%f  -------- START CCA CW = %d ------>  CHANNEL IDLE = %s  \n\n",op_sim_time(),csma.CW, boolean2string(csma.CCA_CHANNEL_IDLE));
-						printf (" [Node %s] t=%f  -------- START CCA CW = %d ------>  CHANNEL IDLE = %s  \n\n",node_attr.name, op_sim_time(), csma.CW, boolean2string(csma.CCA_CHANNEL_IDLE));
+						fprintf (log,"t=%f  -------- START CCA CW = %d\n",op_sim_time(),csma.CW);
+						printf (" [Node %s] t=%f  -------- START CCA CW = %d\n",node_attr.name, op_sim_time(), csma.CW);
 					}
-					op_intrpt_schedule_self (op_sim_time(), CCA_EXPIRATION_CODE);
+					op_intrpt_schedule_self (op_sim_time() + pCCATime * 0.001, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
 			
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
 					/* bug with open-zigbee, for statwire interupt can sustain a duration */
-					if ((OPC_TRUE == csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
+					if ((OPC_FALSE == csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
+						printf("CCA with BUSY.\n");
 						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 					} else {
 						csma.backoff_counter--;
+						printf("CCA with IDLE, backoff_counter decrement to %d.\n", csma.backoff_counter);
 						if (csma.backoff_counter != 0) {
+							printf("CCA at next available backoff boundary = %f sec.\n", wban_backoff_period_boundary_get());
 							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
 						} else {
+							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, wban_backoff_period_boundary_get());
 							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), START_TRANSMISSION_CODE);
 						}
 					}
@@ -1418,7 +1422,7 @@ static void wban_attempt_TX() {
 		SF.TRANSCEIVER_STAGE = OPC_TRUE;
 		FOUT;
 	}
-	
+
 	SF.TRANSCEIVER_STAGE = OPC_FALSE;
 	/* Stack tracing exit point */
 	FOUT;
@@ -1453,7 +1457,7 @@ static void wban_attempt_TX_CSMA(int user_priority) {
 	}
 	//CCA
 	op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
-	op_intrpt_schedule_self (wban_backoff_period_boundary_get() + pCCATime*0.001, CCA_EXPIRATION_CODE);
+	//op_intrpt_schedule_self (wban_backoff_period_boundary_get() + pCCATime*0.001, CCA_EXPIRATION_CODE);
 	if (BACKOFF_EXPIRED && !SF.IN_MAP_PHASE) {
 
 	}
@@ -1563,6 +1567,7 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 	FIN(can_fit_TX);
 
 	if (!packet_to_be_sent_local) {
+		printf("packet_to_be_sent_local pointer is NULL.\n");
 		FRET(OPC_FALSE);
 	}
 
@@ -1576,10 +1581,15 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 		if(packet_to_be_sent_local->ack_policy != N_ACK_POLICY) {
 			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS* 0.000001)) >=0) {
 				FRET(OPC_TRUE);
+			} else {
+				printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
 			}
+		
 		} else {
 			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits), node_attr.data_rate))+pSIFS* 0.000001) >=0) {
 				FRET(OPC_TRUE);
+			} else {
+				printf("No enougth time for I_ACK_POLICY packet transmission in this phase.\n");
 			}
 		}
 	}
@@ -1633,6 +1643,7 @@ static void wban_send_packet() {
 			break;
 		case I_ACK_POLICY:
 			mac_attr.wait_for_ack = OPC_TRUE;
+			mac_attr.wait_ack_seq_num = packet_to_be_sent.seq_num;
 
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + (pSIFS+mTimeOut)*0.000001, WAITING_ACK_END_CODE);
 
