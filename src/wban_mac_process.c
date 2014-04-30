@@ -146,6 +146,7 @@ static void wban_mac_init() {
 	// SF.backoff_timer= -1;
 	// SF.CCA_DEFERRED = OPC_FALSE;
 	SF.SLEEP = OPC_TRUE;
+	SF.TRANSCEIVER_STAGE = OPC_FALSE;
 	
 	// /* CSMA initialization	*/
 	// csma.NB = 0;
@@ -956,7 +957,7 @@ static void wban_mac_interrupt_process() {
 
 				case TRY_PACKET_TRANSMISSION_CODE :
 				{	
-					SF.TRANSCEIVER_STAGE = OPC_TRUE;
+					// SF.TRANSCEIVER_STAGE = OPC_TRUE;
 					wban_attempt_TX();
 					break;
 				};
@@ -1379,6 +1380,7 @@ static void wban_attempt_TX() {
 	}
 
 	if (op_subq_empty(SUBQ_DATA)) {
+		SF.TRANSCEIVER_STAGE = OPC_FALSE;
 		FOUT;
 	} else {
 		/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
@@ -1413,8 +1415,11 @@ static void wban_attempt_TX() {
 			wban_attempt_TX_CSMA(packet_to_be_sent.user_priority);
 		}
 
+		SF.TRANSCEIVER_STAGE = OPC_TRUE;
 		FOUT;
 	}
+	
+	SF.TRANSCEIVER_STAGE = OPC_FALSE;
 	/* Stack tracing exit point */
 	FOUT;
 }
