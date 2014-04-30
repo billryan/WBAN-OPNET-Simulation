@@ -910,6 +910,7 @@ static void wban_mac_interrupt_process() {
 					phase_start_timeG = SF.eap1_start2sec;
 					phase_end_timeG = SF.rap1_start2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.IN_EAP_PHASE = OPC_TRUE;
 					SF.SLEEP = OPC_FALSE;
 				
 					if (enable_log) {
@@ -927,6 +928,7 @@ static void wban_mac_interrupt_process() {
 					phase_start_timeG = SF.rap1_start2sec;
 					phase_end_timeG = SF.rap1_start2sec + SF.rap1_length2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.IN_EAP_PHASE = OPC_FALSE;
 					SF.SLEEP = OPC_FALSE;
 				
 					if (enable_log) {
@@ -1355,7 +1357,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
  * Input:	
  *--------------------------------------------------------------------------------*/
 static void wban_attempt_TX() {
-	
+	Packet* frame_MPDU_temp;
 	/* Stack tracing enrty point */
 	FIN(wban_attempt_TX);
 
@@ -1404,26 +1406,34 @@ static void wban_attempt_TX() {
 			packet_to_be_sent.recipient_id = mac_attr.recipient_id;
 			packet_to_be_sent.sender_id = mac_attr.sender_id;
 		}
-	}
 
-	if (current_packet_txs + current_packet_CS_fails < max_packet_tries) {
-		if (SF.IN_MAP_PHASE) {
-			if (map_attr.TX_state) {
-				// send packet
-			}
-		} else {
-			csma.CW = CWmin[packet_to_be_sent.user_priority];
-			csma.CW_double = OPC_FALSE;
-			csma.backoff_counter = 0;
-			csma.backoff_counter_lock = OPC_FALSE;
-			wban_attempt_TX_CSMA(packet_to_be_sent.user_priority);
+		if ((OPC_TRUE == SF.IN_EAP_PHASE) && (7 != packet_to_be_sent.user_priority)) {
+			printf("%s have no UP=7 traffic in the SUBQ_DATA subqueue currently.\n", node_attr.name);
+			FOUT;
 		}
-
-		SF.TRANSCEIVER_STAGE = OPC_TRUE;
-		FOUT;
+		/* remove the packet in the head of the queue */
+		frame_MPDU_temp = op_subq_pk_remove (SUBQ_DATA, OPC_QPOS_HEAD);
 	}
 
-	SF.TRANSCEIVER_STAGE = OPC_FALSE;
+	// if (current_packet_txs + current_packet_CS_fails < max_packet_tries) {
+	// }
+	current_packet_txs = 0;
+	current_packet_CS_fails = 0;
+
+	if (SF.IN_MAP_PHASE) {
+		if (map_attr.TX_state) {
+			// send packet
+		}
+	} else {
+		csma.CW = CWmin[packet_to_be_sent.user_priority];
+		csma.CW_double = OPC_FALSE;
+		csma.backoff_counter = 0;
+		csma.backoff_counter_lock = OPC_FALSE;
+		wban_attempt_TX_CSMA(packet_to_be_sent.user_priority);
+	}
+
+	SF.TRANSCEIVER_STAGE = OPC_TRUE;
+
 	/* Stack tracing exit point */
 	FOUT;
 }

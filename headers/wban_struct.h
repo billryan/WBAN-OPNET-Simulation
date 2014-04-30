@@ -159,6 +159,7 @@ typedef struct {
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
 	Boolean IN_MAP_PHASE; //true if in MAP phase
+	Boolean IN_EAP_PHASE; //true if in EAP1/EAP2 phase
 	Boolean TRANSCEIVER_STAGE; // If any packet is for transceiver
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
