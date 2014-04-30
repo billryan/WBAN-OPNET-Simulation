@@ -1379,7 +1379,7 @@ static void wban_attempt_TX() {
 		FOUT;
 	}
 
-	if (op_stat_local_read(TX_BUSY_STAT) == 1.0) {
+	if ((op_stat_local_read(TX_BUSY_STAT) == 1.0) || (OPC_TRUE == SF.TRANSCEIVER_STAGE) || (OPC_TRUE == SF.SLEEP)) {
 		FOUT;
 	}
 
