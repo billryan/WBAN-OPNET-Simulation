@@ -894,9 +894,9 @@ static void wban_mac_interrupt_process() {
 				};/*end of BEACON_INTERVAL_CODE */
 
 				case INCREMENT_SLOT: {
-					printf("Node %s Entered into INCREMENT_SLOT interupt. Current time %f\n", node_attr.name, op_sim_time());
+					// printf("Node %s Entered into INCREMENT_SLOT interupt. Current time %f\n", node_attr.name, op_sim_time());
 					SF.current_slot++;
-					printf("SF.current_slot = %d increment 1 after every slot. \n", SF.current_slot);
+					// printf("SF.current_slot = %d increment 1 after every slot. \n", SF.current_slot);
 					if (SF.SD > SF.current_slot + 1) {
 						op_intrpt_schedule_self (op_sim_time() + SF.slot_length2sec, INCREMENT_SLOT);
 					}
