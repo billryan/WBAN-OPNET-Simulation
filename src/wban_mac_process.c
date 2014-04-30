@@ -589,7 +589,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
 
 		/* for node we should calculate the slot boundary */
-		SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);;
+		SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);
+		printf("SF.current_slot = %d when received beacon frame.\n", SF.current_slot);
 		SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
 		op_pk_destroy (beacon_MSDU_rx);
@@ -893,8 +894,10 @@ static void wban_mac_interrupt_process() {
 				};/*end of BEACON_INTERVAL_CODE */
 
 				case INCREMENT_SLOT: {
+					printf("Node %s Entered into INCREMENT_SLOT interupt. Current time %f\n", node_attr.name, op_sim_time());
 					SF.current_slot++;
-					if (SF.current_slot < SF.beacon_period_length - 1) {
+					printf("SF.current_slot = %d increment 1 after every slot. \n", SF.current_slot);
+					if (SF.SD > SF.current_slot + 1) {
 						op_intrpt_schedule_self (op_sim_time() + SF.slot_length2sec, INCREMENT_SLOT);
 					}
 					break;
