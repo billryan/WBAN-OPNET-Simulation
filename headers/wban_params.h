@@ -24,7 +24,7 @@
 #define pAllocationSlotMin 500 //500 μs for NB PHY
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
 #define allocationSlotLength 19 //for NB PHY, L=19 means that 10 ms per slot
-#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution)/1000.0) //10 ms default
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //10 ms default
 
 // constants related to Intra-Frame Spacing IFS 
 #define aMaxSIFSFrameSize_Bits	(18*8)
@@ -34,15 +34,15 @@
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
 #define SYMBOL_RATE 600.0 // Ksps
-#define pSIFS 75 // μs
+#define pSIFS (75 * 0.000001) // μs
 
 // CSMA/CA
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
 // pCCATime = 63 / Symbol Rate
 // pCSMAMACPHYTime = 40 μs
-#define pCCATime (63 / SYMBOL_RATE) // ms
-#define pCSMAMACPHYTime 40 // 40 μs
-#define pCSMASlotLength2Sec (pCCATime * 0.001 + pCSMAMACPHYTime * 0.000001)
+#define pCCATime ((63/SYMBOL_RATE) * 0.001) // ms
+#define pCSMAMACPHYTime (40 * 0.000001) // 40 μs
+#define pCSMASlotLength2Sec (pCCATime + pCSMAMACPHYTime)
 /* 802.15.6 related MAC parameters */
 
 /** MAC Layer attributes		**/
@@ -104,7 +104,7 @@
 
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
-#define I_ACK_PPDU_SIZE_BITS (80+121)
+#define I_ACK_PPDU_SIZE_BITS (72+121)
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,

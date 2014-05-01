@@ -99,14 +99,12 @@ typedef struct {
 
 /* define the backoff parameters */
 typedef struct {
-	int MAX_CSMA_BACKOFF; // maximum number of Backoff (macMaxCSMABackoffs)
-	int NB; // current number of backoff
-	int BE; // Backoff exponent
 	int CW; // Contention Window
 	Boolean CW_double;
 	int backoff_counter;
 	Boolean backoff_counter_lock;
 	double backoff_time;
+	double next_slot_start;
 	double backoff_timer; // for calculating next backoff_time
 	double backoff_expiration_time;
 	Boolean RESUME_BACKOFF_TIMER;
@@ -160,7 +158,7 @@ typedef struct {
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
 	Boolean IN_MAP_PHASE; //true if in MAP phase
 	Boolean IN_EAP_PHASE; //true if in EAP1/EAP2 phase
-	Boolean TRANSCEIVER_STAGE; // If any packet is for transceiver
+	Boolean ENABLE_TX_NEW; // Enable new transmission
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
 	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
