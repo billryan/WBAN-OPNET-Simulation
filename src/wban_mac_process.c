@@ -166,6 +166,9 @@ static void wban_mac_init() {
 	
 	/* packet to be sent initialization */
 	packet_to_be_sent = (packet_to_be_sent_attributes*)malloc(sizeof(packet_to_be_sent_attributes));
+	packet_to_be_sent = NULL;
+	packet_eap_temp = (packet_to_be_sent_attributes*)malloc(sizeof(packet_to_be_sent_attributes));
+	packet_eap_temp = NULL;
 	// packet_to_be_sent->sender_id = mac_attr.sender_id;
 	// packet_to_be_sent->recipient_id = mac_attr.recipient_id;
 	// packet_to_be_sent->ack_policy = -1;
@@ -253,8 +256,10 @@ static void wban_parse_incoming_frame() {
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
 		{
+			printf("Received PPDU packet size = %d.\n", op_pk_total_size_get(rcv_frame));
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
+			printf("Received MPDU packet size = %d.\n", op_pk_total_size_get(frame_MPDU));
 
 			/*update the battery*/
 			packet_size = (double) op_pk_total_size_get(rcv_frame);
@@ -542,7 +547,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	FIN(wban_extract_beacon_frame);
 
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
-	
 	// if I'm a End Device, I get the information and synchronize myself
 	if (!node_attr.is_BANhub) {
 		op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
@@ -587,9 +591,9 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		SF.rap1_end = beacon_attr.rap1_end;
 		SF.rap2_start = beacon_attr.rap2_start;
 		SF.rap2_end = beacon_attr.rap2_end;
-
+		
 		SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
-		beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_MPDU_rx)+121, node_attr.data_rate);
+		beacon_frame_tx_time = TX_TIME(BEACON_PPDU_BITS, node_attr.data_rate);
 		SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time;
 		SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
 		SF.rap2_start2sec = SF.BI_Boundary + SF.rap2_start * SF.slot_length2sec;
@@ -646,6 +650,7 @@ static void wban_schedule_next_beacon() {
 		op_intrpt_schedule_self (SF.eap1_start2sec, START_OF_EAP1_PERIOD_CODE);
 	}
 	if ((SF.rap1_start > 0) && (SF.rap1_length2sec > 0)) {
+		op_intrpt_schedule_self (SF.rap1_start2sec, END_OF_EAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, END_OF_RAP1_PERIOD_CODE);
 	}
@@ -915,22 +920,40 @@ static void wban_mac_interrupt_process() {
 
 				case START_OF_EAP1_PERIOD_CODE: /* start of EAP1 Period */
 				{
+					printf("Entered into START OF EAP1 PERIOD at %f.\n", op_sim_time());
 					mac_state = MAC_EAP1;
 					phase_start_timeG = SF.eap1_start2sec;
 					phase_end_timeG = SF.rap1_start2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_TRUE;
 					SF.SLEEP = OPC_FALSE;
-					SF.ENABLE_TX_NEW = OPC_TRUE;
+
+					// if (NULL == packet_to_be_sent) {
+					// 	op_intrpt_schedule_self (op_sim_time()+pSIFS, TRY_EAP_TRANSMISSION_CODE);
+					// } else if (7 == packet_to_be_sent->user_priority) {
+					// 	d
+					// }
+					// SF.ENABLE_TX_NEW = OPC_TRUE;
 				
 					if (enable_log) {
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE EAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
-					csma.next_slot_start = op_sim_time() + pSIFS;
 					op_intrpt_schedule_self (op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_EAP1_PERIOD_CODE */
+
+				case END_OF_EAP1_PERIOD_CODE: /* start of EAP1 Period */
+				{
+					mac_state = MAC_SLEEP;
+					SF.SLEEP = OPC_TRUE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ END OF THE EAP1 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}			
+					break;
+				};/* end of END_OF_EAP1_PERIOD_CODE */
 
 				case START_OF_RAP1_PERIOD_CODE: /* start of RAP1 Period */
 				{
@@ -940,13 +963,13 @@ static void wban_mac_interrupt_process() {
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_FALSE;
 					SF.SLEEP = OPC_FALSE;
-					SF.ENABLE_TX_NEW = OPC_TRUE;
+					// SF.ENABLE_TX_NEW = OPC_TRUE;
 				
 					if (enable_log) {
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
-					csma.next_slot_start = op_sim_time() + pSIFS;
+					// csma.next_slot_start = op_sim_time() + pSIFS;
 					op_intrpt_schedule_self (op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_RAP1_PERIOD_CODE */
@@ -1401,14 +1424,73 @@ static void wban_attempt_TX() {
 		FOUT;
 	}
 
-	if ((op_stat_local_read(TX_BUSY_STAT) == 1.0) || (OPC_FALSE == SF.ENABLE_TX_NEW) || (OPC_TRUE == SF.SLEEP)) {
+	if ((op_stat_local_read(TX_BUSY_STAT) == 1.0) || (MAC_SLEEP == mac_state)) {
 		FOUT;
+	}
+
+	if (NULL != packet_to_be_sent) {
+		if (OPC_TRUE == SF.IN_EAP_PHASE) {
+			if (7 == packet_to_be_sent->user_priority) {
+				SF.ENABLE_TX_NEW = OPC_FALSE;
+				csma.backoff_counter = 0;
+				wban_attempt_TX_CSMA(7);
+				FOUT;
+			}
+		} else {
+			SF.ENABLE_TX_NEW = OPC_FALSE;
+			if (OPC_TRUE == SF.IN_MAP_PHASE) {
+				if (map_attr.TX_state) {
+					// send packet
+				}
+			} else {
+				// csma.CW = CWmin[packet_to_be_sent->user_priority];
+				// csma.CW_double = OPC_FALSE;
+				csma.backoff_counter = 0;
+				wban_attempt_TX_CSMA(packet_to_be_sent->user_priority);
+			}
+			FOUT;
+		}
 	}
 
 	if (op_subq_empty(SUBQ_DATA)) {
 		SF.ENABLE_TX_NEW = OPC_TRUE;
 		FOUT;
 	} else {
+		if ((NULL != packet_to_be_sent) && (OPC_TRUE == SF.IN_EAP_PHASE)) {
+			frame_MPDU_EAP_temp = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_HEAD);
+
+			op_pk_nfd_get(frame_MPDU_EAP_temp, "Frame Subtype", &(packet_eap_temp->user_priority));
+			if (7 != packet_eap_temp->user_priority) {
+				SF.ENABLE_TX_NEW = OPC_TRUE;
+				FOUT;
+			}
+			op_pk_nfd_get(frame_MPDU_EAP_temp, "Sequence Number", &(packet_eap_temp->seq_num));
+			op_pk_nfd_get(frame_MPDU_EAP_temp, "Ack Policy", &(packet_eap_temp->ack_policy));
+			op_pk_nfd_get(frame_MPDU_EAP_temp, "Recipient ID", &(packet_eap_temp->recipient_id));
+			op_pk_nfd_get(frame_MPDU_EAP_temp, "Frame Type", &(packet_eap_temp->frame_type));
+			// op_pk_nfd_get(frame_MPDU_EAP_temp, "Frame Subtype", &(packet_eap_temp->user_priority));
+			
+			/* for frame enqueued to subqueue before first beacon reception */
+			if (packet_eap_temp->recipient_id == HUB_ID) {
+				op_pk_nfd_set(frame_MPDU_EAP_temp, "Recipient ID", mac_attr.recipient_id);
+				op_pk_nfd_set(frame_MPDU_EAP_temp, "Sender ID", mac_attr.sender_id);
+				op_pk_nfd_set(frame_MPDU_EAP_temp, "BAN ID", mac_attr.ban_id);
+				packet_eap_temp->recipient_id = mac_attr.recipient_id;
+				packet_eap_temp->sender_id = mac_attr.sender_id;
+			}
+
+			/* remove the packet in the head of the queue */
+			frame_MPDU_temp = op_subq_pk_remove (SUBQ_DATA, OPC_QPOS_HEAD);
+
+			current_packet_txs = 0;
+			current_packet_CS_fails = 0;
+			SF.ENABLE_TX_NEW = OPC_FALSE;
+			csma.CW = CWmin[7];
+			csma.CW_double = OPC_FALSE;
+			csma.backoff_counter = 0;
+			wban_attempt_TX_CSMA(packet_to_be_sent->user_priority);
+		}
+
 		/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
 		frame_MPDU_to_be_sent = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_HEAD);
 
@@ -1439,6 +1521,7 @@ static void wban_attempt_TX() {
 	// }
 	current_packet_txs = 0;
 	current_packet_CS_fails = 0;
+	SF.ENABLE_TX_NEW = OPC_FALSE;
 
 	if (SF.IN_MAP_PHASE) {
 		if (map_attr.TX_state) {
@@ -1450,8 +1533,6 @@ static void wban_attempt_TX() {
 		csma.backoff_counter = 0;
 		wban_attempt_TX_CSMA(packet_to_be_sent->user_priority);
 	}
-
-	SF.ENABLE_TX_NEW = OPC_FALSE;
 
 	/* Stack tracing exit point */
 	FOUT;

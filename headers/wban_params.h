@@ -105,6 +105,7 @@
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
 #define I_ACK_PPDU_SIZE_BITS (72+121)
+#define BEACON_PPDU_BITS 361
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,
@@ -118,7 +119,7 @@ enum USER_PRIORITY {
 };
 
 enum MAC_STATES {
-	MAC_SETUP = 1000,
+    MAC_SETUP = 1000,
     MAC_EAP1 = 1001,
     MAC_RAP1 = 1002,
     MAC_MAP1 = 1003,
@@ -126,11 +127,25 @@ enum MAC_STATES {
     MAC_RAP2 = 1005,
     MAC_MAP2 = 1006,
     MAC_CAP = 1007,
-	MAC_RAP = 1017,
-	MAC_FREE_TX_ACCESS = 1012,
-	MAC_FREE_RX_ACCESS = 1013,
-	MAC_BEACON_WAIT = 1019,
-	MAC_SLEEP = 1020
+    MAC_RAP = 1017,
+    MAC_FREE_TX_ACCESS = 1012,
+    MAC_FREE_RX_ACCESS = 1013,
+    MAC_BEACON_WAIT = 1019,
+    MAC_SLEEP = 1020
+};
+
+enum SF_STATES {
+    SF_SLEEP = 1000,
+    SF_EAP1 = 1001,
+    SF_RAP1 = 1002,
+    SF_MAP1 = 1003,
+    SF_EAP2 = 1004,
+    SF_RAP2 = 1005,
+    SF_MAP2 = 1006,
+    SF_CAP = 1007,
+    SF_RAP = 1017,
+    SF_FREE_TX_ACCESS = 1012,
+    SF_FREE_RX_ACCESS = 1013
 };
 
 enum AcknowledgementPolicy_type {
