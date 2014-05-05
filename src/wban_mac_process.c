@@ -137,6 +137,7 @@ static void wban_mac_init() {
 		mac_state = MAC_SETUP;
 
 		beacon_attr.beacon_period_length = -1;
+
 	}
 
 	// SF.current_slot = 0;
@@ -163,6 +164,17 @@ static void wban_mac_init() {
 		
 	//fprint_mac_attributes();
 	
+	/* packet to be sent initialization */
+	packet_to_be_sent = (packet_to_be_sent_attributes*)malloc(sizeof(packet_to_be_sent_attributes));
+	// packet_to_be_sent->sender_id = mac_attr.sender_id;
+	// packet_to_be_sent->recipient_id = mac_attr.recipient_id;
+	// packet_to_be_sent->ack_policy = -1;
+	// packet_to_be_sent->seq_num = -1;
+	// packet_to_be_sent->total_bits = -1;
+	// packet_to_be_sent->ack_bits = -1;
+	// packet_to_be_sent->user_priority = -1;
+	// packet_to_be_sent->frame_type = -1;
+	// packet_to_be_sent->frame_subtype = -1;
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -174,7 +186,6 @@ static void wban_mac_init() {
  *				
  * No parameters
  *--------------------------------------------------------------------------------*/
-
 static void wban_log_file_init() {
  
 	char directory_path_name[120];
@@ -211,7 +222,6 @@ static void wban_log_file_init() {
  *
  * No parameters
  *--------------------------------------------------------------------------------*/
-
 static void wban_parse_incoming_frame() {
 
 	Packet* frame_MPDU;
@@ -941,6 +951,25 @@ static void wban_mac_interrupt_process() {
 					break;
 				};/* end of START_OF_RAP1_PERIOD_CODE */
 
+				case START_OF_MAP1_PERIOD_CODE: /* start of RAP1 Period */
+				{
+					mac_state = MAC_MAP1;
+					phase_start_timeG = SF.map1_start2sec;
+					phase_end_timeG = SF.map1_start2sec + SF.map1_length2sec;
+					SF.IN_MAP_PHASE = OPC_TRUE;
+					SF.IN_EAP_PHASE = OPC_FALSE;
+					SF.SLEEP = OPC_FALSE;
+					SF.ENABLE_TX_NEW = OPC_TRUE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}
+					csma.next_slot_start = op_sim_time() + pSIFS;
+					op_intrpt_schedule_self (op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);				
+					break;
+				};/* end of START_OF_RAP1_PERIOD_CODE */
+
 				case START_OF_RAP2_PERIOD_CODE: /* start of RAP1 Period */
 				{
 					mac_state = MAC_RAP2;
@@ -988,7 +1017,7 @@ static void wban_mac_interrupt_process() {
 			
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
-					if(!can_fit_TX(&packet_to_be_sent)) {
+					if(!can_fit_TX(packet_to_be_sent)) {
 						current_packet_CS_fails++;
 						csma.backoff_counter_lock = OPC_TRUE;
 						break;
@@ -996,14 +1025,14 @@ static void wban_mac_interrupt_process() {
 
 					/* bug with open-zigbee, for statwire interupt can sustain a duration */
 					if ((OPC_FALSE == csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
-						printf("CCA with BUSY.\n");
+						printf("t = %f, CCA with BUSY.\n", op_sim_time());
 						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 						csma.backoff_counter_lock = OPC_TRUE;
 						// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
 						op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
 					} else {
 						csma.backoff_counter--;
-						printf("CCA with IDLE, backoff_counter decrement to %d.\n", csma.backoff_counter);
+						printf("t = %f, CCA with IDLE, backoff_counter decrement to %d.\n", op_sim_time(), csma.backoff_counter);
 						if (csma.backoff_counter != 0) {
 							// printf("CCA at next available backoff boundary = %f sec.\n", csma.next_slot_start);
 							// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
@@ -1052,13 +1081,13 @@ static void wban_mac_interrupt_process() {
 							// double the Contention Window, after every second fail.
 							if (OPC_TRUE == csma.CW_double) {
 								csma.CW *=2;
-								if (csma.CW > CWmax[packet_to_be_sent.user_priority]) {
-									csma.CW = CWmax[packet_to_be_sent.user_priority];
+								if (csma.CW > CWmax[packet_to_be_sent->user_priority]) {
+									csma.CW = CWmax[packet_to_be_sent->user_priority];
 								}
 								printf("CW doubled after %d tries.\n", current_packet_txs + current_packet_CS_fails);
 							}
 							(csma.CW_double == OPC_TRUE) ? (csma.CW_double=OPC_FALSE) : (csma.CW_double=OPC_TRUE);
-							wban_backoff_delay_set(packet_to_be_sent.user_priority);
+							wban_backoff_delay_set(packet_to_be_sent->user_priority);
 							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
 						}
 						// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);	// try to send the same packet once more
@@ -1383,22 +1412,22 @@ static void wban_attempt_TX() {
 		/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
 		frame_MPDU_to_be_sent = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_HEAD);
 
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Sequence Number", &packet_to_be_sent.seq_num);
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Ack Policy", &packet_to_be_sent.ack_policy);
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Recipient ID", &packet_to_be_sent.recipient_id);
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Type", &packet_to_be_sent.frame_type);
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &packet_to_be_sent.user_priority);
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Sequence Number", &(packet_to_be_sent->seq_num));
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Ack Policy", &(packet_to_be_sent->ack_policy));
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Recipient ID", &(packet_to_be_sent->recipient_id));
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Type", &(packet_to_be_sent->frame_type));
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &(packet_to_be_sent->user_priority));
 		
 		/* for frame enqueued to subqueue before first beacon reception */
-		if (packet_to_be_sent.recipient_id == HUB_ID) {
+		if (packet_to_be_sent->recipient_id == HUB_ID) {
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "Recipient ID", mac_attr.recipient_id);
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "Sender ID", mac_attr.sender_id);
 			op_pk_nfd_set(frame_MPDU_to_be_sent, "BAN ID", mac_attr.ban_id);
-			packet_to_be_sent.recipient_id = mac_attr.recipient_id;
-			packet_to_be_sent.sender_id = mac_attr.sender_id;
+			packet_to_be_sent->recipient_id = mac_attr.recipient_id;
+			packet_to_be_sent->sender_id = mac_attr.sender_id;
 		}
 
-		if ((OPC_TRUE == SF.IN_EAP_PHASE) && (7 != packet_to_be_sent.user_priority)) {
+		if ((OPC_TRUE == SF.IN_EAP_PHASE) && (7 != packet_to_be_sent->user_priority)) {
 			printf("%s have no UP=7 traffic in the SUBQ_DATA subqueue currently.\n", node_attr.name);
 			FOUT;
 		}
@@ -1416,10 +1445,10 @@ static void wban_attempt_TX() {
 			// send packet
 		}
 	} else {
-		csma.CW = CWmin[packet_to_be_sent.user_priority];
+		csma.CW = CWmin[packet_to_be_sent->user_priority];
 		csma.CW_double = OPC_FALSE;
 		csma.backoff_counter = 0;
-		wban_attempt_TX_CSMA(packet_to_be_sent.user_priority);
+		wban_attempt_TX_CSMA(packet_to_be_sent->user_priority);
 	}
 
 	SF.ENABLE_TX_NEW = OPC_FALSE;
@@ -1448,7 +1477,7 @@ static void wban_attempt_TX_CSMA(int user_priority) {
 	wban_backoff_delay_set(user_priority);
 	csma.backoff_counter_lock = OPC_FALSE;
 
-	if(!can_fit_TX(&packet_to_be_sent)) {
+	if(!can_fit_TX(packet_to_be_sent)) {
 		current_packet_CS_fails++;
 		csma.backoff_counter_lock = OPC_TRUE;
 
@@ -1531,6 +1560,7 @@ static void wban_backoff_delay_set( int user_priority) {
 		printf ("    + Phase Remaining Length = %f sec \n", phase_remaining_time);
 		printf ("  Current Time Slot = %d\n", SF.current_slot);
 		printf ("  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
+        printf ("  Phase Start Time     = %f sec \n", phase_start_timeG);
 		printf ("  Phase End Time     = %f sec \n", phase_end_timeG);
 		printf ("  Difference       = %f sec \n", phase_end_timeG- wban_backoff_period_boundary_get());
 		printf ("  BackOff Expiration Time  = %f sec\n", csma.backoff_expiration_time);
@@ -1545,6 +1575,7 @@ static void wban_backoff_delay_set( int user_priority) {
 		fprintf (log, "    + Phase Remaining Length = %f sec \n", phase_remaining_time);
 		fprintf (log, "  Current Time Slot = %d\n", SF.current_slot);
 		fprintf (log, "  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
+		fprintf (log, "  Phase Start Time     = %f sec \n", phase_start_timeG);
 		fprintf (log, "  Phase End Time     = %f sec \n", phase_end_timeG);
 		fprintf (log, "  Difference       = %f sec \n", phase_end_timeG- wban_backoff_period_boundary_get());
 		fprintf (log, "  BackOff Expiration Time  = %f sec\n", csma.backoff_expiration_time);
@@ -1580,10 +1611,11 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 		// if(compare_doubles((phase_remaining_time - pCSMASlotLength2Sec), csma.backoff_time) >=0) {// THERE IS A PROBLEM WITH EQUALITY IN DOUBLE
 		// }
 		if(packet_to_be_sent_local->ack_policy != N_ACK_POLICY) {
-			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS* 0.000001)) >=0) {
+			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS)) >=0) {
 				FRET(OPC_TRUE);
 			} else {
 				printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
+				FRET(OPC_FALSE);
 			}
 		
 		} else {
@@ -1626,7 +1658,7 @@ static void wban_send_packet() {
 	ack_expire_time = op_sim_time() + PPDU_tx_time + ack_tx_time + 2* pSIFS;
 	wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU_copy));
 
-	switch (packet_to_be_sent.frame_type) {
+	switch (packet_to_be_sent->frame_type) {
 		case DATA: 
 			break;
 		case MANAGEMENT: 
@@ -1637,19 +1669,19 @@ static void wban_send_packet() {
 			break;
 	}
 
-	switch (packet_to_be_sent.ack_policy) {
+	switch (packet_to_be_sent->ack_policy) {
 		case N_ACK_POLICY:
 			op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS, N_ACK_PACKET_SENT);
 			break;
 		case I_ACK_POLICY:
 			mac_attr.wait_for_ack = OPC_TRUE;
-			mac_attr.wait_ack_seq_num = packet_to_be_sent.seq_num;
+			mac_attr.wait_ack_seq_num = packet_to_be_sent->seq_num;
 
 			current_packet_txs++;
 			if (enable_log) {
-				fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
-				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
+				fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent->recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
+				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent->recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
 			}
 			op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + 2*pSIFS + ack_tx_time, WAITING_ACK_END_CODE);
