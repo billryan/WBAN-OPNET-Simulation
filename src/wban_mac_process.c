@@ -289,7 +289,10 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 						case CONNECTION_REQUEST:
-							// not implemented
+							if (enable_log) {
+								fprintf (log,"t=%f  !!!!!!!!! COnnection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+								printf (" [Node %s] t=%f  !!!!!!!!! COnnection request Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+							}
 							break;
 						case CONNECTION_ASSIGNMENT:
 							// not implemented
@@ -589,6 +592,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			if (conn_req_attr.allocation_length > 0) {
 				// we are unconnected, and we need to connect to obtain scheduled access
 				// we will create and send a connection request
+				printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
+				wban_send_connection_request_frame();
 			}
 		}
 		wban_schedule_next_beacon();
@@ -654,6 +659,7 @@ static void wban_send_connection_request_frame () {
 	/* Stack tracing enrty point */
 	FIN(wban_send_connection_request_frame);
 
+	random_num = wban_update_sequence_number();
 	/* create a connection request frame */
 	connection_request_MSDU = op_pk_create_fmt ("wban_connection_request_frame_format");
 	
@@ -661,7 +667,7 @@ static void wban_send_connection_request_frame () {
 	op_pk_nfd_set (connection_request_MSDU, "Allocation Length", conn_req_attr.allocation_length);
 
 	/* create a MAC frame (MPDU) that encapsulates the connection_request payload (MSDU) */
-	connection_request_MPDU = op_pk_create_fmt ("wban_mac_pkt_format");
+	connection_request_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
 	op_pk_nfd_set (connection_request_MPDU, "Ack Policy", I_ACK_POLICY);
 	op_pk_nfd_set (connection_request_MPDU, "EAP Indicator", 1); // EAP1 enabled
@@ -669,14 +675,14 @@ static void wban_send_connection_request_frame () {
 	op_pk_nfd_set (connection_request_MPDU, "Frame Type", MANAGEMENT);
 	op_pk_nfd_set (connection_request_MPDU, "B2", 1); // beacon2 enabled
 
-	op_pk_nfd_set (connection_request_MPDU, "Sequence Number", 0);
+	op_pk_nfd_set (connection_request_MPDU, "Sequence Number", random_num);
 	op_pk_nfd_set (connection_request_MPDU, "Inactive", beacon_attr.inactive_duration); // connection_request and connection_request2 frame used
 
 	op_pk_nfd_set (connection_request_MPDU, "Recipient ID", mac_attr.recipient_id);
 	op_pk_nfd_set (connection_request_MPDU, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (connection_request_MPDU, "BAN ID", mac_attr.ban_id);
 	
-	op_pk_nfd_set_pkt (connection_request_MPDU, "MSDU", connection_request_MSDU); // wrap connection_request payload (MSDU) in MAC Frame (MPDU)
+	op_pk_nfd_set_pkt (connection_request_MPDU, "MAC Frame Payload", connection_request_MSDU); // wrap connection_request payload (MSDU) in MAC Frame (MPDU)
 
 	/* create PHY frame (PPDU) that encapsulates connection_request MAC frame (MPDU) */
 	connection_request_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
@@ -688,8 +694,7 @@ static void wban_send_connection_request_frame () {
 	
 	frame_PPDU_copy = op_pk_copy(connection_request_PPDU);
 	conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
-	random_num = wban_update_sequence_number();
-	op_intrpt_schedule_self (op_sim_time()+random_num*conn_req_tx_time, WAIT_CONN_ASSIGN_CODE);
+	op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+random_num*conn_req_tx_time, WAIT_CONN_ASSIGN_CODE);
 
 	/* Stack tracing exit point */
 	FOUT;
