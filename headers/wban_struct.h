@@ -193,6 +193,7 @@ typedef struct
 	int user_priority;
 	int frame_type;
 	int frame_subtype;
+	Boolean enable;
 } packet_to_be_sent_attributes;
 
 #endif
