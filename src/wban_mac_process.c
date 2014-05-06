@@ -648,6 +648,8 @@ static void wban_send_connection_request_frame () {
 	Packet* connection_request_MSDU;
 	Packet* connection_request_MPDU;
 	Packet* connection_request_PPDU;
+	int random_num;
+	double conn_req_tx_time;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_connection_request_frame);
@@ -684,9 +686,11 @@ static void wban_send_connection_request_frame () {
 	op_pk_nfd_set_pkt (connection_request_PPDU, "PSDU", connection_request_MPDU);
 	op_pk_nfd_set (connection_request_PPDU, "LENGTH", ((double) op_pk_total_size_get(connection_request_MPDU))/8); //[bytes]	
 	
-	wpan_battery_update_tx ((double) op_pk_total_size_get(connection_request_PPDU));
-	//op_pk_send (connection_request_PPDU, STRM_FROM_MAC_TO_RADIO);
-	
+	frame_PPDU_copy = op_pk_copy(connection_request_PPDU);
+	conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
+	random_num = wban_update_sequence_number();
+	op_intrpt_schedule_self (op_sim_time()+random_num*conn_req_tx_time, WAIT_CONN_ASSIGN_CODE);
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -954,8 +958,8 @@ static void wban_mac_interrupt_process() {
 
 				case START_OF_MAP1_PERIOD_CODE: /* start of RAP1 Period */
 				{
-					// mac_state = MAC_MAP1;
-					mac_state = MAC_SLEEP;
+					mac_state = MAC_MAP1;
+					// mac_state = MAC_SLEEP;
 					phase_start_timeG = SF.map1_start2sec;
 					phase_end_timeG = SF.map1_start2sec + SF.map1_length2sec;
 					SF.IN_MAP_PHASE = OPC_TRUE;
@@ -996,7 +1000,7 @@ static void wban_mac_interrupt_process() {
 				};/* end of START_OF_RAP1_PERIOD_CODE */
 
 				case TRY_PACKET_TRANSMISSION_CODE :
-				{	
+				{
 					// SF.ENABLE_TX_NEW = OPC_TRUE;
 					wban_attempt_TX();
 					break;
@@ -1107,10 +1111,20 @@ static void wban_mac_interrupt_process() {
 					}
 					break;
 				}; /*end of WAITING_ACK_END_CODE */
+
+				case WAIT_CONN_ASSIGN_CODE:
+				{
+					op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+					wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
+					if (op_sim_time() < SF.rap2_start2sec) {
+					op_intrpt_schedule_self(op_sim_time()+0.003, WAIT_CONN_ASSIGN_CODE);
+					}
+				};
 				
 				case N_ACK_PACKET_SENT:
 					SF.ENABLE_TX_NEW = OPC_TRUE;
 					break;
+
 				default:
 				{
 				};	
