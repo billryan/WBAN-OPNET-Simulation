@@ -289,10 +289,17 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 						case CONNECTION_REQUEST:
-							if (enable_log) {
-								fprintf (log,"t=%f  !!!!!!!!! COnnection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
-								printf (" [Node %s] t=%f  !!!!!!!!! COnnection request Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+							if (OPC_FALSE == SF.ENABLE_TX_NEW) {
+								printf("Hub cannot rceive new connection request frame now.\n");
+								op_pk_destroy(frame_MPDU);
+								break;
 							}
+							SF.ENABLE_TX_NEW = OPC_FALSE;
+							if (enable_log) {
+								fprintf (log,"t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+								printf (" [Node %s] t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+							}
+							wban_extract_conn_req_frame (frame_MPDU);
 							break;
 						case CONNECTION_ASSIGNMENT:
 							// not implemented
@@ -498,6 +505,34 @@ static void wban_send_beacon_frame () {
 	FOUT;
 }
 
+/*-----------------------------------------------------------------------------
+ * Function:	wban_extract_conn_req_frame
+ *
+ * Description:	extract the data frame from the MAC frame received from the network
+ *              
+ * Input :  frame_MPDU - the received MAC frame
+ *-----------------------------------------------------------------------------*/
+static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
+	int ack_policy;
+	int seq_num;
+	int allocation_length;
+	Packet* frame_MSDU;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_extract_conn_req_frame);
+
+	op_pk_nfd_get (frame_MPDU, "Sequence Number", &seq_num);
+	wban_send_i_ack_frame (seq_num);
+	op_pk_nfd_get (frame_MSDU, "Allocation Length", &allocation_length);
+ 	if (allocation_length > 0) {
+ 		
+ 		op_intrpt_schedule_self(op_sim_time()+TX_TIME(I_ACK_PPDU_SIZE_BITS)+pSIFS, )
+ 	}
+
+	/* Stack tracing exit point */
+	FOUT;	
+}
+
 /*--------------------------------------------------------------------------------
  * Function:	wban_extract_beacon_frame
  *
@@ -626,10 +661,12 @@ static void wban_schedule_next_beacon() {
 		op_intrpt_schedule_self (SF.rap1_start2sec, END_OF_EAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, END_OF_RAP1_PERIOD_CODE);
+		op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, START_OF_MAP1_PERIOD_CODE);
 	}
 	if ((SF.rap2_length2sec > 0) && (SF.rap2_start > 0)) {
 		op_intrpt_schedule_self (SF.rap2_start2sec, START_OF_RAP2_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap2_start2sec + SF.rap2_length2sec, END_OF_RAP2_PERIOD_CODE);
+		op_intrpt_schedule_self (SF.rap2_start2sec + SF.rap2_length2sec, START_OF_MAP2_PERIOD_CODE);
 	}
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
 	op_intrpt_schedule_remote (SF.BI_Boundary + SF.BI*SF.slot_length2sec, END_OF_SLEEP_PERIOD, node_attr.my_battery);
@@ -712,7 +749,7 @@ static void wban_send_i_ack_frame (int seq_num) {
 	Packet* frame_MPDU;
 	Packet* frame_PPDU;
 	/* Stack tracing enrty point */
-	FIN(wpan_send_ack_frame);
+	FIN(wban_send_i_ack_frame);
 
 	if (enable_log) {
 		fprintf(log,"t=%f  -> Send ACK Frame [SEQ = %d] \n\n", op_sim_time(), ack_sequence_number);
@@ -1126,6 +1163,15 @@ static void wban_mac_interrupt_process() {
 					}
 				};
 				
+				case START_CONN_ASSIGN_CODE:
+				{
+					op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+					wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
+					if (op_sim_time() < SF.rap2_start2sec) {
+					op_intrpt_schedule_self(op_sim_time()+0.003, WAIT_CONN_ASSIGN_CODE);
+					}
+				};
+
 				case N_ACK_PACKET_SENT:
 					SF.ENABLE_TX_NEW = OPC_TRUE;
 					break;
@@ -1209,9 +1255,7 @@ static void wban_mac_interrupt_process() {
  *              
  * Input :  frame_MPDU - the received MAC frame
  *-----------------------------------------------------------------------------*/
-
 static void wban_extract_data_frame(Packet* frame_MPDU) {
-
 	int ack_policy;
 	int seq_num;
 	
