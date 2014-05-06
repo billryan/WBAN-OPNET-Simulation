@@ -52,6 +52,16 @@ typedef struct {
 	int allocation_length;
 } connection_request_attributes;
 
+/* define the connection assignment parameters */
+typedef struct {
+	int eap2_start;
+	int	sender_address; // 48 bits
+
+	int allocation_id;
+	int interval_start;
+	int interval_end;
+} connection_assignment_attributes;
+
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
 typedef struct {
 	int start_slot;	// the starting superframe slot of the appropriate GTS
