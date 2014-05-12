@@ -7,7 +7,6 @@
  *
  * No parameters
  *--------------------------------------------------------------------------------*/
-
 static void wban_mac_init() {
 	Objid beacon_attr_comp_id;
 	Objid beacon_attr_id;
@@ -231,10 +230,10 @@ static void wban_parse_incoming_frame() {
 
 	/* get the packet from the input stream	*/
 	Stream_ID = op_intrpt_strm();
-	rcv_frame = op_pk_get (Stream_ID);	
+	rcv_frame = op_pk_get (Stream_ID);
 	
 	frame_type_fd = 0;
-	/* check from what input stream the packet is received and do the right processing	*/
+	/* check from what input stream the packet is received and do the right processing*/
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
 		{
@@ -317,7 +316,10 @@ static void wban_parse_incoming_frame() {
 							wban_extract_conn_req_frame (frame_MPDU);
 							break;
 						case CONNECTION_ASSIGNMENT:
-							// not implemented
+							if (enable_log) {
+								fprintf (log,"t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+								printf (" [Node %s] t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+							}
 							break;
 						case DISCONNECTION:
 							// not implemented
@@ -546,13 +548,12 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	op_pk_nfd_get (frame_MSDU, "Allocation Length", &allocation_length);
 
+	conn_assign_attr.allocation_length = allocation_length;
 	// wban_send_conn_assign
  	// if (allocation_length > 0) {
- 	// 	op_intrpt_schedule_self(op_sim_time()+TX_TIME(I_ACK_PPDU_SIZE_BITS)+pSIFS, START_CONN_ASSIGN_CODE)
+ 	// 	
  	// }
-
- 	wban_send_conn_assign_frame(allocation_length);
-
+	op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_CONN_ASSIGN_CODE);
 	/* Stack tracing exit point */
 	FOUT;	
 }
@@ -651,8 +652,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			if (conn_req_attr.allocation_length > 0) {
 				// we are unconnected, and we need to connect to obtain scheduled access
 				// we will create and send a connection request
-				printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
-				wban_send_connection_request_frame();
+				// printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
+				op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec + node_attr.objid * beacon_frame_tx_time, SEND_CONN_REQ_CODE);
 			}
 		}
 		wban_schedule_next_beacon();
@@ -722,7 +723,7 @@ static void wban_send_connection_request_frame () {
 	Packet* connection_request_MPDU;
 	Packet* connection_request_PPDU;
 	int random_num;
-	double conn_req_tx_time;
+	// double conn_req_tx_time;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_connection_request_frame);
@@ -761,9 +762,9 @@ static void wban_send_connection_request_frame () {
 	op_pk_nfd_set (connection_request_PPDU, "LENGTH", ((double) op_pk_total_size_get(connection_request_MPDU))/8); //[bytes]	
 	
 	frame_PPDU_copy = op_pk_copy(connection_request_PPDU);
-	conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
-	op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+random_num*conn_req_tx_time, WAIT_CONN_ASSIGN_END_CODE);
-
+	// conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
+	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+random_num*conn_req_tx_time, SEND_CONN_REQ_CODE);
+	op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -885,7 +886,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","ACK_SEND_CODE","","");
 
 	op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
-	op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+3*conn_assign_tx_time, WAIT_CONN_ASSIGN_END_CODE);
+	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+3*conn_assign_tx_time, WAIT_CONN_ASSIGN_END_CODE);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -1313,15 +1314,21 @@ static void wban_mac_interrupt_process() {
 					// if (op_sim_time() < SF.rap2_start2sec) {
 					// op_intrpt_schedule_self(op_sim_time()+0.003, WAIT_CONN_ASSIGN_END_CODE);
 					// }
+					break;
+				};
+
+				case SEND_CONN_REQ_CODE:
+				{
+					printf("t = %f, Node %s start sending connection request frame to Hub.\n", op_sim_time(), node_attr.name);
+					wban_send_connection_request_frame();
+					break;
 				};
 				
-				case START_CONN_ASSIGN_CODE:
+				case SEND_CONN_ASSIGN_CODE:
 				{
-					op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
-					wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
-					if (op_sim_time() < SF.rap2_start2sec) {
-					op_intrpt_schedule_self(op_sim_time()+0.003, WAIT_CONN_ASSIGN_END_CODE);
-					}
+					printf("Node %s start sending connection assignment frame at %f.\n", node_attr.name, op_sim_time());
+ 					wban_send_conn_assign_frame(conn_assign_attr.allocation_length);
+					break;
 				};
 
 				case N_ACK_PACKET_SENT:
