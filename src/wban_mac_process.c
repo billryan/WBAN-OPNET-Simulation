@@ -553,7 +553,7 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
  	// if (allocation_length > 0) {
  	// 	
  	// }
-	op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_CONN_ASSIGN_CODE);
+	op_intrpt_schedule_self(op_sim_time()+TX_TIME(I_ACK_PPDU_SIZE_BITS, node_attr.data_rate)+pSIFS, SEND_CONN_ASSIGN_CODE);
 	/* Stack tracing exit point */
 	FOUT;	
 }
@@ -883,7 +883,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	
 	wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0)
-			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","ACK_SEND_CODE","","");
+			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","SEND_CONN_ASSIGN_CODE","","");
 
 	op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
 	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+3*conn_assign_tx_time, WAIT_CONN_ASSIGN_END_CODE);
