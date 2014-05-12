@@ -765,6 +765,10 @@ static void wban_send_connection_request_frame () {
 	// conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
 	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+random_num*conn_req_tx_time, SEND_CONN_REQ_CODE);
 	op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+
+	mac_attr.wait_for_ack = OPC_TRUE;
+	mac_attr.wait_ack_seq_num = random_num;
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -886,6 +890,9 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","SEND_CONN_ASSIGN_CODE","","");
 
 	op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+
+	mac_attr.wait_for_ack = OPC_TRUE;
+	mac_attr.wait_ack_seq_num = random_num;
 	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+3*conn_assign_tx_time, WAIT_CONN_ASSIGN_END_CODE);
 	/* Stack tracing exit point */
 	FOUT;

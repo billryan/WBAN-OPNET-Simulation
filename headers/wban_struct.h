@@ -61,6 +61,7 @@ typedef struct {
 	int allocation_id;
 	int interval_start;
 	int interval_end;
+	int allocation_length;
 } connection_assignment_attributes;
 
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
