@@ -18,6 +18,7 @@
 #define aMaxFrameRetries	3
 #define aMaxMACFrameSize_Bits  (aMaxPHYPacketSize_Bits-MAC_HEADER_SIZE)	//MAC Frame Payload (MSDU) size
 // 802.15.6 related 
+#define BeaconPeriodLength 64
 #define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
 #define aMaxBeaconPeriodLength_Slots 256 //0-256 Slots
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
