@@ -37,6 +37,7 @@ typedef struct {
 	int rap1_end;
 	int rap2_start;
 	int rap2_end;
+	int b2_start;
 	int inactive_duration;
 } beacon_attributes;
 
@@ -51,6 +52,17 @@ typedef struct {
 	int minimum_length;
 	int allocation_length;
 } connection_request_attributes;
+
+/* define the connection assignment parameters */
+typedef struct {
+	int eap2_start;
+	int	sender_address; // 48 bits
+
+	int allocation_id;
+	int interval_start;
+	int interval_end;
+	int allocation_length;
+} connection_assignment_attributes;
 
 /* define the redord storing in the wpan_node_attributes->GTS_list_PC */
 typedef struct {
@@ -136,8 +148,13 @@ typedef struct {
 	int beacon_period_length; // beacon period length in slots -all
 	int rap1_start;
 	int rap1_end;
+	int map1_start;
+	int map1_end;
+	int eap2_start;
+	int eap2_end;
 	int rap2_start;
 	int rap2_end;
+	int b2_start;
 	int inactive_duration;
 
 	double beacon_frame_tx_time;
@@ -152,7 +169,9 @@ typedef struct {
 	double eap1_start2sec;
 	double rap1_start2sec;
 	double map1_start2sec;
+	double eap2_start2sec;
 	double rap2_start2sec;
+	double b2_start2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
