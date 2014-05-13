@@ -169,6 +169,7 @@ typedef struct {
 	double eap1_start2sec;
 	double rap1_start2sec;
 	double map1_start2sec;
+	double eap2_start2sec;
 	double rap2_start2sec;
 	double b2_start2sec;
 

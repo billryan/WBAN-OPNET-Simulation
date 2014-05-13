@@ -115,6 +115,8 @@ static void wban_mac_init() {
 		conn_assign_attr_comp_id = op_topo_child (conn_assign_attr_id, OPC_OBJTYPE_GENERIC, 0);
 
 		op_ima_obj_attr_get (conn_assign_attr_comp_id, "EAP2 Start", &conn_assign_attr.eap2_start);
+		SF.eap2_start = conn_assign_attr.eap2_start;
+		SF.map1_end = SF.eap2_start - 1;
 
 		// register the beacon frame statistics
 		beacon_frame_hndl = op_stat_reg ("MANAGEMENT.Number of Generated Beacon Frame", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
@@ -146,13 +148,11 @@ static void wban_mac_init() {
 		// node_attr.recipient_id = node_attr.connectedHID;
 		
 		mac_state = MAC_SETUP;
-
 		beacon_attr.beacon_period_length = -1;
-
 	}
 
 	SF.SLEEP = OPC_TRUE;
-	SF.ENABLE_TX_NEW = OPC_TRUE;
+	SF.ENABLE_TX_NEW = OPC_FALSE;
 	
 	// /* CSMA initialization	*/
 	//wpan_log_file_init ();	
@@ -316,11 +316,14 @@ static void wban_parse_incoming_frame() {
 							wban_extract_conn_req_frame (frame_MPDU);
 							break;
 						case CONNECTION_ASSIGNMENT:
+						{
 							if (enable_log) {
 								fprintf (log,"t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 								printf (" [Node %s] t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 							}
+							wban_extract_conn_assign_frame (frame_MPDU);
 							break;
+						};
 						case DISCONNECTION:
 							// not implemented
 							break;
@@ -375,7 +378,6 @@ static void wban_parse_incoming_frame() {
  *
  * Description:	filter the incoming BAN packet
  *              
- *
  * Input: frame_MPDU - the pointer to the frame (MPDU) which 
  * Output: TRUE if the packet is for me
  *--------------------------------------------------------------------------------*/
@@ -558,6 +560,41 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
 	FOUT;	
 }
 
+/*-----------------------------------------------------------------------------
+ * Function:	wban_extract_conn_assign_frame
+ *
+ * Description:	extract the data frame from the MAC frame received from the network
+ *              
+ * Input :  frame_MPDU - the received MAC frame
+ *-----------------------------------------------------------------------------*/
+static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
+	// int ack_policy;
+	int seq_num;
+	Packet* frame_MSDU;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_extract_conn_assign_frame);
+
+	op_pk_nfd_get (frame_MPDU, "Sequence Number", &seq_num);
+	op_pk_nfd_get (frame_MPDU, "Sender ID", &mac_attr.recipient_id);
+	wban_send_i_ack_frame (seq_num);
+
+	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
+	op_pk_nfd_get (frame_MSDU, "EAP2 Start", &conn_assign_attr.eap2_start);
+	op_pk_nfd_get (frame_MSDU, "Interval Start", &conn_assign_attr.interval_start);
+	op_pk_nfd_get (frame_MSDU, "Interval End", &conn_assign_attr.interval_end);
+
+	/* update the parameters of Superframe */
+	SF.eap2_start = conn_assign_attr.eap2_start;
+	SF.eap2_end = SF.rap2_start - 1;
+	SF.map1_end = SF.eap2_start - 1;
+
+	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+
+	/* Stack tracing exit point */
+	FOUT;
+}
+
 /*--------------------------------------------------------------------------------
  * Function:	wban_extract_beacon_frame
  *
@@ -689,14 +726,26 @@ static void wban_schedule_next_beacon() {
 		op_intrpt_schedule_self (SF.rap1_start2sec, END_OF_EAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, END_OF_RAP1_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, START_OF_MAP1_PERIOD_CODE);
+		if (OPC_TRUE == node_attr.is_BANhub){
+			op_intrpt_schedule_self (SF.rap1_start2sec + SF.rap1_length2sec, START_OF_MAP1_PERIOD_CODE);
+		}
+	}
+	if (SF.eap2_start2sec > 0) {
+		SF.eap2_start2sec = SF.BI_Boundary + SF.eap2_start * SF.slot_length2sec;
+		op_intrpt_schedule_self (SF.eap2_start2sec, START_OF_EAP2_PERIOD_CODE);
+		op_intrpt_schedule_self (SF.rap2_start2sec, END_OF_EAP2_PERIOD_CODE);
+		if (OPC_TRUE == node_attr.is_BANhub) {
+			op_intrpt_schedule_self (SF.eap2_start2sec, END_OF_MAP1_PERIOD_CODE);
+		}
 	}
 	if ((SF.rap2_length2sec > 0) && (SF.rap2_start > 0)) {
 		op_intrpt_schedule_self (SF.rap2_start2sec, START_OF_RAP2_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap2_start2sec + SF.rap2_length2sec, END_OF_RAP2_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.rap2_start2sec + SF.rap2_length2sec, START_OF_MAP2_PERIOD_CODE);
+		if (OPC_TRUE == node_attr.is_BANhub){
+			op_intrpt_schedule_self (SF.rap2_start2sec + SF.rap2_length2sec, START_OF_MAP2_PERIOD_CODE);
+		}
 	}
-	if (SF.b2_start2sec > 0) {
+	if ((SF.b2_start2sec > 0) && (OPC_TRUE == node_attr.is_BANhub)) {
 		op_intrpt_schedule_self (SF.b2_start2sec, END_OF_MAP2_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
 	}
@@ -855,6 +904,8 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "EAP2 Start", conn_assign_attr.eap2_start);
+	op_pk_nfd_set (conn_assign_MSDU, "Interval Start", conn_assign_attr.interval_start);
+	op_pk_nfd_set (conn_assign_MSDU, "Interval End", conn_assign_attr.interval_end);
 
 	/* create a MAC frame (MPDU) that encapsulates the conn_assign payload (MSDU) */
 	conn_assign_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
@@ -1055,6 +1106,8 @@ static void wban_mac_interrupt_process() {
 	//int seq_num;
 	//int dest_address;
 
+	double map_start2sec;
+	double map_end2sec;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
 	
@@ -1090,6 +1143,20 @@ static void wban_mac_interrupt_process() {
 					if (SF.SD > SF.current_slot + 1) {
 						op_intrpt_schedule_self (op_sim_time() + SF.slot_length2sec, INCREMENT_SLOT);
 					}
+
+					if(OPC_FALSE == node_attr.is_BANhub) {
+						map_start2sec = SF.BI_Boundary + conn_assign_attr.interval_start * SF.slot_length2sec;
+						map_end2sec = SF.BI_Boundary + (conn_assign_attr.interval_end+1) * SF.slot_length2sec;
+						if((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot < SF.eap2_start)) {
+							op_intrpt_schedule_self(max_double(map_start2sec, op_sim_time()), START_OF_MAP1_PERIOD_CODE);
+							op_intrpt_schedule_self(map_end2sec, END_OF_MAP1_PERIOD_CODE);
+						} else if ((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot > SF.rap2_end)) {
+							// printf("Node %s map_start2sec = %f, map_end2sec = %f.\n", node_attr.name, map_start2sec, map_end2sec);
+							op_intrpt_schedule_self(max_double(map_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
+							op_intrpt_schedule_self(map_end2sec, END_OF_MAP2_PERIOD_CODE);
+						}
+					}
+					
 					break;
 				};
 
