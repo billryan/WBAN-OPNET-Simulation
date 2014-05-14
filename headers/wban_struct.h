@@ -167,10 +167,17 @@ typedef struct {
 
 	double BI_Boundary; // Specfiy the time at which the beacon frame has been created to synchronize all node to this time reference
 	double eap1_start2sec;
+	double eap1_end2sec;
 	double rap1_start2sec;
+	double rap1_end2sec;
 	double map1_start2sec;
+	double map1_end2sec;
 	double eap2_start2sec;
+	double eap2_end2sec;
 	double rap2_start2sec;
+	double rap2_end2sec;
+	double map2_start2sec;
+	double map2_end2sec;
 	double b2_start2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
