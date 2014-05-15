@@ -137,28 +137,28 @@ static void wban_mac_init() {
  * Function:	 wban_log_file_init
  *
  * Description:	log file init
- *				
+ *
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
- 
+
 	char directory_path_name[120];
 	char log_name[132];
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_log_file_init);
 
 	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", directory_path_name);
-	
+
 	/* verification if the directory_path_name is a valid directory */
 	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
 		char msg[128];
 		sprintf (msg, " \"%s\" is not valid directory name. The output will not be logged.\n", directory_path_name);
 		/* Display an appropriate warning.	*/
-		op_prg_odb_print_major ("Warning from wban_mac process: ", msg, OPC_NIL);			
+		op_prg_odb_print_major ("Warning from wban_mac process: ", msg, OPC_NIL);
 		enable_log = OPC_FALSE;
 	}
-	
+
 	if (enable_log) {
 		sprintf (log_name, "%s%s.ak", directory_path_name, node_attr.name);
 		printf ("Log file name: %s \n\n", log_name);
@@ -478,7 +478,7 @@ static void wban_send_beacon_frame () {
 	SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
 	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
 	SF.rap2_end2sec = SF.BI_Boundary + (SF.rap2_end+1)*SF.slot_length2sec;
-	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec;
+	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec + pSIFS;
 
 	SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
 	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
@@ -1240,6 +1240,38 @@ static void wban_mac_interrupt_process() {
 					}			
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
+
+				case START_OF_EAP2_PERIOD_CODE: /* start of EAP2 Period */
+				{
+					mac_state = MAC_EAP2;
+					phase_start_timeG = SF.eap2_start2sec;
+					phase_end_timeG = SF.rap2_start2sec - pSIFS;
+					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.IN_EAP_PHASE = OPC_TRUE;
+					SF.ENABLE_TX_NEW = OPC_TRUE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF THE EAP2 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}
+
+					if (OPC_FALSE == SF.ENABLE_TX_NEW) {
+						op_intrpt_schedule_self (op_sim_time(), TRY_PROCESS_LAST_PACKET_CODE);
+					}
+					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
+					break;
+				};/* end of START_OF_EAP2_PERIOD_CODE */
+
+				case END_OF_EAP2_PERIOD_CODE: /* end of EAP2 Period */
+				{
+					mac_state = MAC_SLEEP;
+					SF.ENABLE_TX_NEW = OPC_FALSE;
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ END OF THE EAP2 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}			
+					break;
+				};/* end of END_OF_EAP2_PERIOD_CODE */
 
 				case START_OF_RAP2_PERIOD_CODE: /* start of RAP1 Period */
 				{
@@ -2042,4 +2074,3 @@ static void wban_send_packet() {
 	/* Stack tracing exit point */
 	FOUT;
 }
-// have a test
