@@ -557,6 +557,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	int beacon_PPDU_size;
 	int rcv_sender_id;
 	double beacon_frame_tx_time;
+	double send_conn_req_time;
 	int sequence_number_fd;
 	int eap_indicator_fd;
 	int beacon2_enabled_fd;
@@ -617,11 +618,12 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			 */
 			mac_attr.recipient_id = rcv_sender_id;
 			mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
+			send_conn_req_time = SF.BI_Boundary + beacon_attr.rap1_end*allocationSlotLength2ms*0.001 + node_attr.objid * beacon_frame_tx_time;
 			if (conn_req_attr.allocation_length > 0) {
 				// we are unconnected, and we need to connect to obtain scheduled access
 				// we will create and send a connection request
 				// printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
-				op_intrpt_schedule_self (SF.rap1_end2sec + node_attr.objid * beacon_frame_tx_time, SEND_CONN_REQ_CODE);
+				op_intrpt_schedule_self (send_conn_req_time, SEND_CONN_REQ_CODE);
 			}
 		}
 		wban_schedule_next_beacon();
@@ -1039,7 +1041,7 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	}
 
 	/* try to send the packet in SF active phase */
-	if ((MAC_SLEEP != mac_state) && (MAC_SETUP != mac_state) && (OPC_TRUE == SF.ENABLE_TX_NEW)) {
+	if ((OPC_TRUE == SF.ENABLE_TX_NEW) && (MAC_SLEEP != mac_state) && (MAC_SETUP != mac_state)) {
 		op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 	}
 	
@@ -1131,12 +1133,13 @@ static void wban_mac_interrupt_process() {
 						if((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot < SF.eap2_start)) {
 							SF.map1_start2sec = map_start2sec;
 							SF.map1_end2sec = map_end2sec;
-							op_intrpt_schedule_self(max_double(SF.map1_start2sec, op_sim_time()) + pSIFS, START_OF_MAP1_PERIOD_CODE);
+							printf("Node %s map1_start2sec=%f, map1_end2sec=%f.\n", node_attr.name, SF.map1_start2sec, SF.map1_end2sec);
+							op_intrpt_schedule_self(max_double(SF.map1_start2sec, op_sim_time()), START_OF_MAP1_PERIOD_CODE);
 							op_intrpt_schedule_self(SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 						} else if ((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot > SF.rap2_end)) {
 							SF.map2_start2sec = map_start2sec;
 							SF.map2_end2sec = map_end2sec;
-							op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()) + pSIFS, START_OF_MAP2_PERIOD_CODE);
+							op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
 							op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
 						}
 					}
@@ -1410,7 +1413,7 @@ static void wban_mac_interrupt_process() {
 					} else {
 						csma.backoff_counter--;
 						printf("t = %f, CCA with IDLE, backoff_counter decrement to %d.\n", op_sim_time(), csma.backoff_counter);
-						if (csma.backoff_counter != 0) {
+						if (csma.backoff_counter > 0) {
 							// printf("CCA at next available backoff boundary = %f sec.\n", csma.next_slot_start);
 							// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
 							printf("CCA at next available backoff boundary = %f sec.\n", wban_backoff_period_boundary_get());
@@ -1436,12 +1439,13 @@ static void wban_mac_interrupt_process() {
 			
 				case WAITING_ACK_END_CODE:	/* the timer for waiting an ACK has expired, the packet must be retransmitted */
 				{
+					printf("Node %s waitting for ACK END at %f.\n", node_attr.name, op_sim_time());
 					// check if we reached the max number and if so delete the packet
-					if (current_packet_txs + current_packet_CS_fails == max_packet_tries) {
+					if (current_packet_txs + current_packet_CS_fails >= max_packet_tries) {
 						// collect statistics
 						printf("Packet transmission exceeds max packet tries at time %f\n", op_sim_time());
 						// remove MAC frame (MPDU) frame_MPDU_to_be_sent
-						op_pk_destroy(frame_MPDU_to_be_sent);
+						// op_pk_destroy(frame_MPDU_to_be_sent);
 						// packet_to_be_sent = NULL;
 						mac_attr.wait_for_ack = OPC_FALSE;
 						SF.ENABLE_TX_NEW = OPC_TRUE;
@@ -1452,6 +1456,7 @@ static void wban_mac_interrupt_process() {
 						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					} else {
 						mac_attr.wait_for_ack = OPC_TRUE;
+						SF.ENABLE_TX_NEW = OPC_FALSE;
 						if (SF.IN_MAP_PHASE) {
 							wban_send_packet();
 						} else {
@@ -1533,7 +1538,7 @@ static void wban_mac_interrupt_process() {
 
 					/*Try to send a packet if any*/
 					if (op_stat_local_read (TX_BUSY_STAT) == 0.0) {
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
+						// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					}
 					
 					break;
@@ -1542,7 +1547,7 @@ static void wban_mac_interrupt_process() {
 				case TX_BUSY_STAT :
 				{
 					if (op_stat_local_read (TX_BUSY_STAT) == 0.0)
-						op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
+						// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					
 					break;
 				}
@@ -1674,7 +1679,7 @@ static void wpan_battery_update_tx(double pksize) {
 	
 	iciptr = op_ici_create ("wpan_battery_ici_format");
 	op_ici_attr_set (iciptr, "Packet Size", pksize);
-	op_ici_attr_set (iciptr, "WBAN DATA RATE", WBAN_DATA_RATE);
+	op_ici_attr_set (iciptr, "WPAN DATA RATE", WBAN_DATA_RATE);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), PACKET_TX_CODE, node_attr.my_battery); 
 	op_ici_install (OPC_NIL);
@@ -1700,7 +1705,7 @@ static void wpan_battery_update_rx(double pksize, int frame_type) {
 	
 	iciptr = op_ici_create ("wpan_battery_ici_format");
 	op_ici_attr_set (iciptr, "Packet Size", pksize);
-	op_ici_attr_set (iciptr, "WPAN DATA RATE", WPAN_DATA_RATE);
+	op_ici_attr_set (iciptr, "WPAN DATA RATE", WBAN_DATA_RATE);
 	op_ici_attr_set (iciptr, "Frame Type", frame_type);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), PACKET_RX_CODE, node_attr.my_battery); 
@@ -1731,7 +1736,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 	if (mac_attr.wait_for_ack == OPC_TRUE) {
 		if (mac_attr.wait_ack_seq_num == seq_num) { /* yes, I have received my ACK */
 			mac_attr.wait_for_ack = OPC_FALSE;
-		
+			
 			/* disable the invocation of only the next interrupt of WAITING_ACK_END_CODE */
 			op_intrpt_disable (OPC_INTRPT_SELF, WAITING_ACK_END_CODE, OPC_TRUE);
 			
@@ -1814,7 +1819,7 @@ static void wban_attempt_TX() {
 			printf("Node %s enters into EAP phase.\n", node_attr.name);
 			if (7 != packet_to_be_sent.user_priority) {
 				printf("%s have no UP=7 traffic in the SUBQ_DATA subqueue currently.\n", node_attr.name);
-				SF.ENABLE_TX_NEW = OPC_TRUE;
+				// SF.ENABLE_TX_NEW = OPC_TRUE;
 				FOUT;
 			}
 		}
@@ -1837,12 +1842,12 @@ static void wban_attempt_TX() {
 
 	/* remove the packet in the head of the queue */
 	frame_MPDU_temp = op_subq_pk_remove (SUBQ_DATA, OPC_QPOS_HEAD);
+	SF.ENABLE_TX_NEW = OPC_FALSE;
 
 	current_packet_txs = 0;
 	current_packet_CS_fails = 0;
-	SF.ENABLE_TX_NEW = OPC_FALSE;
 
-	if (SF.IN_MAP_PHASE) {
+	if (OPC_TRUE == SF.IN_MAP_PHASE) {
 		if (OPC_TRUE == map_attr.TX_state) {
 			wban_send_packet();
 		}
@@ -1862,7 +1867,7 @@ static void wban_attempt_TX() {
  *
  * Description:	CSMA/CA for contention access period
  * 
- * Input:	
+ * Input:
  *--------------------------------------------------------------------------------*/
 static void wban_attempt_TX_CSMA(int user_priority) {
 	//extern double backoff_start_time;
@@ -2055,7 +2060,7 @@ static void wban_send_packet() {
 
 	PPDU_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
 	ack_tx_time = TX_TIME(I_ACK_PPDU_SIZE_BITS, node_attr.data_rate);
-	ack_expire_time = op_sim_time() + PPDU_tx_time + ack_tx_time + 2* pSIFS;
+	ack_expire_time = op_sim_time() + PPDU_tx_time + ack_tx_time +  pSIFS;
 	wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU_copy));
 
 	switch (packet_to_be_sent.frame_type) {
@@ -2084,7 +2089,8 @@ static void wban_send_packet() {
 				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
 			}
 			op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
-			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + 2*pSIFS + ack_tx_time, WAITING_ACK_END_CODE);
+			SF.ENABLE_TX_NEW = OPC_FALSE;
+			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS + ack_tx_time, WAITING_ACK_END_CODE);
 			//PPDU_sent_bits = PPDU_sent_bits + ((double)(op_pk_total_size_get(frame_PPDU))/1000.0); // in kbits
 			
 			// op_stat_write(statistic_global_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
