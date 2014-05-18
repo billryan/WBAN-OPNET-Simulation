@@ -1589,7 +1589,6 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy);
 	switch (ack_policy) {
 		case N_ACK_POLICY:
-
 			break;
 		case I_ACK_POLICY:
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &seq_num);
@@ -1602,7 +1601,6 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
 		default:
 			break;
 	}
-
 	/* Stack tracing exit point */
 	FOUT;	
 }
@@ -1643,7 +1641,7 @@ static void queue_status() {
 		op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 		
 		if (op_subq_empty(i)) {
-			if (enable_log) {	
+			if (enable_log) {
 				fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), i, pk_capacity, bit_capacity);
 				printf(" [Node %s] t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", node_attr.name, op_sim_time(), i, pk_capacity, bit_capacity);
 			}
@@ -1676,7 +1674,7 @@ static void wpan_battery_update_tx(double pksize) {
 	
 	iciptr = op_ici_create ("wpan_battery_ici_format");
 	op_ici_attr_set (iciptr, "Packet Size", pksize);
-	op_ici_attr_set (iciptr, "WPAN DATA RATE", WPAN_DATA_RATE);
+	op_ici_attr_set (iciptr, "WBAN DATA RATE", WBAN_DATA_RATE);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), PACKET_TX_CODE, node_attr.my_battery); 
 	op_ici_install (OPC_NIL);
