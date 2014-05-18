@@ -94,11 +94,11 @@ static void wban_mac_init() {
 		op_ima_obj_attr_get (conn_assign_attr_comp_id, "EAP2 Start", &conn_assign_attr.eap2_start);
 		SF.eap2_start = conn_assign_attr.eap2_start;
 		SF.map1_end = SF.eap2_start - 1;
+		SF.current_first_free_slot = SF.rap1_end + 1;
 
 		// register the beacon frame statistics
 		beacon_frame_hndl = op_stat_reg ("MANAGEMENT.Number of Generated Beacon Frame", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 		wban_send_beacon_frame ();
-		SF.current_first_free_slot = SF.rap1_end + 1;
 	} else { /* if the node is not a Hub */
 		mac_attr.sender_id = UNCONNECTED;
 		mac_attr.recipient_id = UNCONNECTED;
@@ -122,10 +122,10 @@ static void wban_mac_init() {
 		// current_free_connected_NID++;
 		// node_attr.recipient_id = node_attr.connectedHID;
 		
-		mac_state = MAC_SETUP;
+		SF.eap2_start = 0;
 		beacon_attr.beacon_period_length = -1;
 	}
-
+	mac_state = MAC_SETUP;
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
 	
@@ -411,6 +411,7 @@ static void wban_send_beacon_frame () {
 	printf (" \t RAP1 End               : %d \n", beacon_attr.rap1_end);
 	printf (" \t RAP2 Start             : %d \n", beacon_attr.rap2_start);
 	printf (" \t RAP2 End               : %d \n", beacon_attr.rap2_end);
+	printf (" \t B2 Start               : %d \n", beacon_attr.b2_start);
 	printf (" \t Inactive Duration      : %d\n\n", beacon_attr.inactive_duration);
 	
 	/* create a beacon frame */
@@ -450,39 +451,15 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set_pkt (beacon_PPDU, "PSDU", beacon_MPDU);
 	op_pk_nfd_set (beacon_PPDU, "LENGTH", ((double) op_pk_total_size_get(beacon_MPDU))/8); //[bytes]	
 	
+	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
+	beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_PPDU), node_attr.data_rate);
+	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
+
 	// collect the number of beacon frame
 	op_stat_write (beacon_frame_hndl, 1.0);
 
 	wpan_battery_update_tx ((double) op_pk_total_size_get(beacon_PPDU));
 
-	// update the superframe parameters
-	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
-	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
-	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
-
-	SF.slot_length2sec = allocationSlotLength2ms / 1000.0; // transfer allocation slot length from ms to sec.
-	SF.rap1_start = beacon_attr.rap1_start;
-	SF.rap1_end = beacon_attr.rap1_end;
-	SF.rap2_start = beacon_attr.rap2_start;
-	SF.rap2_end = beacon_attr.rap2_end;
-	SF.b2_start = beacon_attr.b2_start;
-	SF.current_slot = 0;
-	SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
-
-	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
-	beacon_frame_tx_time = TX_TIME(op_pk_total_size_get(beacon_PPDU), node_attr.data_rate);
-	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time;
-	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec + pSIFS;
-	SF.eap2_start2sec = SF.BI_Boundary + SF.eap2_start * SF.slot_length2sec + pSIFS;
-	SF.rap2_start2sec = SF.BI_Boundary + SF.rap2_start * SF.slot_length2sec + pSIFS;
-	SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
-	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
-	SF.rap2_end2sec = SF.BI_Boundary + (SF.rap2_end+1)*SF.slot_length2sec;
-	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec + pSIFS;
-
-	SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
-	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
-	SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
 
 	if (enable_log) {
 		printf("sequence_num_beaconG = %d\n", sequence_num_beaconG - 1);
@@ -493,8 +470,8 @@ static void wban_send_beacon_frame () {
 	}
 
 	//op_intrpt_priority_set (OPC_INTRPT_SELF, BEACON_INTERVAL_CODE, -2);
-	wban_schedule_next_beacon (); // Maybe for updating the parameters of superframe
 	op_pk_send (beacon_PPDU, STRM_FROM_MAC_TO_RADIO);
+	wban_schedule_next_beacon (); // Maybe for updating the parameters of superframe
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -577,6 +554,7 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
  *--------------------------------------------------------------------------------*/
 static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	Packet* beacon_MSDU_rx;
+	int beacon_PPDU_size;
 	int rcv_sender_id;
 	double beacon_frame_tx_time;
 	int sequence_number_fd;
@@ -585,6 +563,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	
 	/* Stack tracing enrty point */
 	FIN(wban_extract_beacon_frame);
+
+	beacon_PPDU_size = op_pk_total_size_get(beacon_MPDU_rx) + PHY_HEADER_SIZE;
 
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
 	// if I'm a End Device, I get the information and synchronize myself
@@ -614,6 +594,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 Start", &beacon_attr.rap2_start);
 		op_pk_nfd_get (beacon_MSDU_rx, "RAP2 End", &beacon_attr.rap2_end);
 		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 Start", &beacon_attr.rap1_start);
+		op_pk_nfd_get (beacon_MSDU_rx, "B2 Start", &beacon_attr.b2_start);
 		op_pk_nfd_get (beacon_MSDU_rx, "Inactive Duration", &beacon_attr.inactive_duration);
 
 		// update with actual Hub id
@@ -621,35 +602,9 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			node_attr.traffic_dest_id = rcv_sender_id;
 		}
 
-		// update the superframe parameters
-		SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
-		SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
-		SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
-
-		SF.slot_length2sec = allocationSlotLength2ms / 1000.0; // transfer allocation slot length from ms to sec.
-		SF.rap1_start = beacon_attr.rap1_start;
-		SF.rap1_end = beacon_attr.rap1_end;
-		SF.rap2_start = beacon_attr.rap2_start;
-		SF.rap2_end = beacon_attr.rap2_end;
-		
 		SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
-		beacon_frame_tx_time = TX_TIME(BEACON_PPDU_BITS, node_attr.data_rate);
-		SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time;
-		SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec + pSIFS;
-		SF.rap2_start2sec = SF.BI_Boundary + SF.rap2_start * SF.slot_length2sec + pSIFS;
-		SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
-		SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
-		SF.rap2_end2sec = SF.BI_Boundary + (SF.rap2_end+1)*SF.slot_length2sec;
-
-		SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
-		SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
-		SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
-
-		/* for node we should calculate the slot boundary */
-		SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);
-		printf("SF.current_slot = %d when received beacon frame.\n", SF.current_slot);
-		printf("Node %s beacon_frame_tx_time=%f\n", node_attr.name, beacon_frame_tx_time);
-		SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
+		beacon_frame_tx_time = TX_TIME(beacon_PPDU_size, node_attr.data_rate);
+		SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
 
 		op_pk_destroy (beacon_MSDU_rx);
 		op_pk_destroy (beacon_MPDU_rx);
@@ -688,6 +643,38 @@ static void wban_schedule_next_beacon() {
 	/* Stack tracing enrty point */
 	FIN(wban_schedule_next_beacon);
 
+	// update the superframe parameters
+	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
+	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
+	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
+
+	SF.slot_length2sec = allocationSlotLength2ms / 1000.0; // transfer allocation slot length from ms to sec.
+	SF.rap1_start = beacon_attr.rap1_start;
+	SF.rap1_end = beacon_attr.rap1_end;
+	SF.rap2_start = beacon_attr.rap2_start;
+	SF.rap2_end = beacon_attr.rap2_end;
+	SF.b2_start = beacon_attr.b2_start;
+	SF.current_slot = 0;
+	SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
+
+	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec + pSIFS;
+	SF.eap2_start2sec = SF.BI_Boundary + SF.eap2_start * SF.slot_length2sec + pSIFS; //for Hub at the first beacon
+	SF.rap2_start2sec = SF.BI_Boundary + SF.rap2_start * SF.slot_length2sec + pSIFS;
+	SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
+	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
+	SF.rap2_end2sec = SF.BI_Boundary + (SF.rap2_end+1)*SF.slot_length2sec;
+	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec + pSIFS;
+
+	// SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
+	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
+	SF.rap2_length2sec = (SF.rap2_end - SF.rap2_start + 1) * SF.slot_length2sec;
+
+	SF.current_first_free_slot = SF.rap1_end + 1; // spec for hub assignment
+
+	/* for node we should calculate the slot boundary */
+	SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);
+	printf("SF.current_slot = %d when received beacon frame.\n", SF.current_slot);
+
 	// SF_slot[BeaconPeriodLength] = {0}; // initialize array SF_slot
 
 	/* INCREMENT_SLOT at slot boundary */
@@ -708,12 +695,14 @@ static void wban_schedule_next_beacon() {
 			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
 		}
 	}
-	if (SF.eap2_start2sec > 0) {
+	if (SF.eap2_start > 0) {
 		SF.eap2_start2sec = SF.BI_Boundary + SF.eap2_start * SF.slot_length2sec + pSIFS;
+		SF.eap2_end2sec = SF.rap2_start2sec - pSIFS;
 		op_intrpt_schedule_self (SF.eap2_start2sec, START_OF_EAP2_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.rap2_start2sec - pSIFS, END_OF_EAP2_PERIOD_CODE);
+		op_intrpt_schedule_self (SF.eap2_end2sec, END_OF_EAP2_PERIOD_CODE);
 		if (OPC_TRUE == node_attr.is_BANhub) {
-			op_intrpt_schedule_self (SF.eap2_start2sec - pSIFS, END_OF_MAP1_PERIOD_CODE);
+			SF.map1_end2sec = SF.eap2_start2sec - pSIFS;
+			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
 	}
 	if ((SF.rap2_length2sec > 0) && (SF.rap2_start > 0)) {
@@ -725,18 +714,34 @@ static void wban_schedule_next_beacon() {
 		}
 	}
 	if ((SF.b2_start2sec > 0) && (OPC_TRUE == node_attr.is_BANhub)) {
+		SF.map2_end2sec = SF.b2_start2sec - pSIFS;
 		op_intrpt_schedule_self (SF.b2_start2sec - pSIFS, END_OF_MAP2_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
 	}
+	op_intrpt_schedule_self (SF.BI_Boundary + SF.SD*SF.slot_length2sec, START_OF_SLEEP_PERIOD);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
 	op_intrpt_schedule_remote (SF.BI_Boundary + SF.BI*SF.slot_length2sec, END_OF_SLEEP_PERIOD, node_attr.my_battery);
 	//op_intrpt_priority_set (OPC_INTRPT_SELF, END_OF_CAP_PERIOD_CODE, -2);
 	if (enable_log) {
+		printf("Node %s Superframe parameters:\n", node_attr.name);
+		printf("\tSF.eap1_start2sec=%f\n", SF.eap1_start2sec);
+		printf("\tSF.eap1_end2sec=%f\n", SF.eap1_end2sec);
+		printf("\tSF.rap1_start2sec=%f\n", SF.rap1_start2sec);
+		printf("\tSF.rap1_end2sec=%f\n", SF.rap1_end2sec);
+		printf("\tSF.map1_start2sec=%f\n", SF.map1_start2sec);
+		printf("\tSF.map1_end2sec=%f\n", SF.map1_end2sec);
+		printf("\tSF.eap2_start2sec=%f\n", SF.eap2_start2sec);
+		printf("\tSF.eap2_end2sec=%f\n", SF.eap2_end2sec);
+		printf("\tSF.rap2_start2sec=%f\n", SF.rap2_start2sec);
+		printf("\tSF.rap2_end2sec=%f\n", SF.rap2_end2sec);
+		printf("\tSF.map2_start2sec=%f\n", SF.map2_start2sec);
+		printf("\tSF.map2_end2sec=%f\n", SF.map2_end2sec);
+
 		fprintf (log,"t=%f  -> Schedule Next Beacon at %f\n\n", op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
 		printf (" [Node %s] t=%f  -> Schedule Next Beacon at %f\n\n", node_attr.name, op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
 	}
 	/* Stack tracing exit point */
-	FOUT;	
+	FOUT;
 }
 
 /*--------------------------------------------------------------------------------
@@ -1273,7 +1278,7 @@ static void wban_mac_interrupt_process() {
 					break;
 				};/* end of END_OF_EAP2_PERIOD_CODE */
 
-				case START_OF_RAP2_PERIOD_CODE: /* start of RAP1 Period */
+				case START_OF_RAP2_PERIOD_CODE: /* start of RAP2 Period */
 				{
 					mac_state = MAC_RAP2;
 					phase_start_timeG = SF.rap2_start2sec;
@@ -1293,6 +1298,18 @@ static void wban_mac_interrupt_process() {
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_RAP1_PERIOD_CODE */
+
+				case END_OF_RAP2_PERIOD_CODE: /* END of RAP2 Period */
+				{
+					mac_state = MAC_SLEEP;
+					SF.ENABLE_TX_NEW = OPC_FALSE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ END OF THE RAP2 ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE RAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}			
+					break;
+				};/* end of END_OF_RAP2_PERIOD_CODE */
 
 				case START_OF_MAP2_PERIOD_CODE: /* start of MAP2 Period */
 				{
@@ -1329,6 +1346,18 @@ static void wban_mac_interrupt_process() {
 					}			
 					break;
 				};/* end of END_OF_MAP2_PERIOD_CODE */
+
+				case START_OF_SLEEP_PERIOD: /* Start of Sleep Period */
+				{
+					mac_state = MAC_SLEEP;
+					SF.ENABLE_TX_NEW = OPC_FALSE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}			
+					break;
+				};/* end of Start of Sleep Period */
 
 				case TRY_PACKET_TRANSMISSION_CODE :
 				{
@@ -1764,10 +1793,10 @@ static void wban_attempt_TX() {
 		case MAC_MAP2: 
 			SF.IN_MAP_PHASE = OPC_TRUE;
 			break;
-		default: FOUT; // nono of the valid state above
+		default: FOUT; // none of the valid state above
 	}
 
-	if (!(op_intrpt_type () == OPC_INTRPT_SELF && op_intrpt_code () == TRY_PACKET_TRANSMISSION_CODE)) {
+	if (!((op_intrpt_type () == OPC_INTRPT_SELF) && (op_intrpt_code () == TRY_PACKET_TRANSMISSION_CODE))) {
 		FOUT;
 	}
 
