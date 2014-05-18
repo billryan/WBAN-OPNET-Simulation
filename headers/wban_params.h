@@ -97,8 +97,8 @@
 // Frame Control Field - Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
 #define BEACON_HEADER_SIZE 72
 
-// Physical layer header (SHR+PHR) [bits]
-#define PHY_HEADER_SIZE 48
+// Physical layer header [bits]
+#define PHY_HEADER_SIZE 121
 
 // Beacon frame (MAC payload MSDU) size with length of beacon payload set to 0 [bits]
 #define BEACON_MSDU_SIZE 32
