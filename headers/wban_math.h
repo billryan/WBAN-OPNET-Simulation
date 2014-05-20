@@ -234,4 +234,27 @@ static int compare_doubles (double a, double b) {
 	}
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	rand_int(int seed)
+ *
+ * Description:	return random integer from given seed
+ *
+ *           seed integer
+ *--------------------------------------------------------------------------------*/
+ static int rand_int (int module) {
+	// int new_seed, rand_int;
+	// PrgT_Random_Gen *my_rng;
+
+	// new_seed = (int)time(0) + (int)op_dist_uniform (256);
+	// /* create a new random number generator */
+	// my_rng = op_prg_random_gen_create (new_seed);
+	// printf("new_seed=%d\n", new_seed);
+
+	//  generate a random integer in the interval [0,module-1] 
+	// rand_int = (op_prg_random_integer_gen (my_rng) % module);
+
+	// /* destroy the random number generator */
+	// op_prg_random_gen_destroy (my_rng);
+	return (int)op_dist_uniform(module);
+ }
 #endif
