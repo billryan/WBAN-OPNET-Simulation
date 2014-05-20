@@ -128,7 +128,7 @@ static void wban_mac_init() {
 	mac_state = MAC_SETUP;
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
-	
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -559,6 +559,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	double beacon_frame_tx_time;
 	double send_conn_req_time;
 	int sequence_number_fd;
+	int random_num;
 	int eap_indicator_fd;
 	int beacon2_enabled_fd;
 	
@@ -618,7 +619,11 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			 */
 			mac_attr.recipient_id = rcv_sender_id;
 			mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
-			send_conn_req_time = SF.BI_Boundary + beacon_attr.rap1_end*allocationSlotLength2ms*0.001 + node_attr.objid * beacon_frame_tx_time;
+			random_num = rand_int(53);
+			printf("Node %s SF.BI_Boundary=%f\n", node_attr.name, SF.BI_Boundary);
+			printf("Node %s generates random number with %d for connection request.\n", node_attr.name, random_num);
+			send_conn_req_time = SF.BI_Boundary + beacon_attr.rap1_end*allocationSlotLength2ms*0.001 + random_num * 0.0015;
+			printf("Node %s\n send connection request frame at %f.\n", node_attr.name, send_conn_req_time);
 			if (conn_req_attr.allocation_length > 0) {
 				// we are unconnected, and we need to connect to obtain scheduled access
 				// we will create and send a connection request
@@ -921,7 +926,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	
 	frame_PPDU_copy = op_pk_copy(conn_assign_PPDU);
 	conn_assign_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
-	
+	printf("conn_assign_tx_time=%f\n", conn_assign_tx_time);
 	wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0)
 			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","SEND_CONN_ASSIGN_CODE","","");
@@ -1808,7 +1813,7 @@ static void wban_attempt_TX() {
 	}
 
 	if (op_subq_empty(SUBQ_DATA)) {
-		SF.ENABLE_TX_NEW = OPC_TRUE;
+		// SF.ENABLE_TX_NEW = OPC_TRUE;
 		FOUT;
 	} else {
 		/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
