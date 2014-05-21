@@ -799,10 +799,10 @@ static void wban_send_connection_request_frame () {
 	op_pk_nfd_set_pkt (connection_request_PPDU, "PSDU", connection_request_MPDU);
 	op_pk_nfd_set (connection_request_PPDU, "LENGTH", ((double) op_pk_total_size_get(connection_request_MPDU))/8); //[bytes]	
 	
-	frame_PPDU_copy = op_pk_copy(connection_request_PPDU);
-	// conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
+	frame_PPDU_to_be_sent = op_pk_copy(connection_request_PPDU);
+	// conn_req_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_to_be_sent), node_attr.data_rate);
 	// op_intrpt_schedule_self (SF.rap1_start2sec+SF.rap1_length2sec+random_num*conn_req_tx_time, SEND_CONN_REQ_CODE);
-	op_pk_send(frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+	op_pk_send(frame_PPDU_to_be_sent, STRM_FROM_MAC_TO_RADIO);
 
 	mac_attr.wait_for_ack = OPC_TRUE;
 	mac_attr.wait_ack_seq_num = random_num;
@@ -922,14 +922,14 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	op_pk_nfd_set_pkt (conn_assign_PPDU, "PSDU", conn_assign_MPDU);
 	op_pk_nfd_set (conn_assign_PPDU, "LENGTH", ((double) op_pk_total_size_get(conn_assign_MPDU))/8); //[bytes]	
 	
-	frame_PPDU_copy = op_pk_copy(conn_assign_PPDU);
-	conn_assign_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
+	frame_PPDU_to_be_sent = op_pk_copy(conn_assign_PPDU);
+	conn_assign_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_to_be_sent), node_attr.data_rate);
 	printf("conn_assign_tx_time=%f\n", conn_assign_tx_time);
-	wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_copy));
+	wpan_battery_update_tx ((double) op_pk_total_size_get(frame_PPDU_to_be_sent));
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0)
 			op_sim_end("ERROR : TRY TO SEND AN CONNECTION_ASSIGNMENT WHILE THE TX CHANNEL IS BUSY","SEND_CONN_ASSIGN_CODE","","");
 
-	op_pk_send (frame_PPDU_copy, STRM_FROM_MAC_TO_RADIO);
+	op_pk_send (frame_PPDU_to_be_sent, STRM_FROM_MAC_TO_RADIO);
 
 	mac_attr.wait_for_ack = OPC_TRUE;
 	mac_attr.wait_ack_seq_num = random_num;
@@ -1811,6 +1811,11 @@ static void wban_attempt_TX() {
 		FOUT;
 	}
 
+	if (OPC_FALSE == SF.ENABLE_TX_NEW){
+		printf("Node %s has packet being sent.\n", node_attr.name);
+		FOUT;
+	}
+
 	if (op_subq_empty(SUBQ_DATA)) {
 		// SF.ENABLE_TX_NEW = OPC_TRUE;
 		FOUT;
@@ -1843,6 +1848,13 @@ static void wban_attempt_TX() {
 		packet_to_be_sent.recipient_id = mac_attr.recipient_id;
 		packet_to_be_sent.sender_id = mac_attr.sender_id;
 	}
+
+	/* create PHY frame (PPDU) that encapsulates beacon MAC frame (MPDU) */
+	frame_PPDU_to_be_sent = op_pk_create_fmt("wban_frame_PPDU_format");
+	op_pk_nfd_set (frame_PPDU_to_be_sent, "RATE", node_attr.data_rate);
+	/* wrap MAC frame (MPDU) in PHY frame (PPDU) */
+	op_pk_nfd_set_pkt (frame_PPDU_to_be_sent, "PSDU", frame_MPDU_to_be_sent);
+	op_pk_nfd_set (frame_PPDU_to_be_sent, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU_to_be_sent))/8); //[bytes]	
 
 	/* remove the packet in the head of the queue */
 	frame_MPDU_temp = op_subq_pk_remove (SUBQ_DATA, OPC_QPOS_HEAD);
@@ -2048,23 +2060,13 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 static void wban_send_packet() {
 	// double backoff_period_index;
 	// double next_backoff_period_boundary;
+	Packet* frame_PPDU_copy;
 	double PPDU_tx_time;
 	double ack_tx_time;
 	double ack_expire_time;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_packet);
-	/* create PHY frame (PPDU) that encapsulates beacon MAC frame (MPDU) */
-	frame_PPDU_copy = op_pk_create_fmt("wban_frame_PPDU_format");
-	op_pk_nfd_set (frame_PPDU_copy, "RATE", node_attr.data_rate);
-	/* wrap MAC frame (MPDU) in PHY frame (PPDU) */
-	op_pk_nfd_set_pkt (frame_PPDU_copy, "PSDU", frame_MPDU_to_be_sent);
-	op_pk_nfd_set (frame_PPDU_copy, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU_to_be_sent))/8); //[bytes]	
-
-	PPDU_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
-	ack_tx_time = TX_TIME(I_ACK_PPDU_SIZE_BITS, node_attr.data_rate);
-	ack_expire_time = op_sim_time() + PPDU_tx_time + ack_tx_time +  pSIFS;
-	wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU_copy));
 
 	switch (packet_to_be_sent.frame_type) {
 		case DATA: 
@@ -2076,6 +2078,12 @@ static void wban_send_packet() {
 		default: 
 			break;
 	}
+
+	frame_PPDU_copy = op_pk_copy(frame_PPDU_to_be_sent);
+	PPDU_tx_time = TX_TIME(op_pk_total_size_get(frame_PPDU_copy), node_attr.data_rate);
+	ack_tx_time = TX_TIME(I_ACK_PPDU_SIZE_BITS, node_attr.data_rate);
+	ack_expire_time = op_sim_time() + PPDU_tx_time + ack_tx_time +  pSIFS;
+	wpan_battery_update_tx((double)op_pk_total_size_get(frame_PPDU_copy));
 
 	switch (packet_to_be_sent.ack_policy) {
 		case N_ACK_POLICY:
