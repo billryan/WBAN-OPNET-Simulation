@@ -222,4 +222,23 @@ typedef struct
 	Boolean enable;
 } packet_to_be_sent_attributes;
 
+/* statistic vectors */
+typedef struct {
+	Stathandle data_pkt_fail;
+	Stathandle data_pkt_suc1;
+	Stathandle data_pkt_suc2;
+	Stathandle dropped_packets;
+	Stathandle mac_delay;
+	Stathandle sent_pkt;
+} wban_statistic_vector;
+
+typedef struct {
+	Stathandle data_pkt_fail;
+	Stathandle data_pkt_suc1;
+	Stathandle data_pkt_suc2;
+	Stathandle dropped_packets;
+	Stathandle mac_delay;
+	Stathandle sent_pkt;
+} wban_global_statistic_vector;
+
 #endif
