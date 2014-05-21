@@ -17,7 +17,7 @@ static void wban_mac_init() {
 	Objid mac_attr_comp_id;
 	Objid mac_attr_id;
 	Objid traffic_source_up_id;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_mac_init);
 	
@@ -209,7 +209,6 @@ static void wban_parse_incoming_frame() {
 		{
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
-
 			/*update the battery*/
 			packet_size = (double) op_pk_total_size_get(rcv_frame);
 			wpan_battery_update_rx (packet_size, frame_type_fd);
@@ -236,7 +235,6 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 
 			op_pk_destroy (rcv_frame);
-			
 			switch (frame_type_fd) {
 				case DATA: /* Handle data packets */
 					if (enable_log) {
@@ -323,7 +321,9 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 					}
+					break;
 				default:	/*OTHER FRAME TYPES*/
+					printf("Node %s received none of the frame above.\n", node_attr.name);
 					break;
 			}
 			break;
@@ -381,6 +381,8 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 		/* Stack tracing exit point */
 		FRET(OPC_TRUE);
 	} else {
+		printf (" [Node %s] t=%f  -> Not the frame for me: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
+		op_pk_destroy (frame_MPDU);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
@@ -438,7 +440,7 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set (beacon_MPDU, "B2", 1); // beacon2 enabled
 	op_pk_nfd_set (beacon_MPDU, "Sequence Number", ((sequence_num_beaconG++) % 256));
 	op_pk_nfd_set (beacon_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
-	op_pk_nfd_set (beacon_MPDU, "Recipient ID", mac_attr.recipient_id);
+	op_pk_nfd_set (beacon_MPDU, "Recipient ID", BROADCAST_NID);
 	op_pk_nfd_set (beacon_MPDU, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (beacon_MPDU, "BAN ID", mac_attr.ban_id);
 	
@@ -462,9 +464,6 @@ static void wban_send_beacon_frame () {
 
 
 	if (enable_log) {
-		printf("sequence_num_beaconG = %d\n", sequence_num_beaconG - 1);
-		printf("Size of beacon_PPDU=%d\n", op_pk_total_size_get(beacon_PPDU));
-		printf("beacon_frame_tx_time = %f\n", beacon_frame_tx_time);
 		fprintf(log,"t=%f  -> Beacon Frame transmission. \n\n", op_sim_time());
 		printf(" [Node %s] t=%f  -> Beacon Frame transmission. \n\n", node_attr.name, op_sim_time());
 	}
@@ -556,7 +555,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	Packet* beacon_MSDU_rx;
 	int beacon_PPDU_size;
 	int rcv_sender_id;
-	double beacon_frame_tx_time;
 	double send_conn_req_time;
 	int sequence_number_fd;
 	int random_num;
@@ -619,7 +617,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			 */
 			mac_attr.recipient_id = rcv_sender_id;
 			mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
-			random_num = rand_int(53);
+			random_num = (rand_int(500) + node_attr.objid)%54;
 			printf("Node %s SF.BI_Boundary=%f\n", node_attr.name, SF.BI_Boundary);
 			printf("Node %s generates random number with %d for connection request.\n", node_attr.name, random_num);
 			send_conn_req_time = SF.BI_Boundary + beacon_attr.rap1_end*allocationSlotLength2ms*0.001 + random_num * 0.0015;
@@ -1044,7 +1042,6 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 		/* destroy the packet */
 		op_pk_destroy (data_frame_mpdu);
 	}
-
 	/* try to send the packet in SF active phase */
 	if ((OPC_TRUE == SF.ENABLE_TX_NEW) && (MAC_SLEEP != mac_state) && (MAC_SETUP != mac_state)) {
 		op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
@@ -1106,6 +1103,7 @@ static void wban_mac_interrupt_process() {
 	
 		case OPC_INTRPT_STRM: // incomming packet
 		{
+			printf("Node %s received packets from incomming.\n", node_attr.name);
 			wban_parse_incoming_frame();	// parse the incoming packet
 			break;
 		};/*end of OPC_INTRPT_STRM */
@@ -1119,6 +1117,7 @@ static void wban_mac_interrupt_process() {
 						fprintf (log,"t=%f  -> ++++++++++ END OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
+					op_prg_odb_bkpt ("beacon_end");
 					if (IAM_BAN_HUB) {
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
@@ -1426,6 +1425,7 @@ static void wban_mac_interrupt_process() {
 						} else {
 							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, wban_backoff_period_boundary_get());
 							// op_intrpt_schedule_self (csma.next_slot_start, START_TRANSMISSION_CODE);
+							op_prg_odb_bkpt("send_packet");
 							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), START_TRANSMISSION_CODE);
 						}
 					}
@@ -1666,7 +1666,6 @@ static void queue_status() {
 	/* Stack tracing exit point */
 	FOUT;
 }
-
 
 /*--------------------------------------------------------------------------------
  * Function:	wpan_battery_update_tx
@@ -2055,7 +2054,6 @@ static void wban_send_packet() {
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_packet);
-
 	/* create PHY frame (PPDU) that encapsulates beacon MAC frame (MPDU) */
 	frame_PPDU_copy = op_pk_create_fmt("wban_frame_PPDU_format");
 	op_pk_nfd_set (frame_PPDU_copy, "RATE", node_attr.data_rate);
