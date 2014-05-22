@@ -129,6 +129,16 @@ static void wban_mac_init() {
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
 
+	/* register the statistics */
+	stat_vec.data_pkt_fail = op_stat_reg("Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	stat_vec.data_pkt_suc1 = op_stat_reg("Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	stat_vec.data_pkt_suc2 = op_stat_reg("Data Packet Succed 2", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	stat_vec.data_pkt_sent = op_stat_reg("Data Packet Sent", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	/* register the GLOBAL statistics */
+	stat_vecG.data_pkt_fail = op_stat_reg("Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	stat_vecG.data_pkt_suc1 = op_stat_reg("Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	stat_vecG.data_pkt_suc2 = op_stat_reg("Data Packet Succed 2", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	stat_vecG.data_pkt_sent = op_stat_reg("Data Packet Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -1448,6 +1458,14 @@ static void wban_mac_interrupt_process() {
 					// check if we reached the max number and if so delete the packet
 					if (current_packet_txs + current_packet_CS_fails >= max_packet_tries) {
 						// collect statistics
+						op_stat_write(stat_vec.data_pkt_fail, 1.0);
+						op_stat_write(stat_vec.data_pkt_suc1, 0.0);
+						op_stat_write(stat_vec.data_pkt_suc2, 0.0);
+
+						op_stat_write(stat_vecG.data_pkt_fail, 1.0);
+						op_stat_write(stat_vecG.data_pkt_suc1, 0.0);
+						op_stat_write(stat_vecG.data_pkt_suc2, 0.0);
+
 						printf("Packet transmission exceeds max packet tries at time %f\n", op_sim_time());
 						// remove MAC frame (MPDU) frame_MPDU_to_be_sent
 						// op_pk_destroy(frame_MPDU_to_be_sent);
@@ -1750,6 +1768,20 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			}
 
 			//collect statistics
+			op_stat_write(stat_vec.data_pkt_fail, 0.0);
+			if(1 == current_packet_txs + current_packet_CS_fails){
+				op_stat_write(stat_vec.data_pkt_suc1, 1.0);
+			} else {
+				op_stat_write(stat_vec.data_pkt_suc2, 1.0);
+			}
+			
+			op_stat_write(stat_vecG.data_pkt_fail, 0.0);
+			if(1 == current_packet_txs + current_packet_CS_fails){
+				op_stat_write(stat_vecG.data_pkt_suc1, 1.0);
+			} else {
+				op_stat_write(stat_vecG.data_pkt_suc2, 1.0);
+			}
+
 			SF.ENABLE_TX_NEW = OPC_TRUE;
 			/* Try to send another packet after pSIFS */
 			op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
@@ -2070,7 +2102,11 @@ static void wban_send_packet() {
 
 	switch (packet_to_be_sent.frame_type) {
 		case DATA: 
+		{
+			op_stat_write(stat_vec.data_pkt_sent, (double)(op_pk_total_size_get(frame_PPDU_to_be_sent)));
+			op_stat_write(stat_vecG.data_pkt_sent, (double)(op_pk_total_size_get(frame_PPDU_to_be_sent)));
 			break;
+		}
 		case MANAGEMENT: 
 			break;
 		case COMMAND:
