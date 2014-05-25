@@ -163,7 +163,10 @@ typedef struct {
 	int eap2_end;
 	int rap2_start;
 	int rap2_end;
+	int map2_start;
+	int map2_end;
 	int b2_start;
+	int cap_end;
 	int inactive_duration;
 
 	double beacon_frame_tx_time;
@@ -188,6 +191,7 @@ typedef struct {
 	double map2_start2sec;
 	double map2_end2sec;
 	double b2_start2sec;
+	double cap_start2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
