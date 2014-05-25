@@ -41,6 +41,14 @@ typedef struct {
 	int inactive_duration;
 } beacon_attributes;
 
+/* define the beacon2 frame parameters */
+typedef struct {
+	int beacon_period_length;
+	int allocation_slot_length;
+	int cap_end;
+	int map2_end;
+} beacon2_attributes;
+
 /* define the connection request parameters */
 typedef struct {
 	int recipient_address;
