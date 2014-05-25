@@ -22,6 +22,7 @@ typedef struct {
 
 	Boolean is_BANhub; // state if the node is a Hub or not
 	char Device_Mode[20]; // Can be a Node or a Hub
+	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
 	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
@@ -40,6 +41,14 @@ typedef struct {
 	int b2_start;
 	int inactive_duration;
 } beacon_attributes;
+
+/* define the beacon2 frame parameters */
+typedef struct {
+	int beacon_period_length;
+	int allocation_slot_length;
+	int cap_end;
+	int map2_end;
+} beacon2_attributes;
 
 /* define the connection request parameters */
 typedef struct {
@@ -154,7 +163,10 @@ typedef struct {
 	int eap2_end;
 	int rap2_start;
 	int rap2_end;
+	int map2_start;
+	int map2_end;
 	int b2_start;
+	int cap_end;
 	int inactive_duration;
 
 	double beacon_frame_tx_time;
@@ -179,6 +191,7 @@ typedef struct {
 	double map2_start2sec;
 	double map2_end2sec;
 	double b2_start2sec;
+	double cap_start2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
@@ -221,5 +234,26 @@ typedef struct
 	int frame_subtype;
 	Boolean enable;
 } packet_to_be_sent_attributes;
+
+/* statistic vectors */
+typedef struct {
+	Stathandle data_pkt_fail;
+	Stathandle data_pkt_suc1;
+	Stathandle data_pkt_suc2;
+	Stathandle data_pkt_sent;
+	Stathandle dropped_packets;
+	Stathandle mac_delay;
+	Stathandle sent_pkt;
+} wban_statistic_vector;
+
+typedef struct {
+	Stathandle data_pkt_fail;
+	Stathandle data_pkt_suc1;
+	Stathandle data_pkt_suc2;
+	Stathandle data_pkt_sent;
+	Stathandle dropped_packets;
+	Stathandle mac_delay;
+	Stathandle sent_pkt;
+} wban_global_statistic_vector;
 
 #endif
