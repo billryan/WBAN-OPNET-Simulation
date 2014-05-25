@@ -116,7 +116,7 @@ static void wban_mac_init() {
 		beacon_frame_hndl = op_stat_reg ("MANAGEMENT.Number of Generated Beacon Frame", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 		wban_send_beacon_frame ();
 	} else { /* if the node is not a Hub */
-		mac_attr.sender_id = UNCONNECTED;
+		mac_attr.sender_id = UNCONNECTED_NID;
 		mac_attr.recipient_id = UNCONNECTED;
 		//node_attr.unconnectedNID = 1 + (unconnectedNID - 1) % 16;
 		//unconnectedNID++;
@@ -327,6 +327,10 @@ static void wban_parse_incoming_frame() {
 					}
 					break;
 				case  CONTROL: /* Handle control packets */
+			 		if (enable_log) {
+						fprintf (log,"t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+						printf (" [Node %s] t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+					}
 					switch (frame_subtype_fd) {
 						case I_ACK:
 							wban_extract_i_ack_frame (frame_MPDU);
@@ -559,7 +563,7 @@ static void wban_send_beacon2_frame () {
 	SF.cap_start2sec = SF.b2_start2sec + beacon2_frame_tx_time + pSIFS;
 	/* Additional processing for proposed protocol */
 	if (1 == node_attr.protocol_ver) {
-		SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec * 0.001;
+		SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
 		update_conn_assgin_start = SF.b2_start2sec + pSIFS;
 		op_intrpt_schedule_self(update_conn_assgin_start, UPDATE_OF_CONN_ASSGIN);
 	}
@@ -662,9 +666,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	Packet* beacon_MSDU_rx;
 	int beacon_PPDU_size;
 	int rcv_sender_id;
-	double send_conn_req_time;
 	int sequence_number_fd;
-	int random_num;
 	int eap_indicator_fd;
 	int beacon2_enabled_fd;
 	
@@ -716,25 +718,18 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		op_pk_destroy (beacon_MSDU_rx);
 		op_pk_destroy (beacon_MPDU_rx);
 
-		if (UNCONNECTED == mac_attr.sender_id) {
+		mac_attr.recipient_id = rcv_sender_id;
+		if (UNCONNECTED_NID == mac_attr.sender_id) {
 			/* We will try to connect to this BAN  if our scheduled access length
 			 * is NOT set to unconnected (-1). If it is set to 0, it means we are
 			 * establishing a sleeping pattern and waking up only to hear beacons
 			 * and are only able to transmit in RAP periods.
 			 */
-			mac_attr.recipient_id = rcv_sender_id;
-			mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
-			random_num = (rand_int(500) + node_attr.objid)%54;
-			printf("Node %s SF.BI_Boundary=%f\n", node_attr.name, SF.BI_Boundary);
-			printf("Node %s generates random number with %d for connection request.\n", node_attr.name, random_num);
-			send_conn_req_time = SF.BI_Boundary + beacon_attr.rap1_end*allocationSlotLength2ms*0.001 + random_num * 0.0015;
-			printf("Node %s\n send connection request frame at %f.\n", node_attr.name, send_conn_req_time);
-			if (conn_req_attr.allocation_length > 0) {
-				// we are unconnected, and we need to connect to obtain scheduled access
-				// we will create and send a connection request
-				// printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
-				op_intrpt_schedule_self (send_conn_req_time, SEND_CONN_REQ_CODE);
-			}
+			/* initialize the NID from 32 */
+			mac_attr.sender_id = current_free_connected_NID;
+			current_free_connected_NID++;
+			// printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
 		}
 		wban_schedule_next_beacon();
 	}
@@ -789,13 +784,20 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 		// op_pk_nfd_get (beacon2_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
 		op_pk_nfd_get (beacon2_MSDU_rx, "CAP End", &b2_attr.cap_end);
 		op_pk_nfd_get (beacon2_MSDU_rx, "MAP2 End", &b2_attr.map2_end);
+		SF.cap_end = b2_attr.cap_end;
+		SF.map2_end = b2_attr.map2_end;
 
 		beacon2_frame_tx_time = TX_TIME(beacon2_PPDU_size, node_attr.data_rate);
+		printf("SF.b2_start2sec=%f\n", SF.b2_start2sec);
+		printf("beacon2_frame_tx_time=%f\n", beacon2_frame_tx_time);
+		printf("SF.b2_start2sec + beacon2_frame_tx_time + pSIFS=");
+		printf("%f\n", SF.b2_start2sec + beacon2_frame_tx_time + pSIFS);
 
 		SF.cap_start2sec = max_double(SF.b2_start2sec + beacon2_frame_tx_time + pSIFS, op_sim_time());
 		/* Additional processing for proposed protocol */
 		if (1 == node_attr.protocol_ver) {
-			SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec * 0.001;
+			SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
+			printf("SF.cap_start2sec replaced with %f for protocol version 1.\n", SF.cap_start2sec);
 		}
 		op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
 
@@ -815,7 +817,8 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_schedule_next_beacon() {
-	
+	double subq_data_tx_time_total;
+	double send_conn_req_time;
 	/* Stack tracing enrty point */
 	FIN(wban_schedule_next_beacon);
 
@@ -869,6 +872,30 @@ static void wban_schedule_next_beacon() {
 		if (OPC_TRUE == node_attr.is_BANhub){
 			SF.map1_start2sec = SF.rap1_end2sec + pSIFS;
 			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
+		} else {
+			/* get the queue infomation of SUBQ_DATA */
+			subq_info_get(SUBQ_DATA);
+			printf("subq_info.pksize=%f\n", subq_info.pksize);
+			printf("subq_info.bitsize=%f\n", subq_info.bitsize);
+			printf("node_attr.data_rate=%f\n", node_attr.data_rate);
+			subq_data_tx_time_total = subq_info.pksize * pSIFS + subq_info.bitsize / (node_attr.data_rate*1000);
+			conn_req_attr.allocation_length = (int)(ceil)(subq_data_tx_time_total / SF.slot_length2sec);
+			printf("Connection Request allocation_length=%d for Node %s\n", conn_req_attr.allocation_length, node_attr.name);
+			op_prg_odb_bkpt("pre_req");
+			if (conn_req_attr.allocation_length > 0) {
+				if(conn_req_attr.allocation_length > 10){
+					/* maximum allocation length for a node is 10 */
+					conn_req_attr.allocation_length = 10;
+				}
+				/* node_attr.objid % 10 for preventing waiting too long */
+				send_conn_req_time = SF.rap1_end2sec + (node_attr.objid % 10) * 0.0015;
+				printf("Node %s\n send connection request frame at %f.\n", node_attr.name, send_conn_req_time);
+				
+				// we are unconnected, and we need to connect to obtain scheduled access
+				// we will create and send a connection request
+				// printf("Node %s start sending connection request frame at %f.\n", node_attr.name, op_sim_time());
+				op_intrpt_schedule_self (send_conn_req_time, SEND_CONN_REQ_CODE);
+			}
 		}
 	}
 	if (SF.eap2_start > 0) {
@@ -880,7 +907,10 @@ static void wban_schedule_next_beacon() {
 			SF.map1_end2sec = SF.eap2_start2sec - pSIFS;
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
+	} else {
+		SF.eap2_start2sec = 0;
 	}
+
 	if ((SF.rap2_length2sec > 0) && (SF.rap2_start > 0)) {
 		op_intrpt_schedule_self (SF.rap2_start2sec, START_OF_RAP2_PERIOD_CODE);
 		op_intrpt_schedule_self (SF.rap2_end2sec, END_OF_RAP2_PERIOD_CODE);
@@ -888,12 +918,16 @@ static void wban_schedule_next_beacon() {
 			SF.map2_start2sec = SF.rap2_end2sec + pSIFS;
 			op_intrpt_schedule_self (SF.map2_start2sec, START_OF_MAP2_PERIOD_CODE);
 		}
+	} else {
+		SF.rap2_start2sec = 0;
 	}
+
 	if ((SF.b2_start2sec > 0) && (OPC_TRUE == node_attr.is_BANhub)) {
-		if(SF.eap2_start2sec > 0){
+		if(SF.eap2_start > 0){
 			SF.map2_end2sec = SF.b2_start2sec - pSIFS;
 			op_intrpt_schedule_self (SF.b2_start2sec - pSIFS, END_OF_MAP2_PERIOD_CODE);
 		} else {
+			SF.map1_end = SF.b2_start;
 			SF.map1_end2sec = SF.b2_start2sec - pSIFS;
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
@@ -943,7 +977,7 @@ static void wban_send_connection_request_frame () {
 	/* Stack tracing enrty point */
 	FIN(wban_send_connection_request_frame);
 
-	random_num = wban_update_sequence_number();
+	random_num = rand_int(256);
 	/* create a connection request frame */
 	connection_request_MSDU = op_pk_create_fmt ("wban_connection_request_frame_format");
 	
@@ -1006,7 +1040,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	/* Stack tracing enrty point */
 	FIN(wban_send_conn_assign_frame);
 
-	random_num = wban_update_sequence_number();
+	random_num = rand_int(256);
 	/* create a connection request frame */
 	conn_assign_MSDU = op_pk_create_fmt ("wban_connection_assignment_frame_format");
 	
@@ -1024,14 +1058,18 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	if (SF.current_first_free_slot < SF.map1_end + 1) {
 		/* allocation within MAP1 */
 		if (SF.current_first_free_slot + allocation_length < SF.map1_end + 2) {
-			conn_assign_attr.interval_start = SF.current_first_free_slot;
-			conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
-			SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
+			if(0 == node_attr.protocol_ver){
+				conn_assign_attr.interval_start = SF.current_first_free_slot;
+				conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
+				SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
 
-			/* map the allocation slot into array SF_slot */
-			i = conn_assign_attr.interval_start;
-			for (; i <= conn_assign_attr.interval_end; i++) {
-				SF_slot[i] = mac_attr.recipient_id;
+				/* map the allocation slot into array SF_slot */
+				i = conn_assign_attr.interval_start;
+				for (; i <= conn_assign_attr.interval_end; i++) {
+					SF_slot[i] = mac_attr.recipient_id;
+				}
+			} else if(1 == node_attr.protocol_ver){
+
 			}
 		} else if (SF.rap2_end + allocation_length < SF.b2_start - 1) {
 			conn_assign_attr.interval_start = SF.rap2_end + 1;
@@ -1700,6 +1738,7 @@ static void wban_mac_interrupt_process() {
 
 				case SEND_CONN_REQ_CODE:
 				{
+					op_prg_odb_bkpt("send_conn_req");
 					printf("t = %f, Node %s start sending connection request frame to Hub.\n", op_sim_time(), node_attr.name);
 					wban_send_connection_request_frame();
 					break;
@@ -1867,9 +1906,57 @@ static void queue_status() {
 				fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 				printf(" [Node %s] t=%f  -> Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", node_attr.name, op_sim_time(), i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 			}
-		}	
+		}
 	}
 	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*-----------------------------------------------------------------------------
+ * Function:	subq_info_get
+ *
+ * Description:	print the status of each subqueue
+ *              
+ * No parameters
+ *-----------------------------------------------------------------------------*/
+static void subq_info_get (int subq_index) {
+	Objid queue_objid;
+	Objid subq_objid;
+	double bit_capacity;
+	double pk_capacity;
+
+	/* Stack tracing enrty point */
+	FIN(subq_info_get);
+
+	/* get the subqueues object ID */
+	op_ima_obj_attr_get (mac_attr.objid, "subqueue", &queue_objid);
+
+	/* Obtain object ID of the subq_index th subqueue */
+	subq_objid = op_topo_child (queue_objid, OPC_OBJMTYPE_ALL, subq_index);
+	
+	/* Get current subqueue attribute settings */
+	op_ima_obj_attr_get (subq_objid, "bit capacity", &bit_capacity);
+	op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
+	
+	if (op_subq_empty(subq_index)) {
+		if (enable_log) {
+			fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), subq_index, pk_capacity, bit_capacity);
+			printf(" [Node %s] t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", node_attr.name, op_sim_time(), subq_index, pk_capacity, bit_capacity);
+		}
+		subq_info.pksize = 0;
+		subq_info.bitsize = 0;
+	} else {
+		subq_info.pksize = op_subq_stat (subq_index, OPC_QSTAT_PKSIZE);
+		subq_info.bitsize = op_subq_stat (subq_index, OPC_QSTAT_BITSIZE);
+		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
+		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
+		if (enable_log) {
+			fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
+			printf(" [Node %s] t=%f  -> Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", node_attr.name, op_sim_time(), subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
+		}
+	}
+
 	/* Stack tracing exit point */
 	FOUT;
 }
