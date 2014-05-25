@@ -235,6 +235,15 @@ typedef struct
 	Boolean enable;
 } packet_to_be_sent_attributes;
 
+/* define the subqueue infomation parameters */
+typedef struct {
+	double pksize;
+	double bitsize;
+	double free_pksize;
+	double free_bitsize;
+	double pk_overflows;
+} subqueue_info;
+
 /* statistic vectors */
 typedef struct {
 	Stathandle data_pkt_fail;
