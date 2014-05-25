@@ -22,6 +22,7 @@ typedef struct {
 
 	Boolean is_BANhub; // state if the node is a Hub or not
 	char Device_Mode[20]; // Can be a Node or a Hub
+	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
 	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
