@@ -235,6 +235,22 @@ typedef struct
 	Boolean enable;
 } packet_to_be_sent_attributes;
 
+/* define the subqueue infomation parameters */
+typedef struct 
+{
+	Objid objid;
+	int	sender_id; // Sender ID of the node
+	int	recipient_id; // Recipient ID of the node
+	int ack_policy;
+	int seq_num;
+	int total_bits; // length of PPDU
+	int ack_bits; // length of ack PPDU
+	int user_priority;
+	int frame_type;
+	int frame_subtype;
+	Boolean enable;
+} subqueue_info;
+
 /* statistic vectors */
 typedef struct {
 	Stathandle data_pkt_fail;
