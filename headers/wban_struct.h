@@ -252,6 +252,7 @@ typedef struct {
 	Stathandle data_pkt_suc1;
 	Stathandle data_pkt_suc2;
 	Stathandle data_pkt_sent;
+	Stathandle data_pkt_rec;
 	Stathandle dropped_packets;
 	Stathandle mac_delay;
 	Stathandle sent_pkt;
@@ -262,6 +263,7 @@ typedef struct {
 	Stathandle data_pkt_suc1;
 	Stathandle data_pkt_suc2;
 	Stathandle data_pkt_sent;
+	Stathandle data_pkt_rec;
 	Stathandle dropped_packets;
 	Stathandle mac_delay;
 	Stathandle sent_pkt;
