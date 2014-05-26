@@ -150,6 +150,7 @@ static void wban_mac_init() {
 	stat_vec.data_pkt_suc1 = op_stat_reg("Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	stat_vec.data_pkt_suc2 = op_stat_reg("Data Packet Succed 2", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	stat_vec.data_pkt_sent = op_stat_reg("Data Packet Sent", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	stat_vec.data_pkt_rec = op_stat_reg("Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	/* register the GLOBAL statistics */
 	stat_vecG.data_pkt_fail = op_stat_reg("Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	stat_vecG.data_pkt_suc1 = op_stat_reg("Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
@@ -202,7 +203,6 @@ static void wban_log_file_init() {
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_parse_incoming_frame() {
-
 	Packet* frame_MPDU;
 	Packet* rcv_frame;
 	int Stream_ID;
@@ -266,11 +266,13 @@ static void wban_parse_incoming_frame() {
 						fprintf (log,"t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
+					op_stat_write(stat_vec.data_pkt_rec, 1.0);
 					wban_extract_data_frame (frame_MPDU);
 					/* send to higher layer for statistics */
 					op_pk_send (frame_MPDU, STRM_FROM_MAC_TO_SINK);
 					break;
 				case MANAGEMENT: /* Handle management packets */
+					op_stat_write(stat_vec.data_pkt_rec, 0.0);
 			 		if (enable_log) {
 						fprintf (log,"t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
@@ -326,6 +328,7 @@ static void wban_parse_incoming_frame() {
 					}
 					break;
 				case  CONTROL: /* Handle control packets */
+					op_stat_write(stat_vec.data_pkt_rec, 0.0);
 			 		if (enable_log) {
 						fprintf (log,"t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
