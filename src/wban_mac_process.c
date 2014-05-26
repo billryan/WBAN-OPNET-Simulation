@@ -167,7 +167,6 @@ static void wban_mac_init() {
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
-
 	char directory_path_name[120];
 	char log_name[132];
 
@@ -297,12 +296,12 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 						case CONNECTION_REQUEST:
-							if (OPC_FALSE == SF.ENABLE_TX_NEW) {
+							if (OPC_TRUE == SF.IN_CONN_SETUP) {
 								printf("Hub cannot rceive new connection request frame now.\n");
 								op_pk_destroy(frame_MPDU);
 								break;
 							}
-							SF.ENABLE_TX_NEW = OPC_FALSE;
+							SF.IN_CONN_SETUP = OPC_TRUE;
 							if (enable_log) {
 								fprintf (log,"t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 								printf (" [Node %s] t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
@@ -497,7 +496,6 @@ static void wban_send_beacon_frame () {
 
 	wpan_battery_update_tx ((double) op_pk_total_size_get(beacon_PPDU));
 
-
 	if (enable_log) {
 		fprintf(log,"t=%f  -> Beacon Frame transmission. \n\n", op_sim_time());
 		printf(" [Node %s] t=%f  -> Beacon Frame transmission. \n\n", node_attr.name, op_sim_time());
@@ -570,9 +568,7 @@ static void wban_send_beacon2_frame () {
 
 	// collect the number of beacon2 frame
 	// op_stat_write (beacon_frame_hndl, 1.0);
-
 	wpan_battery_update_tx ((double) op_pk_total_size_get(beacon2_PPDU));
-
 
 	if (enable_log) {
 		fprintf(log,"t=%f  -> Beacon2 Frame transmission. \n\n", op_sim_time());
@@ -645,8 +641,14 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 
 	/* update the parameters of Superframe */
 	SF.eap2_start = conn_assign_attr.eap2_start;
-	SF.eap2_end = SF.rap2_start - 1;
-	SF.map1_end = SF.eap2_start - 1;
+	if(0 < SF.eap2_start){
+		SF.eap2_end = SF.rap2_start - 1;
+	} else {
+		SF.eap2_end = 0;
+		if(0 < SF.b2_start){
+			SF.map1_end = SF.b2_start - 1;
+		}
+	}
 
 	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
 
@@ -785,21 +787,28 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 		op_pk_nfd_get (beacon2_MSDU_rx, "CAP End", &b2_attr.cap_end);
 		op_pk_nfd_get (beacon2_MSDU_rx, "MAP2 End", &b2_attr.map2_end);
 		SF.cap_end = b2_attr.cap_end;
-		SF.map2_end = b2_attr.map2_end;
 
 		beacon2_frame_tx_time = TX_TIME(beacon2_PPDU_size, node_attr.data_rate);
+		printf("SF.BI_Boundary=%f\n", SF.BI_Boundary);
 		printf("SF.b2_start2sec=%f\n", SF.b2_start2sec);
 		printf("beacon2_frame_tx_time=%f\n", beacon2_frame_tx_time);
 		printf("SF.b2_start2sec + beacon2_frame_tx_time + pSIFS=");
 		printf("%f\n", SF.b2_start2sec + beacon2_frame_tx_time + pSIFS);
-
+		op_prg_odb_bkpt("extract_b2");
 		SF.cap_start2sec = max_double(SF.b2_start2sec + beacon2_frame_tx_time + pSIFS, op_sim_time());
+		if(0 == SF.cap_end){
+			SF.cap_end2sec = SF.BI_Boundary + SF.SD*SF.slot_length2sec;
+		} else {
+			SF.cap_end2sec = SF.BI_Boundary + SF.cap_end * SF.slot_length2sec;
+		}
 		/* Additional processing for proposed protocol */
 		if (1 == node_attr.protocol_ver) {
+			SF.map2_end = b2_attr.map2_end;
 			SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
 			printf("SF.cap_start2sec replaced with %f for protocol version 1.\n", SF.cap_start2sec);
 		}
 		op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
+		op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
 
 		op_pk_destroy (beacon2_MSDU_rx);
 		op_pk_destroy (beacon2_MPDU_rx);
@@ -877,7 +886,6 @@ static void wban_schedule_next_beacon() {
 			subq_info_get(SUBQ_DATA);
 			printf("subq_info.pksize=%f\n", subq_info.pksize);
 			printf("subq_info.bitsize=%f\n", subq_info.bitsize);
-			printf("node_attr.data_rate=%f\n", node_attr.data_rate);
 			subq_data_tx_time_total = subq_info.pksize * pSIFS + subq_info.bitsize / (node_attr.data_rate*1000);
 			conn_req_attr.allocation_length = (int)(ceil)(subq_data_tx_time_total / SF.slot_length2sec);
 			printf("Connection Request allocation_length=%d for Node %s\n", conn_req_attr.allocation_length, node_attr.name);
@@ -898,6 +906,7 @@ static void wban_schedule_next_beacon() {
 			}
 		}
 	}
+	
 	if (SF.eap2_start > 0) {
 		SF.eap2_start2sec = SF.BI_Boundary + SF.eap2_start * SF.slot_length2sec + pSIFS;
 		SF.eap2_end2sec = SF.rap2_start2sec - pSIFS;
@@ -933,7 +942,6 @@ static void wban_schedule_next_beacon() {
 		}
 		op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
 	}
-	op_intrpt_schedule_self (SF.BI_Boundary + SF.SD*SF.slot_length2sec, END_OF_CAP_PERIOD_CODE);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.SD*SF.slot_length2sec, START_OF_SLEEP_PERIOD);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
 	op_intrpt_schedule_remote (SF.BI_Boundary + SF.BI*SF.slot_length2sec, END_OF_SLEEP_PERIOD, node_attr.my_battery);
@@ -1055,10 +1063,14 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "Connection Status", 0);
 
-	if (SF.current_first_free_slot < SF.map1_end + 1) {
-		/* allocation within MAP1 */
-		if (SF.current_first_free_slot + allocation_length < SF.map1_end + 2) {
-			if(0 == node_attr.protocol_ver){
+	if(0 == node_attr.protocol_ver){
+		if(SF.current_first_free_slot <= SF.current_slot){
+			SF.current_first_free_slot = SF.current_slot + 1;
+		}
+		if(0 == SF.eap2_start){
+			/* do not use the second part of EAP2/RAP2/MAP */
+			if(SF.current_first_free_slot + allocation_length < SF.b2_start + 1){
+				/* allocation within the first MAP */
 				conn_assign_attr.interval_start = SF.current_first_free_slot;
 				conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
 				SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
@@ -1068,44 +1080,64 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 				for (; i <= conn_assign_attr.interval_end; i++) {
 					SF_slot[i] = mac_attr.recipient_id;
 				}
-			} else if(1 == node_attr.protocol_ver){
-
-			}
-		} else if (SF.rap2_end + allocation_length < SF.b2_start - 1) {
-			conn_assign_attr.interval_start = SF.rap2_end + 1;
-			conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
-			SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
-
-			/* map the allocation slot into array SF_slot */
-			i = conn_assign_attr.interval_start;
-			for (; i <= conn_assign_attr.interval_end; i++) {
-				SF_slot[i] = mac_attr.recipient_id;
-			}
-		}
-
-		if (SF.current_first_free_slot == SF.eap2_start) {
-			SF.current_first_free_slot = SF.rap2_end + 1;
-		}
-	} else if (SF.current_first_free_slot < SF.b2_start) {
-		/* allocation within MAP2 */
-		if (SF.current_first_free_slot + allocation_length < SF.b2_start + 1) {
-			conn_assign_attr.interval_start = SF.current_first_free_slot;
-			conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
-			SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
-
-			/* map the allocation slot into array SF_slot */
-			i = conn_assign_attr.interval_start;
-			for (; i <= conn_assign_attr.interval_end; i++) {
-				SF_slot[i] = mac_attr.recipient_id;
+			} else {
+				conn_assign_attr.interval_start = 255;
+				conn_assign_attr.interval_end = 0;
+				printf("There are no enougth slots for scheduling.\n");
 			}
 		} else {
-			conn_assign_attr.interval_start = 255;
-			conn_assign_attr.interval_end = 0;
-			printf("There is no enougth slots for scheduling.\n");
-			// FOUT;
+			if (SF.current_first_free_slot < SF.map1_end + 1) {
+				/* allocation within MAP1 */
+				if (SF.current_first_free_slot + allocation_length < SF.map1_end + 2) {
+					conn_assign_attr.interval_start = SF.current_first_free_slot;
+					conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
+					SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
+
+					/* map the allocation slot into array SF_slot */
+					i = conn_assign_attr.interval_start;
+					for (; i <= conn_assign_attr.interval_end; i++) {
+						SF_slot[i] = mac_attr.recipient_id;
+					}
+				} else if (SF.rap2_end + allocation_length < SF.b2_start - 1) {
+					conn_assign_attr.interval_start = SF.rap2_end + 1;
+					conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
+					SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
+
+					/* map the allocation slot into array SF_slot */
+					i = conn_assign_attr.interval_start;
+					for (; i <= conn_assign_attr.interval_end; i++) {
+						SF_slot[i] = mac_attr.recipient_id;
+					}
+				}
+
+				if (SF.current_first_free_slot == SF.eap2_start) {
+					SF.current_first_free_slot = SF.rap2_end + 1;
+				}
+			} else if (SF.current_first_free_slot < SF.b2_start) {
+				/* allocation within MAP2 */
+				if (SF.current_first_free_slot + allocation_length < SF.b2_start + 1) {
+					conn_assign_attr.interval_start = SF.current_first_free_slot;
+					conn_assign_attr.interval_end = conn_assign_attr.interval_start + allocation_length - 1;
+					SF.current_first_free_slot = conn_assign_attr.interval_end + 1;
+
+					/* map the allocation slot into array SF_slot */
+					i = conn_assign_attr.interval_start;
+					for (; i <= conn_assign_attr.interval_end; i++) {
+						SF_slot[i] = mac_attr.recipient_id;
+					}
+				} else {
+					conn_assign_attr.interval_start = 255;
+					conn_assign_attr.interval_end = 0;
+					printf("There is no enougth slots for scheduling.\n");
+					// FOUT;
+				}
+			}
 		}
 	}
 
+	if(1 == node_attr.protocol_ver){
+		/* Scheduling for proposed protocol */
+	}
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "EAP2 Start", conn_assign_attr.eap2_start);
 	op_pk_nfd_set (conn_assign_MSDU, "Interval Start", conn_assign_attr.interval_start);
@@ -1349,13 +1381,13 @@ static void wban_mac_interrupt_process() {
 					if(!IAM_BAN_HUB) {
 						map_start2sec = SF.BI_Boundary + conn_assign_attr.interval_start * SF.slot_length2sec + pSIFS;
 						map_end2sec = SF.BI_Boundary + (conn_assign_attr.interval_end+1) * SF.slot_length2sec;
-						if((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot < SF.eap2_start)) {
+						if((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot < SF.b2_start)) {
 							SF.map1_start2sec = map_start2sec;
 							SF.map1_end2sec = map_end2sec;
 							printf("Node %s map1_start2sec=%f, map1_end2sec=%f.\n", node_attr.name, SF.map1_start2sec, SF.map1_end2sec);
 							op_intrpt_schedule_self(max_double(SF.map1_start2sec, op_sim_time()), START_OF_MAP1_PERIOD_CODE);
 							op_intrpt_schedule_self(SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
-						} else if ((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot > SF.rap2_end)) {
+						} else if ((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot > SF.b2_start)) {
 							SF.map2_start2sec = map_start2sec;
 							SF.map2_end2sec = map_end2sec;
 							op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
@@ -1586,10 +1618,26 @@ static void wban_mac_interrupt_process() {
 				{
 					printf("Node %s enters into CAP Period.\n", node_attr.name);
 					mac_state = MAC_CAP;
+					phase_start_timeG = SF.cap_start2sec;
+					phase_end_timeG = SF.cap_end2sec;
+					SF.IN_MAP_PHASE = OPC_FALSE;
+					SF.IN_EAP_PHASE = OPC_FALSE;
 					SF.ENABLE_TX_NEW = OPC_TRUE;
 					op_intrpt_schedule_self(op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				}
+
+				case END_OF_CAP_PERIOD_CODE: /* end of CAP Period */
+				{
+					mac_state = MAC_SLEEP;
+					SF.ENABLE_TX_NEW = OPC_FALSE;
+				
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ END OF THE CAP ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}	
+					break;
+				};/* end of END_OF_CAP_PERIOD_CODE */
 
 				case START_OF_SLEEP_PERIOD: /* Start of Sleep Period */
 				{
@@ -2059,6 +2107,9 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			}
 
 			SF.ENABLE_TX_NEW = OPC_TRUE;
+			if (OPC_TRUE == SF.IN_CONN_SETUP){
+				SF.IN_CONN_SETUP = OPC_FALSE;
+			}
 			/* Try to send another packet after pSIFS */
 			op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		} else	{	/* No, This is not my ACK, I'm Still Waiting */
@@ -2163,7 +2214,8 @@ static void wban_attempt_TX() {
 	/* wrap MAC frame (MPDU) in PHY frame (PPDU) */
 	op_pk_nfd_set_pkt (frame_PPDU_to_be_sent, "PSDU", frame_MPDU_to_be_sent);
 	op_pk_nfd_set (frame_PPDU_to_be_sent, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU_to_be_sent))/8); //[bytes]	
-
+	/* update the total bits of packet */
+	packet_to_be_sent.total_bits = op_pk_total_size_get(frame_PPDU_to_be_sent);
 	/* remove the packet in the head of the queue */
 	frame_MPDU_temp = op_subq_pk_remove (SUBQ_DATA, OPC_QPOS_HEAD);
 	SF.ENABLE_TX_NEW = OPC_FALSE;
@@ -2172,10 +2224,14 @@ static void wban_attempt_TX() {
 	current_packet_CS_fails = 0;
 
 	if (OPC_TRUE == SF.IN_MAP_PHASE) {
+		/* update the ack bits of packet */
+		packet_to_be_sent.ack_bits = I_ACK_PPDU_SIZE_BITS;
 		if (OPC_TRUE == map_attr.TX_state) {
 			wban_send_packet();
 		}
 	} else {
+		/* update the ack bits of packet */
+		packet_to_be_sent.ack_bits = I_ACK_PPDU_SIZE_BITS;
 		csma.CW = CWmin[packet_to_be_sent.user_priority];
 		csma.CW_double = OPC_FALSE;
 		csma.backoff_counter = 0;
@@ -2343,15 +2399,15 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* packet_to_be_sent_local
 			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits + packet_to_be_sent_local->ack_bits), node_attr.data_rate)+pSIFS)) >=0) {
 				FRET(OPC_TRUE);
 			} else {
-				printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
+				printf("No enougth time for I_ACK_POLICY packet transmission in this phase.\n");
 				FRET(OPC_FALSE);
 			}
 		
 		} else {
-			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits), node_attr.data_rate))+pSIFS* 0.000001) >=0) {
+			if (compare_doubles(phase_remaining_time, (TX_TIME((packet_to_be_sent_local->total_bits), node_attr.data_rate))+pSIFS) >=0) {
 				FRET(OPC_TRUE);
 			} else {
-				printf("No enougth time for I_ACK_POLICY packet transmission in this phase.\n");
+				printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
 			}
 		}
 	}
