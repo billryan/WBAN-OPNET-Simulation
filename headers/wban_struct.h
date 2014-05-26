@@ -192,6 +192,7 @@ typedef struct {
 	double map2_end2sec;
 	double b2_start2sec;
 	double cap_start2sec;
+	double cap_end2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
@@ -199,6 +200,7 @@ typedef struct {
 	Boolean IN_MAP_PHASE; //true if in MAP phase
 	Boolean IN_EAP_PHASE; //true if in EAP1/EAP2 phase
 	Boolean ENABLE_TX_NEW; // Enable new transmission
+	Boolean IN_CONN_SETUP; // whether in connection setup
 	Boolean SLEEP;	// Inactive portion
 	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
 	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
