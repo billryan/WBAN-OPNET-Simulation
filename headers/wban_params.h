@@ -34,14 +34,21 @@
 
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
-#define SYMBOL_RATE 600.0 // Ksps
+#define SYMBOL_RATE 600000 // 600 Ksps
 #define pSIFS (75 * 0.000001) // μs
+#define LOG_M 2 //QPSK Modulation
+#define N_preamble 90 // 90 bits
+#define N_header 31 //31 bits
+#define S_header 4 // spreading factor for PLCP header
+#define MILLI 0.001
+#define MICRO 0.000001
+#define BCH_CODE (51.0/63)
 
 // CSMA/CA
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
 // pCCATime = 63 / Symbol Rate
 // pCSMAMACPHYTime = 40 μs
-#define pCCATime ((63/SYMBOL_RATE) * 0.001) // ms
+#define pCCATime (63.0/SYMBOL_RATE) // ms
 #define pCSMAMACPHYTime (40 * 0.000001) // 40 μs
 #define pCSMASlotLength2Sec (pCCATime + pCSMAMACPHYTime)
 /* 802.15.6 related MAC parameters */
@@ -106,7 +113,7 @@
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
 #define I_ACK_PPDU_SIZE_BITS (72+121)
-#define BEACON_PPDU_BITS 369
+#define BEACON_PPDU_BITS 321
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,

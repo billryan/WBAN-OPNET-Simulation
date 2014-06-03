@@ -244,6 +244,7 @@ typedef struct {
 	double free_pksize;
 	double free_bitsize;
 	double pk_overflows;
+	double lambda;
 } subqueue_info;
 
 /* statistic vectors */
@@ -252,6 +253,14 @@ typedef struct {
 	Stathandle data_pkt_suc1;
 	Stathandle data_pkt_suc2;
 	Stathandle data_pkt_sent;
+	Stathandle up0_sent;
+	Stathandle up1_sent;
+	Stathandle up2_sent;
+	Stathandle up3_sent;
+	Stathandle up4_sent;
+	Stathandle up5_sent;
+	Stathandle up6_sent;
+	Stathandle up7_sent;
 	Stathandle data_pkt_rec;
 	Stathandle dropped_packets;
 	Stathandle mac_delay;
@@ -263,6 +272,14 @@ typedef struct {
 	Stathandle data_pkt_suc1;
 	Stathandle data_pkt_suc2;
 	Stathandle data_pkt_sent;
+	Stathandle up0_sent;
+	Stathandle up1_sent;
+	Stathandle up2_sent;
+	Stathandle up3_sent;
+	Stathandle up4_sent;
+	Stathandle up5_sent;
+	Stathandle up6_sent;
+	Stathandle up7_sent;
 	Stathandle data_pkt_rec;
 	Stathandle dropped_packets;
 	Stathandle mac_delay;
