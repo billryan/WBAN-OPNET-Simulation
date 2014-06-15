@@ -82,17 +82,6 @@ typedef struct {
 	int beacon_persistence_time;	// how long this GTS descriptor will appear in the beacon [# of superframes]
 } wpan_gts_list_PC_record;
 
-/* define the GTS parameters of the node */
-typedef struct {
-	double start_time;	// start of the using of the GTS
-	double stop_time;	// end of the using of GTS
-	int length;	 // asked length of the GTS [superframe slots]
-	int direction;	// direction of the transmission (device->PANCoord (transmit)=0, PANCoord->device(receive)=1)
-	int start_slot;	// start slot given by PANCoordinator and received from the beacon frame
-	Boolean GTS_ACTIVE; //true if the GTS slot(s) is active
-	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
-} wpan_gts_attributes;
-
 /* define the MAP1 parameters of the node */
 typedef struct {
 	double start_time;	// start of the using of the MAP1
@@ -105,18 +94,6 @@ typedef struct {
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wban_map_attributes;
 
-
-
-/* define the backoff parameters */
-typedef struct {
-	int MAX_CSMA_BACKOFF; // maximum number of Backoff (macMaxCSMABackoffs)
-	int macMinBE; // Minimum Backoff Exponent
-	int NB; // current number of backoff
-	int BE; // Backoff exponent
-	int CW; // Contention Window
-	Boolean CCA_CHANNEL_IDLE; // if TRUE the Channel is assessed to be idle, otherwise busy
-	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
-} wpan_csma_attributes;
 
 /* define the backoff parameters */
 typedef struct {
@@ -245,6 +222,7 @@ typedef struct {
 	double free_bitsize;
 	double pk_overflows;
 	double lambda;
+	int up; // user priority
 } subqueue_info;
 
 /* statistic vectors */

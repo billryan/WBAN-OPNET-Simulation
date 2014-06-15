@@ -34,7 +34,7 @@
 
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
-#define SYMBOL_RATE 600000 // 600 Ksps
+#define SYMBOL_RATE 600000.0 // 600 Ksps
 #define pSIFS (75 * 0.000001) // μs
 #define LOG_M 2 //QPSK Modulation
 #define N_preamble 90 // 90 bits
@@ -43,7 +43,7 @@
 #define MILLI 0.001
 #define MICRO 0.000001
 #define BCH_CODE (51.0/63)
-
+#define T_PHY ((N_preamble + S_header*N_header)/SYMBOL_RATE)
 // CSMA/CA
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
 // pCCATime = 63 / Symbol Rate
