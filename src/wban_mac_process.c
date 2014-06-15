@@ -153,6 +153,7 @@ static void wban_mac_init() {
 	stat_vec.up7_sent = op_stat_reg("DATA.UP7 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	stat_vec.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	stat_vec.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	stat_vec.data_pkt_rec_map1 = op_stat_reg("DATA.Data Packet Received MAP1", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	/* register the GLOBAL statistics */
 	stat_vecG.data_pkt_fail = op_stat_reg("DATA.Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	stat_vecG.data_pkt_suc1 = op_stat_reg("DATA.Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
@@ -161,6 +162,7 @@ static void wban_mac_init() {
 	stat_vecG.up7_sent = op_stat_reg("DATA.UP7 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	stat_vecG.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	stat_vecG.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -274,9 +276,12 @@ static void wban_parse_incoming_frame() {
 						fprintf (log,"t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
-					op_stat_write(stat_vec.data_pkt_rec, 1.0);
+					op_stat_write(stat_vec.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
+					op_stat_write(stat_vecG.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
+
 					wban_extract_data_frame (frame_MPDU);
 					if(SF.IN_MAP_PHASE == OPC_TRUE){
+						op_stat_write(stat_vec.data_pkt_rec_map1, op_pk_total_size_get(frame_MPDU));
 						op_prg_odb_bkpt("map_data");
 					}
 					/* send to higher layer for statistics */

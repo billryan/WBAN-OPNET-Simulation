@@ -240,6 +240,7 @@ typedef struct {
 	Stathandle up6_sent;
 	Stathandle up7_sent;
 	Stathandle data_pkt_rec;
+	Stathandle data_pkt_rec_map1;
 	Stathandle dropped_packets;
 	Stathandle mac_delay;
 	Stathandle sent_pkt;
