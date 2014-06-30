@@ -1,4 +1,3 @@
-
 /*--------------------------------------------------------------------------------
  * Function:	wban_mac_init
  *
@@ -46,7 +45,7 @@ static void wban_mac_init() {
 	}
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (node_attr.objid, "Protocol Version", &node_attr.protocol_ver);
-
+	op_ima_obj_attr_get (node_attr.objid, "MAP Schedule", &node_attr.map_schedule);
 	
 	/* obtain object ID of the Traffic Source node */
 	traffic_source_up_id = op_id_from_name(node_attr.objid, OPC_OBJTYPE_PROC, "Traffic Source_UP");
@@ -87,20 +86,23 @@ static void wban_mac_init() {
 		op_ima_obj_attr_get (beacon_attr_comp_id, "Beacon Period Length", &beacon_attr.beacon_period_length);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP1 Start", &beacon_attr.rap1_start);
+		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP Length", &beacon_attr.rap_length);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP1 End", &beacon_attr.rap1_end);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP2 Start", &beacon_attr.rap2_start);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP2 End", &beacon_attr.rap2_end);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "B2 Start", &beacon_attr.b2_start);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "Inactive Duration", &beacon_attr.inactive_duration);
+		/* update rap1_end with rap1_start + rap1_length */
+		beacon_attr.rap1_end = beacon_attr.rap1_start + beacon_attr.rap_length - 1;
 
 		/* get the Connection Assignment for the Hub */
 		op_ima_obj_attr_get (node_attr.objid, "Connection Assignment", &conn_assign_attr_id);
 		conn_assign_attr_comp_id = op_topo_child (conn_assign_attr_id, OPC_OBJTYPE_GENERIC, 0);
-		op_ima_obj_attr_get (conn_assign_attr_comp_id, "EAP2 Start", &conn_assign_attr.eap2_start);
-		SF.eap2_start = conn_assign_attr.eap2_start;
-		if (SF.eap2_start > 0){
-			SF.map1_end = SF.eap2_start - 1;
-		}
+		// op_ima_obj_attr_get (conn_assign_attr_comp_id, "EAP2 Start", &conn_assign_attr.eap2_start);
+		// SF.eap2_start = conn_assign_attr.eap2_start;
+		// if (SF.eap2_start > 0){
+		// 	SF.map1_end = SF.eap2_start - 1;
+		// }
 
 		/* get the beacon2 frame for the Hub*/
 		op_ima_obj_attr_get (node_attr.objid, "Beacon2", &b2_attr_id);
@@ -123,7 +125,7 @@ static void wban_mac_init() {
 		node_attr.unconnectedNID = node_attr.objid;
 		
 		if (enable_log) {
-			fprintf (log," [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
+			// fprintf (log," [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
 			printf (" [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
 		}
 		/* get the Connection Request for the Node */
@@ -177,6 +179,8 @@ static void wban_mac_init() {
 static void wban_log_file_init() {
 	char directory_path_name[120];
 	char log_name[132];
+	time_t timep;
+	struct tm *p;
 
 	/* Stack tracing enrty point */
 	FIN(wban_log_file_init);
@@ -192,8 +196,13 @@ static void wban_log_file_init() {
 		enable_log = OPC_FALSE;
 	}
 
+	time(&timep);
+	p=localtime(&timep);
+	printf("%d%d%d",(1900+p->tm_year), (1+p->tm_mon),p->tm_mday);
+	printf("%d;%d;%d\n", p->tm_hour, p->tm_min, p->tm_sec);
+
 	if (enable_log) {
-		sprintf (log_name, "%s%s.ak", directory_path_name, node_attr.name);
+		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d-map%d.trace", directory_path_name, node_attr.name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, node_attr.protocol_ver, node_attr.map_schedule);
 		printf ("Log file name: %s \n\n", log_name);
 		log = fopen(log_name,"w");
 	}
@@ -225,7 +234,7 @@ static void wban_parse_incoming_frame() {
 	int inactive_fd;
 	//int source_address;
 	//int dest_address;
-	double packet_size;
+	int packet_size;
 
 	/* Stack tracing enrty point */
 	FIN(wban_parse_incoming_frame);
@@ -242,16 +251,16 @@ static void wban_parse_incoming_frame() {
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
 			/*update the battery*/
-			packet_size = (double) op_pk_total_size_get(rcv_frame);
+			packet_size = op_pk_total_size_get(frame_MPDU);
+			printf("Received packet size=%d.\n", packet_size);
 			if (MAC_SLEEP == mac_state){
 				FOUT;
 			}
 			
-			wban_battery_update_rx (frame_MPDU);
+			// wban_battery_update_rx (frame_MPDU);
 			op_pk_nfd_get (frame_MPDU, "BAN ID", &ban_id);
 			op_pk_nfd_get (frame_MPDU, "Recipient ID", &recipient_id);
 			op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
-
 			// filter the incoming BAN packet - not implemented entirely
     		if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
     			FOUT;
@@ -269,34 +278,31 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 
-			op_pk_destroy (rcv_frame);
+			
 			switch (frame_type_fd) {
 				case DATA: /* Handle data packets */
 					if (enable_log) {
-						fprintf (log,"t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
 					op_stat_write(stat_vec.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
 					op_stat_write(stat_vecG.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
 
 					wban_extract_data_frame (frame_MPDU);
-					if(SF.IN_MAP_PHASE == OPC_TRUE){
-						op_stat_write(stat_vec.data_pkt_rec_map1, op_pk_total_size_get(frame_MPDU));
-						op_prg_odb_bkpt("map_data");
-					}
 					/* send to higher layer for statistics */
 					op_pk_send (frame_MPDU, STRM_FROM_MAC_TO_SINK);
 					break;
 				case MANAGEMENT: /* Handle management packets */
+					fprintf(log,"RX,MAN_ALL,t=%f,pk size of MAN_MPDU=%d,received from ID=%d\n", op_sim_time(), packet_size, sender_id);
 					// op_stat_write(stat_vec.data_pkt_rec, 0.0);
 			 		if (enable_log) {
-						fprintf (log,"t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+						// fprintf (log,"t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Management Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
 					switch (frame_subtype_fd) {
 						case BEACON: 
+							fprintf(log,"RX,MAN_BEACON,t=%f,pk size of MAN_MPDU=%d,received from ID=%d\n", op_sim_time(), packet_size, sender_id);
 							if (enable_log) {
-								fprintf (log,"t=%f  -> Beacon Frame Reception From @%d \n\n", op_sim_time(), sender_id);
+								// fprintf (log,"t=%f  -> Beacon Frame Reception From @%d \n\n", op_sim_time(), sender_id);
 								printf (" [Node %s] t=%f  -> Beacon Frame Reception From @%d \n\n", node_attr.name, op_sim_time(), sender_id);
 							}
 							wban_extract_beacon_frame (frame_MPDU);
@@ -314,8 +320,9 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 						case CONNECTION_REQUEST:
+							fprintf(log,"RX,MAN_CONN_REQ,t=%f,pk size of MAN_MPDU=%d,received from ID=%d\n", op_sim_time(), packet_size, sender_id);
 							if (enable_log) {
-								fprintf (log,"t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+								// fprintf (log,"t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 								printf (" [Node %s] t=%f  !!!!!!!!! Connection request Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 							}
 							op_prg_odb_bkpt("rcv_req");
@@ -323,8 +330,9 @@ static void wban_parse_incoming_frame() {
 							break;
 						case CONNECTION_ASSIGNMENT:
 						{
+							fprintf(log,"RX,MAN_CONN_ASSIGN,t=%f,pk size of MAN_MPDU=%d,received from ID=%d\n", op_sim_time(), packet_size, sender_id);
 							if (enable_log) {
-								fprintf (log,"t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+								// fprintf (log,"t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 								printf (" [Node %s] t=%f  !!!!!!!!! Connection assignment Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 							}
 							wban_extract_conn_assign_frame (frame_MPDU);
@@ -339,9 +347,9 @@ static void wban_parse_incoming_frame() {
 					}
 					break;
 				case  CONTROL: /* Handle control packets */
-					op_stat_write(stat_vec.data_pkt_rec, 0.0);
+					op_prg_odb_bkpt("rcv_con");
 			 		if (enable_log) {
-						fprintf (log,"t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
+						// fprintf (log,"t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", op_sim_time(), sender_id);
 						printf (" [Node %s] t=%f  !!!!!!!!! Control Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
 					}
 					switch (frame_subtype_fd) {
@@ -352,7 +360,8 @@ static void wban_parse_incoming_frame() {
 							// not implemented
 							break;
 						case BEACON2: 
-						{
+						{	
+							op_prg_odb_bkpt("rcv_b2");
 							wban_extract_beacon2_frame(frame_MPDU);
 							break;
 						}
@@ -386,7 +395,7 @@ static void wban_parse_incoming_frame() {
 		{
 		};
 	}
-
+	op_pk_destroy (rcv_frame);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -403,23 +412,24 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 	/* Stack tracing enrty point */
 	FIN(is_packet_for_me);
 	
-	if (node_attr.ban_id != ban_id) {
-		if (enable_log) {
-			fprintf (log,"The packet from BAN ID %d is not the same with my BAN ID %d.\n", ban_id, node_attr.ban_id);
-			printf (" [Node %s] The packet from BAN ID %d is not the same with my BAN ID %d.\n", node_attr.name, ban_id, node_attr.ban_id);
-		}
-
-		/* Stack tracing exit point */
-		FRET(OPC_FALSE);
-	}
-
 	/*Check if the frame is loop*/
 	if (mac_attr.sender_id == sender_id) {
 		// if (enable_log) {
 		// 	fprintf(log,"t=%f  -> Loop: DISCARD FRAME \n\n",op_sim_time());
-		// 	printf (" [Node %s] t=%f  -> Loop: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
+			printf (" [Node %s] t=%f  -> Loop: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
 		// }
 		op_pk_destroy (frame_MPDU);
+
+		/* Stack tracing exit point */
+		FRET(OPC_FALSE);
+	}
+	wban_battery_update_rx (frame_MPDU);
+
+	if (node_attr.ban_id != ban_id) {
+		if (enable_log) {
+			// fprintf (log,"The packet from BAN ID %d is not the same with my BAN ID %d.\n", ban_id, node_attr.ban_id);
+			printf (" [Node %s] The packet from BAN ID %d is not the same with my BAN ID %d.\n", node_attr.name, ban_id, node_attr.ban_id);
+		}
 
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
@@ -429,7 +439,7 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 		/* Stack tracing exit point */
 		FRET(OPC_TRUE);
 	} else {
-		// printf (" [Node %s] t=%f  -> Not the frame for me: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
+		printf (" [Node %s] t=%f  -> Not the frame for me: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
 		op_pk_destroy (frame_MPDU);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
@@ -558,10 +568,11 @@ static void wban_send_beacon2_frame () {
 
 	/* send the MPDU to PHY and calculate the energer consuming */
 	wban_send_mac_pk_to_phy(beacon2_MPDU);
+	// op_prg_odb_bkpt("send_b2");
 
 	beacon2_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon2_MPDU), node_attr.data_rate);
 	SF.cap_start2sec = SF.b2_start2sec + beacon2_frame_tx_time + pSIFS;
-	SF.map2_end = b2_attr.map2_end;
+	// SF.map2_end = b2_attr.map2_end;
 	/* Additional processing for proposed protocol */
 	if (1 == node_attr.protocol_ver) {
 		SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
@@ -570,7 +581,7 @@ static void wban_send_beacon2_frame () {
 	}
 
 	if (enable_log) {
-		fprintf(log,"t=%f  -> Beacon2 Frame transmission. \n\n", op_sim_time());
+		// fprintf(log,"t=%f  -> Beacon2 Frame transmission. \n\n", op_sim_time());
 		printf(" [Node %s] t=%f  -> Beacon2 Frame transmission. \n\n", node_attr.name, op_sim_time());
 	}
 
@@ -636,20 +647,20 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	wban_send_i_ack_frame (seq_num);
 
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
-	op_pk_nfd_get (frame_MSDU, "EAP2 Start", &conn_assign_attr.eap2_start);
+	// op_pk_nfd_get (frame_MSDU, "EAP2 Start", &conn_assign_attr.eap2_start);
 	op_pk_nfd_get (frame_MSDU, "Interval Start", &conn_assign_attr.interval_start);
 	op_pk_nfd_get (frame_MSDU, "Interval End", &conn_assign_attr.interval_end);
 
 	/* update the parameters of Superframe */
-	SF.eap2_start = conn_assign_attr.eap2_start;
-	if(0 < SF.eap2_start){
-		SF.eap2_end = SF.rap2_start - 1;
-	} else {
-		SF.eap2_end = 0;
-		if(0 < SF.b2_start){
-			SF.map1_end = SF.b2_start - 1;
-		}
-	}
+	// SF.eap2_start = conn_assign_attr.eap2_start;
+	// if(0 < SF.eap2_start){
+	// 	SF.eap2_end = SF.rap2_start - 1;
+	// } else {
+	// 	SF.eap2_end = 0;
+	// 	if(0 < SF.b2_start){
+	// 		SF.map1_end = SF.b2_start - 1;
+	// 	}
+	// }
 
 	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
 	op_prg_odb_bkpt("rcv_assign");
@@ -690,14 +701,14 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 
 		if (node_attr.ban_id + 15 != rcv_sender_id) {
 			if (enable_log) {
-				fprintf(log,"t=%f  -> Beacon Frame Reception  - but not from Hub. \n",op_sim_time());	
+				// fprintf(log,"t=%f  -> Beacon Frame Reception  - but not from Hub. \n",op_sim_time());	
 				printf(" [Node %s] t=%f  -> Beacon Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
 			}
 			/* Stack tracing exit point */
 			FOUT;
 		} else {
 			if (enable_log) {
-				printf (" [Node %s] t=%f  -> Beacon Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
+				// printf (" [Node %s] t=%f  -> Beacon Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
 				printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
 			}
 		}
@@ -715,7 +726,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		if (HUB_ID == node_attr.traffic_dest_id) {
 			node_attr.traffic_dest_id = rcv_sender_id;
 		}
-
+		/*update rap length*/
+		beacon_attr.rap_length = beacon_attr.rap1_end - beacon_attr.rap1_start + 1;
 		SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
 		SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
 		op_prg_odb_bkpt("rcv_beacon");
@@ -732,8 +744,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			/* initialize the NID from 32 */
 			mac_attr.sender_id = current_free_connected_NID;
 			current_free_connected_NID++;
-			printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
-			fprintf(log,"Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			// printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			fprintf(log,"NID=%d\n", mac_attr.sender_id);
 			op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
 		}
@@ -763,6 +775,7 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 	/* Stack tracing enrty point */
 	FIN(wban_extract_beacon2_frame);
 
+	op_prg_odb_bkpt("extract_b2");
 	beacon2_PPDU_size = op_pk_total_size_get(beacon2_MPDU_rx) + PHY_HEADER_SIZE;
 
 	op_pk_nfd_get_pkt (beacon2_MPDU_rx, "MAC Frame Payload", &beacon2_MSDU_rx);
@@ -775,7 +788,7 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 
 		if (node_attr.ban_id + 15 != rcv_sender_id) {
 			if (enable_log) {
-				fprintf(log,"t=%f  -> Beacon2 Frame Reception  - but not from Hub. \n",op_sim_time());	
+				// fprintf(log,"t=%f  -> Beacon2 Frame Reception  - but not from Hub. \n",op_sim_time());	
 				printf(" [Node %s] t=%f  -> Beacon2 Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
 			}
 			/* Stack tracing exit point */
@@ -798,7 +811,6 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 		printf("beacon2_frame_tx_time=%f\n", beacon2_frame_tx_time);
 		printf("SF.b2_start2sec + beacon2_frame_tx_time + pSIFS=");
 		printf("%f\n", SF.b2_start2sec + beacon2_frame_tx_time + pSIFS);
-		op_prg_odb_bkpt("extract_b2");
 		SF.cap_start2sec = max_double(SF.b2_start2sec + beacon2_frame_tx_time + pSIFS, op_sim_time());
 		if(0 == SF.cap_end){
 			SF.cap_end2sec = SF.BI_Boundary + SF.SD*SF.slot_length2sec;
@@ -851,6 +863,9 @@ static void wban_schedule_next_beacon() {
 	SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
 	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
 	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec + pSIFS;
+	if(SF.b2_start == 0){
+		SF.b2_start2sec = 0;
+	}
 
 	// SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
 	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
@@ -882,11 +897,21 @@ static void wban_schedule_next_beacon() {
 		}
 	}
 
-	if ((SF.b2_start2sec > 0) && (OPC_TRUE == node_attr.is_BANhub)) {
-		SF.map1_end = SF.b2_start;
-		SF.map1_end2sec = SF.b2_start2sec - pSIFS;
-		op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
+	if (SF.b2_start > 0) {
+		if(OPC_TRUE == node_attr.is_BANhub){
+			SF.map1_end = SF.b2_start;
+			SF.map1_end2sec = SF.b2_start2sec - pSIFS;
+			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
+			op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
+		} else {
+			/* used for setup of Node */
+			op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
+		}
+	} else {
+		if(OPC_TRUE == node_attr.is_BANhub){
+			SF.map1_end = SF.SD - 1;
+			SF.map1_end2sec = SF.BI_Boundary + SF.BI*SF.slot_length2sec;
+		}
 	}
 	// op_intrpt_schedule_self (SF.BI_Boundary + SF.SD*SF.slot_length2sec, START_OF_SLEEP_PERIOD);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
@@ -903,7 +928,7 @@ static void wban_schedule_next_beacon() {
 		printf("\tSF.map2_start2sec=%f\n", SF.map2_start2sec);
 		printf("\tSF.map2_end2sec=%f\n", SF.map2_end2sec);
 
-		fprintf (log,"t=%f  -> Schedule Next Beacon at %f\n\n", op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
+		// fprintf (log,"t=%f  -> Schedule Next Beacon at %f\n\n", op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
 		printf (" [Node %s] t=%f  -> Schedule Next Beacon at %f\n\n", node_attr.name, op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
 	}
 	/* Stack tracing exit point */
@@ -935,11 +960,13 @@ static void wban_queue_conn_req () {
 	printf("PHY Header tx time=%f.\n", ph_tx_time);
 	/* get the queue infomation of SUBQ_DATA */
 	subq_data_tx_time_total = subq_info.pksize*(ph_tx_time + pSIFS) + subq_info.bitsize / (node_attr.data_rate*1000);
-	conn_req_attr.allocation_length = (int)(subq_data_tx_time_total / SF.slot_length2sec + 0.4 * SF.slot_length2sec);
+	if(0 == node_attr.map_schedule){
+		conn_req_attr.allocation_length = (int)(subq_data_tx_time_total / SF.slot_length2sec + 0.4);
+	}
 	printf("Connection Request allocation_length=%d for Node %s\n", conn_req_attr.allocation_length, node_attr.name);
 	op_prg_odb_bkpt("pre_req");
 	if (conn_req_attr.allocation_length > 0) {
-		if(conn_req_attr.allocation_length > 3){
+		if(conn_req_attr.allocation_length > 5){
 			/* maximum allocation length for a node is 3 */
 			conn_req_attr.allocation_length = 3;
 		}
@@ -977,12 +1004,12 @@ static void wban_queue_conn_req () {
 	op_pk_priority_set (conn_req_MPDU, 6.0);
 	if (op_subq_pk_insert(SUBQ_MAN, conn_req_MPDU, OPC_QPOS_TAIL) == OPC_QINS_OK) {
 		if (enable_log) {
-			fprintf (log,"t=%f  -> Enqueuing of MAC MANAGEMENT frame [SEQ = %d]\n\n", op_sim_time(), random_num);
+			// fprintf (log,"t=%f  -> Enqueuing of MAC MANAGEMENT frame [SEQ = %d]\n\n", op_sim_time(), random_num);
 			printf (" [Node %s] t=%f  -> Enqueuing of MAC MANAGEMENT frame [SEQ = %d]\n\n", node_attr.name, op_sim_time(), random_num);
 		}
 	} else {
 		if (enable_log) {
-			fprintf (log,"t=%f  -> MAC MANAGEMENT frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
+			// fprintf (log,"t=%f  -> MAC MANAGEMENT frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
 			printf (" [Node %s] t=%f  -> MAC MANAGEMENT frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
 		}
 		/* destroy the packet */
@@ -1116,7 +1143,7 @@ static void wban_send_i_ack_frame (int seq_num) {
 	FIN(wban_send_i_ack_frame);
 
 	if (enable_log) {
-		fprintf(log,"t=%f  -> Send ACK Frame [SEQ = %d] \n\n", op_sim_time(), ack_sequence_number);
+		// fprintf(log,"t=%f  -> Send ACK Frame [SEQ = %d] \n\n", op_sim_time(), ack_sequence_number);
 		printf(" [Node %s] t=%f  -> Send ACK Frame [SEQ = %d] \n\n", node_attr.name, op_sim_time(), seq_num);
 	}
 	/* create a MAC frame (MPDU) that encapsulates the connection_request payload (MSDU) */
@@ -1182,12 +1209,12 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
 	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_TAIL) == OPC_QINS_OK) {
 		if (enable_log) {
-			fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ack_policy);
+			// fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ack_policy);
 			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ack_policy);
 		}
 	} else {
 		if (enable_log) {
-			fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
+			// fprintf (log,"t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", op_sim_time());
 			printf (" [Node %s] t=%f  -> MAC DATA frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
 		}
 		
@@ -1231,7 +1258,7 @@ static void wban_mac_interrupt_process() {
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
 					if (enable_log) {
-						fprintf (log,"t=%f  -> ++++++++++ END OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time());
+						fprintf (log,"t=%f  -> ++++++++++ END OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
 					}
 					op_intrpt_schedule_remote(op_sim_time(), END_OF_SLEEP_PERIOD, node_attr.my_battery); 
@@ -1242,7 +1269,11 @@ static void wban_mac_interrupt_process() {
 					} else {
 						mac_state = MAC_SETUP;
 						subq_info_get(SUBQ_DATA);
-						if(subq_info.lambda > 0){
+						if(0 == node_attr.map_schedule){
+							if(subq_info.lambda > 0){
+								wban_queue_conn_req();
+							}
+						} else {
 							wban_queue_conn_req();
 						}
 					}
@@ -1261,7 +1292,7 @@ static void wban_mac_interrupt_process() {
 						}
 						map_start2sec = SF.BI_Boundary + conn_assign_attr.interval_start * SF.slot_length2sec;
 						map_end2sec = SF.BI_Boundary + (conn_assign_attr.interval_end+1) * SF.slot_length2sec;
-						if((SF.current_slot == conn_assign_attr.interval_start) && (SF.current_slot < SF.b2_start)) {
+						if(SF.current_slot == conn_assign_attr.interval_start) {
 							SF.map1_start2sec = map_start2sec;
 							SF.map1_end2sec = map_end2sec;
 							printf("Node %s map1_start2sec=%f, map1_end2sec=%f.\n", node_attr.name, SF.map1_start2sec, SF.map1_end2sec);
@@ -1369,6 +1400,7 @@ static void wban_mac_interrupt_process() {
 					if (OPC_FALSE == SF.ENABLE_TX_NEW) {
 						op_intrpt_schedule_self (op_sim_time(), TRY_PROCESS_LAST_PACKET_CODE);
 					}
+					op_prg_odb_bkpt("map1_start");
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_MAP1_PERIOD_CODE */
@@ -1393,6 +1425,7 @@ static void wban_mac_interrupt_process() {
 						printf("Hub start sending beacon2 frame at time %f.\n", op_sim_time());
 						wban_send_beacon2_frame();
 					} else {
+						mac_state = MAC_SETUP;
 						printf("Node %s is not Hub and not allowed sending beacon2 frame.\n", node_attr.name);
 						FOUT;
 					}
@@ -1408,6 +1441,10 @@ static void wban_mac_interrupt_process() {
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_FALSE;
 					SF.ENABLE_TX_NEW = OPC_TRUE;
+					if (enable_log) {
+						fprintf (log,"t=%f  -> ++++++++++ START OF THE CAP ++++++++++ \n\n", op_sim_time());
+						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
+					}
 					op_intrpt_schedule_self(op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				}
@@ -1469,7 +1506,7 @@ static void wban_mac_interrupt_process() {
 					}
 
 					if (enable_log) {
-						fprintf (log,"t=%f  -------- START CCA CW = %d\n",op_sim_time(),csma.CW);
+						// fprintf (log,"t=%f  -------- START CCA CW = %d\n",op_sim_time(),csma.CW);
 						printf (" [Node %s] t=%f  -------- START CCA CW = %d\n",node_attr.name, op_sim_time(), csma.CW);
 					}
 					// csma.next_slot_start = op_sim_time() + pCSMASlotLength2Sec;
@@ -1620,6 +1657,7 @@ static void wban_mac_interrupt_process() {
 				
 				fclose(log);
 			}
+			// wban_battery_end();
 
 			break;
 		};	/*end of OPC_INTRPT_ENDSIM */
@@ -1654,7 +1692,7 @@ static void wban_mac_interrupt_process() {
 				case RX_COLLISION_STAT :
 				{
 					if (enable_log){
-						fprintf(log,"t=%f  -> $$$$$ COLLISION $$$$$$$  \n\n",op_sim_time());
+						// fprintf(log,"t=%f  -> $$$$$ COLLISION $$$$$$$  \n\n",op_sim_time());
 						printf(" [Node %s] t=%f  -> COLLISION TIME  \n",node_attr.name, op_sim_time());
 					}
 					
@@ -1685,12 +1723,25 @@ static void wban_mac_interrupt_process() {
 static void wban_extract_data_frame(Packet* frame_MPDU) {
 	int ack_policy;
 	int seq_num;
+	Packet* frame_MSDU;
+	double ete_delay;
+	int pk_size;
+	int up_prio;
+	int sender_id;
 	
 	/* Stack tracing enrty point */
 	FIN(wban_extract_data_frame);
-
-	/* check if any ACK is requested */	
+	pk_size = op_pk_total_size_get(frame_MPDU);
 	op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy);
+	op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
+	op_pk_nfd_get (frame_MPDU, "Frame Subtype", &up_prio);
+	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
+	ete_delay = op_sim_time() - op_pk_creation_time_get(frame_MSDU);
+
+	fprintf(log, "RX,DATA_MAC_STATE=%d,RAP_Length=%d,", mac_state, beacon_attr.rap_length);
+	fprintf(log, "t=%f,pk size of DATA_MPDU=%d,UPx=%d,received from ID=%d,", op_sim_time(), pk_size, up_prio, sender_id);
+	fprintf(log, "ETE_DELAY=%f\n", ete_delay);
+	/* check if any ACK is requested */
 	switch (ack_policy) {
 		case N_ACK_POLICY:
 			break;
@@ -1735,7 +1786,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			op_intrpt_disable (OPC_INTRPT_SELF, WAITING_ACK_END_CODE, OPC_TRUE);
 			
 			if (enable_log) {
-				fprintf(log,"t=%f  -> ACK Frame Reception [Requested SEQ = %d]\n\n", op_sim_time(), seq_num);
+				// fprintf(log,"t=%f  -> ACK Frame Reception [Requested SEQ = %d]\n\n", op_sim_time(), seq_num);
 				printf(" [Node %s] t=%f  -> ACK Frame Reception [Requested SEQ = %d]\n\n", node_attr.name, op_sim_time(), seq_num);
 			}
 
@@ -1759,13 +1810,13 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		} else	{	/* No, This is not my ACK, I'm Still Waiting */
 			if (enable_log) {
-				fprintf(log,"t=%f  -> WRONG ACK Frame Reception [RCV = %d], Still Waiting ACK [RQST = %d] \n\n", op_sim_time(), seq_num , mac_attr.wait_ack_seq_num );
+				// fprintf(log,"t=%f  -> WRONG ACK Frame Reception [RCV = %d], Still Waiting ACK [RQST = %d] \n\n", op_sim_time(), seq_num , mac_attr.wait_ack_seq_num );
 				printf(" [Node %s] t=%f  -> WRONG ACK Frame Reception [RCV = %d], Still Waiting ACK [RQST = %d] \n\n", node_attr.name, op_sim_time(), seq_num , mac_attr.wait_ack_seq_num );
 			}
 		}
 	} else {/* if (mac_attributes.wait_ack == OPC_FALSE) */ 
 		if (enable_log) {
-			fprintf (log,"t=%f  -> I'm not Waiting ACK Frame - ACK Frame Destroyed. \n\n", op_sim_time());	
+			// fprintf (log,"t=%f  -> I'm not Waiting ACK Frame - ACK Frame Destroyed. \n\n", op_sim_time());	
 			printf (" [Node %s] t=%f  -> I'm not Waiting ACK Frame - ACK Frame Destroyed. \n\n", node_attr.name, op_sim_time());
 		}
 	}
@@ -1831,6 +1882,7 @@ static void wban_attempt_TX() {
 		} else {
 			/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
 			frame_MPDU_to_be_sent = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_PRIO);
+			printf("PK_ACCESS, pk size of frame_MPDU=%d\n", op_pk_total_size_get(frame_MPDU_to_be_sent));
 			op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &packet_to_be_sent.user_priority);
 			if (OPC_TRUE == SF.IN_EAP_PHASE) {
 				printf("Node %s is in EAP phase.\n", node_attr.name);
@@ -1876,11 +1928,12 @@ static void wban_attempt_TX() {
 		op_pk_nfd_set(frame_MPDU_to_be_sent, "Recipient ID", mac_attr.recipient_id);
 		op_pk_nfd_set(frame_MPDU_to_be_sent, "Sender ID", mac_attr.sender_id);
 		op_pk_nfd_set(frame_MPDU_to_be_sent, "BAN ID", mac_attr.ban_id);
+		printf("HUB_ID, pk size of frame_MPDU=%d\n", op_pk_total_size_get(frame_MPDU_to_be_sent));
 		packet_to_be_sent.recipient_id = mac_attr.recipient_id;
 		packet_to_be_sent.sender_id = mac_attr.sender_id;
 	}
 
-	// packet_to_be_sent.total_bits = op_pk_total_size_get(frame_PPDU_to_be_sent);
+	// packet_to_be_sent.total_bits = op_pk_total_size_get(frame_MPDU_to_be_sent);
 	/* remove the packet in the head of the queue */
 	SF.ENABLE_TX_NEW = OPC_FALSE;
 
@@ -1890,6 +1943,7 @@ static void wban_attempt_TX() {
 	if (OPC_TRUE == SF.IN_MAP_PHASE) {
 		/* set the Ack Policy with N_ACK_POLICY */
 		op_pk_nfd_set (frame_MPDU_to_be_sent, "Ack Policy", N_ACK_POLICY);
+		printf("SET_ACK, pk size of frame_MPDU=%d\n", op_pk_total_size_get(frame_MPDU_to_be_sent));
 		packet_to_be_sent.ack_policy = N_ACK_POLICY;
 		/* update the ack bits of packet */
 		packet_to_be_sent.ack_bits = 0;
@@ -1931,7 +1985,7 @@ static void wban_attempt_TX_CSMA(int user_priority) {
 	FIN(wban_attempt_TX_CSMA);
 
 	if (enable_log) {
-		fprintf(log," - BACKOFF INIT t=%f \n", op_sim_time());
+		// fprintf(log," - BACKOFF INIT t=%f \n", op_sim_time());
 		printf(" [Node %s] t=%f  - BACKOFF INIT  \n", node_attr.name, op_sim_time());
 	}
 
@@ -2027,20 +2081,20 @@ static void wban_backoff_delay_set( int user_priority) {
 		printf ("  BackOff Expiration Time  = %f sec\n", csma.backoff_expiration_time);
 		printf ("----------------------------------------------------------------------------\n\n");
 	
-		fprintf (log, "-------------------------- BACKOFF -----------------------------------\n");
-		fprintf (log, " [Node %s] ENTERS BACKOFF STATUT AT %f\n", node_attr.name, op_sim_time());
-		fprintf (log, "  Beacon Boundary = %f\n", SF.BI_Boundary);
-		fprintf (log, "  CW = %d\n", csma.CW);
-		fprintf (log, "  Random Backoff counter = %d\n", csma.backoff_counter);
-		fprintf (log, "    + Random Backoff time  = %f sec \n", csma.backoff_time);
-		fprintf (log, "    + Phase Remaining Length = %f sec \n", phase_remaining_time);
-		fprintf (log, "  Current Time Slot = %d\n", SF.current_slot);
-		fprintf (log, "  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
-		fprintf (log, "  Phase Start Time     = %f sec \n", phase_start_timeG);
-		fprintf (log, "  Phase End Time     = %f sec \n", phase_end_timeG);
-		fprintf (log, "  Difference       = %f sec \n", phase_end_timeG- wban_backoff_period_boundary_get());
-		fprintf (log, "  BackOff Expiration Time  = %f sec\n", csma.backoff_expiration_time);
-		fprintf (log, "----------------------------------------------------------------------------\n\n");
+		// fprintf (log, "-------------------------- BACKOFF -----------------------------------\n");
+		// fprintf (log, " [Node %s] ENTERS BACKOFF STATUT AT %f\n", node_attr.name, op_sim_time());
+		// fprintf (log, "  Beacon Boundary = %f\n", SF.BI_Boundary);
+		// fprintf (log, "  CW = %d\n", csma.CW);
+		// fprintf (log, "  Random Backoff counter = %d\n", csma.backoff_counter);
+		// fprintf (log, "    + Random Backoff time  = %f sec \n", csma.backoff_time);
+		// fprintf (log, "    + Phase Remaining Length = %f sec \n", phase_remaining_time);
+		// fprintf (log, "  Current Time Slot = %d\n", SF.current_slot);
+		// fprintf (log, "  Backoff Boundary = %f sec \n", wban_backoff_period_boundary_get());
+		// fprintf (log, "  Phase Start Time     = %f sec \n", phase_start_timeG);
+		// fprintf (log, "  Phase End Time     = %f sec \n", phase_end_timeG);
+		// fprintf (log, "  Difference       = %f sec \n", phase_end_timeG- wban_backoff_period_boundary_get());
+		// fprintf (log, "  BackOff Expiration Time  = %f sec\n", csma.backoff_expiration_time);
+		// fprintf (log, "----------------------------------------------------------------------------\n\n");
 	}
 	
 	/* Stack tracing exit point */
@@ -2129,7 +2183,7 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 	double PPDU_tx_time;
 	double ack_tx_time;
 	double ack_expire_time;
-	double pk_size;
+	int pk_size;
 	int frame_type;
 	int frame_subtype;
 	int ack_policy;
@@ -2142,11 +2196,15 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 	op_pk_nfd_get(frame_MPDU, "Ack Policy", &ack_policy);
 	op_pk_nfd_get(frame_MPDU, "Frame Type", &frame_type);
 	op_pk_nfd_get(frame_MPDU, "Frame Subtype", &frame_subtype);
-	pk_size = (double)op_pk_total_size_get(frame_MPDU);
+	pk_size = op_pk_total_size_get(frame_MPDU);
+	printf("MAC_TO_PHY, pk size of frame_MPDU=%d\n", pk_size);
+	op_prg_odb_bkpt("mpdu_size");
 
 	switch (frame_type) {
 		case DATA:
 		{
+			fprintf(log, "TX,DATA_MAC_STATE=%d,RAP_Length=%d,", mac_state, beacon_attr.rap_length);
+			fprintf(log, "t=%f,pk size of DATA_MPDU=%d,UPx=%d,send to ID=%d\n", op_sim_time(), pk_size, frame_subtype, mac_attr.recipient_id);
 			op_stat_write(stat_vec.data_pkt_sent, pk_size);
 			op_stat_write(stat_vecG.data_pkt_sent, pk_size);
 			switch(frame_subtype){
@@ -2224,7 +2282,7 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 
 			current_packet_txs++;
 			if (enable_log) {
-				fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
+				// fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
 				printf(" [Node %s] t=%f  ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries \n\n", node_attr.name, op_sim_time(), packet_to_be_sent.recipient_id, mac_attr.wait_ack_seq_num, ack_expire_time,current_packet_txs+current_packet_CS_fails);
 			}
 			SF.ENABLE_TX_NEW = OPC_FALSE;
@@ -2351,6 +2409,28 @@ static void wban_battery_update_rx(Packet* frame_MPDU) {
 	FOUT;
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	wban_battery_end
+ *
+ * Description:	send information about the operation to do to the battery module 
+ *
+ * Input : 	Packet* frame_MPDU
+ *--------------------------------------------------------------------------------*/
+static void wban_battery_end() {
+	Ici * iciptr;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_battery_end);
+	
+	iciptr = op_ici_create ("wban_battery_ici_format");
+	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
+	op_ici_install (iciptr);
+	op_intrpt_schedule_remote (op_sim_time(), END_OF_SIM, node_attr.my_battery);
+	op_ici_install (OPC_NIL);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
 
 /*-----------------------------------------------------------------------------
  * Function:	queue_status
@@ -2388,12 +2468,12 @@ static void queue_status() {
 		
 		if (op_subq_empty(i)) {
 			if (enable_log) {
-				fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), i, pk_capacity, bit_capacity);
+				// fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), i, pk_capacity, bit_capacity);
 				printf(" [Node %s] t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", node_attr.name, op_sim_time(), i, pk_capacity, bit_capacity);
 			}
 		} else {
 			if (enable_log) {	 
-				fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
+				// fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 				printf(" [Node %s] t=%f  -> Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", node_attr.name, op_sim_time(), i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 			}
 		}
@@ -2437,7 +2517,7 @@ static void subq_info_get (int subq_index) {
 	
 	if (op_subq_empty(subq_index)) {
 		if (enable_log) {
-			fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), subq_index, pk_capacity, bit_capacity);
+			// fprintf(log,"t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), subq_index, pk_capacity, bit_capacity);
 			printf(" [Node %s] t=%f  -> Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", node_attr.name, op_sim_time(), subq_index, pk_capacity, bit_capacity);
 		}
 		subq_info.pksize = 0;
@@ -2449,7 +2529,7 @@ static void subq_info_get (int subq_index) {
 		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
 		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
 		if (enable_log) {
-			fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
+			// fprintf(log,"t=%f  -> Subqueue #%d is non empty, \n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 			printf(" [Node %s] t=%f  -> Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", node_attr.name, op_sim_time(), subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		}
 		pk_head_ptr = op_subq_pk_access(subq_index, OPC_QPOS_HEAD);
