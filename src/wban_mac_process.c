@@ -165,6 +165,16 @@ static void wban_mac_init() {
 	stat_vecG.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	stat_vecG.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 
+
+	stat_vec.ppdu_sent_kbits = 0;
+	stat_vec.ppdu_sent_nbr = 0;
+	stat_vec.ppdu_sent_kbits_rap = 0;
+	stat_vec.ppdu_sent_nbr_rap = 0;
+	// for Hub only
+	stat_vec.ppdu_rcv_kbits = 0;
+	stat_vec.ppdu_rcv_nbr = 0;
+	stat_vec.ppdu_rcv_kbits_rap = 0;
+	stat_vec.ppdu_rcv_nbr_rap = 0;
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -235,6 +245,7 @@ static void wban_parse_incoming_frame() {
 	//int source_address;
 	//int dest_address;
 	int packet_size;
+	int ppdu_bits;
 
 	/* Stack tracing enrty point */
 	FIN(wban_parse_incoming_frame);
@@ -248,6 +259,7 @@ static void wban_parse_incoming_frame() {
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
 		{
+			ppdu_bits = op_pk_total_size_get(rcv_frame);
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
 			/*update the battery*/
@@ -267,6 +279,8 @@ static void wban_parse_incoming_frame() {
     		} else {
 				wban_battery_update_rx (frame_MPDU);
     		}
+    		PPDU_rcv_nbr = PPDU_rcv_nbr + 1;
+    		PPDU_rcv_kbits = PPDU_rcv_kbits + 1.0*ppdu_bits/1000.0;
 
     		/* repalce the mac_attr.receipient_id with Sender ID */
     		mac_attr.recipient_id = sender_id;
@@ -285,6 +299,12 @@ static void wban_parse_incoming_frame() {
 				case DATA: /* Handle data packets */
 					if (enable_log) {
 						printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+					}
+					stat_vec.ppdu_rcv_nbr = stat_vec.ppdu_rcv_nbr + 1;
+					stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*ppdu_bits/1000.0;
+					if((mac_state == MAC_RAP1) && (node_attr.is_BANhub)){
+						stat_vec.ppdu_rcv_kbits_rap = stat_vec.ppdu_rcv_kbits_rap + 1.0*ppdu_bits/1000.0;
+						stat_vec.ppdu_rcv_nbr_rap = stat_vec.ppdu_rcv_nbr_rap + 1;
 					}
 					op_stat_write(stat_vec.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
 					op_stat_write(stat_vecG.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
@@ -1353,6 +1373,11 @@ static void wban_mac_interrupt_process() {
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_FALSE;
 					SF.ENABLE_TX_NEW = OPC_TRUE;
+
+					// stat_vec.ppdu_sent_nbr = 0;
+					// stat_vec.ppdu_sent_kbits = 0.0;
+					stat_vec.ppdu_rap_sent_start = stat_vec.ppdu_sent_kbits;
+					stat_vec.ppdu_rap_rcv_start = stat_vec.ppdu_rcv_kbits;
 				
 					if (enable_log) {
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time());
@@ -1370,7 +1395,15 @@ static void wban_mac_interrupt_process() {
 				{
 					mac_state = MAC_SLEEP;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
-				
+
+					stat_vec.ppdu_rap_sent_end = stat_vec.ppdu_sent_kbits;
+					stat_vec.ppdu_rap_rcv_end = stat_vec.stat_vec.ppdu_rcv_kbits;
+					stat_vec.ppdu_sent_kbits_rap = stat_vec.ppdu_rap_sent_end - stat_vec.ppdu_rap_sent_start;
+					stat_vec.ppdu_rcv_kbits_rap = stat_vec.ppdu_rap_rcv_end - stat_vec.ppdu_rap_rcv_start;
+					stat_vec.traffic_G = stat_vec.ppdu_sent_kbits_rap/(WBAN_DATA_RATE_KBITS*SF.rap1_length2sec);
+					stat_vec.throughput_S = stat_vec.ppdu_rcv_kbits_rap/(WBAN_DATA_RATE_KBITS*SF.rap1_length2sec);
+					fprintf(log,"STAT,CHANNEL_TRAFFIC_RAP_G=%f\n", stat_vec.traffic_G);
+					fprintf(log,"STAT,CHANNEL_THROUGHPUT_RAP_S=%f\n", stat_vec.throughput_S);
 					if (enable_log) {
 						fprintf (log,"t=%f  -> ++++++++++ END OF THE RAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
@@ -1511,6 +1544,7 @@ static void wban_mac_interrupt_process() {
 						printf (" [Node %s] t=%f  -------- START CCA CW = %d\n",node_attr.name, op_sim_time(), csma.CW);
 					}
 					// csma.next_slot_start = op_sim_time() + pCSMASlotLength2Sec;
+					wban_battery_cca();
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
@@ -1652,6 +1686,10 @@ static void wban_mac_interrupt_process() {
 		
 		case OPC_INTRPT_ENDSIM:
 		{
+			fprintf(log,"STAT,PPDU_sent_nbr=%f\n", PPDU_sent_nbr);
+			fprintf(log,"STAT,PPDU_rcv_nbr=%f\n", PPDU_rcv_nbr);
+			fprintf(log,"STAT,CHANNEL_TRAFFIC_G=%f\n", PPDU_sent_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
+			fprintf(log,"STAT,CHANNEL_THROUGHPUT_S=%f\n", PPDU_rcv_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
 			if (enable_log) {
 				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 				printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
@@ -2293,7 +2331,6 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 				FOUT;
 			}
 			op_intrpt_schedule_self(ack_expire_time, WAITING_ACK_END_CODE);
-			//PPDU_sent_bits = PPDU_sent_bits + ((double)(op_pk_total_size_get(frame_PPDU))/1000.0); // in kbits
 			
 			// op_stat_write(statistic_global_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
 			// op_stat_write(statistic_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
@@ -2348,6 +2385,10 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	op_pk_bulk_size_set (frame_PPDU, bulk_size);
 
 	wban_battery_update_tx (frame_MPDU);
+	PPDU_sent_kbits = PPDU_sent_kbits + ((double)(op_pk_total_size_get(frame_PPDU))/1000.0); // in kbits
+	PPDU_sent_nbr = PPDU_sent_nbr + 1;
+	stat_vec.ppdu_sent_kbits = stat_vec.ppdu_sent_kbits + ((double)(op_pk_total_size_get(frame_PPDU))/1000.0); // in kbits
+	stat_vec.ppdu_sent_nbr = stat_vec.ppdu_sent_nbr + 1;
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0){
 		op_sim_end("ERROR : TRY TO SEND Packet WHILE THE TX CHANNEL IS BUSY","PK_SEND_CODE","","");
 	}
@@ -2427,6 +2468,29 @@ static void wban_battery_end() {
 	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), END_OF_SIM, node_attr.my_battery);
+	op_ici_install (OPC_NIL);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	wban_battery_cca
+ *
+ * Description:	send information about the operation to do to the battery module 
+ *
+ * Input : 
+ *--------------------------------------------------------------------------------*/
+static void wban_battery_cca() {
+	Ici * iciptr;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_battery_cca);
+	
+	iciptr = op_ici_create ("wban_battery_ici_format");
+	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
+	op_ici_install (iciptr);
+	op_intrpt_schedule_remote (op_sim_time(), CCA_CODE, node_attr.my_battery);
 	op_ici_install (OPC_NIL);
 	
 	/* Stack tracing exit point */
@@ -2556,3 +2620,7 @@ static void subq_info_get (int subq_index) {
 	/* Stack tracing exit point */
 	FOUT;
 }
+
+// static void wban_analyzer_update (){
+// 	d
+// }
