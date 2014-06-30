@@ -264,6 +264,8 @@ static void wban_parse_incoming_frame() {
 			// filter the incoming BAN packet - not implemented entirely
     		if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
     			FOUT;
+    		} else {
+				wban_battery_update_rx (frame_MPDU);
     		}
 
     		/* repalce the mac_attr.receipient_id with Sender ID */
@@ -423,7 +425,6 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
-	wban_battery_update_rx (frame_MPDU);
 
 	if (node_attr.ban_id != ban_id) {
 		if (enable_log) {
