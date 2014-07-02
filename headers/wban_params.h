@@ -78,6 +78,10 @@
 #define WPAN_DATA_RATE 250000.0
 // WBAN bit rate [bps]
 #define WBAN_DATA_RATE 971400.0
+#define WBAN_DATA_RATE_KBITS (WBAN_DATA_RATE/1000.0)
+
+/* Node configuration constants     */
+#define DELAY_INFINITY 1000.0
 
 // broadcast address corresponds to 0xFFFF
 #define BROADCAST_ADDRESS 65535
