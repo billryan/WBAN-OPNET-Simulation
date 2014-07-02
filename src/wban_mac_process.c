@@ -1397,7 +1397,7 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 
 					stat_vec.ppdu_rap_sent_end = stat_vec.ppdu_sent_kbits;
-					stat_vec.ppdu_rap_rcv_end = stat_vec.stat_vec.ppdu_rcv_kbits;
+					stat_vec.ppdu_rap_rcv_end = stat_vec.ppdu_rcv_kbits;
 					stat_vec.ppdu_sent_kbits_rap = stat_vec.ppdu_rap_sent_end - stat_vec.ppdu_rap_sent_start;
 					stat_vec.ppdu_rcv_kbits_rap = stat_vec.ppdu_rap_rcv_end - stat_vec.ppdu_rap_rcv_start;
 					stat_vec.traffic_G = stat_vec.ppdu_sent_kbits_rap/(WBAN_DATA_RATE_KBITS*SF.rap1_length2sec);
