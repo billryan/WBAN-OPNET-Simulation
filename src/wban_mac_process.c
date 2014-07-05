@@ -951,6 +951,8 @@ static void wban_schedule_next_beacon() {
 		printf (" [Node %s] t=%f  -> Schedule Next Beacon at %f\n\n", node_attr.name, op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_length2sec);
 	}
 	if(!IAM_BAN_HUB){
+		conn_assign_attr.interval_start = 255;
+		conn_assign_attr.interval_end = 0;
 		wban_send_conn_req_frame();
 	}
 	/* Stack tracing exit point */
@@ -1951,10 +1953,12 @@ static void wban_attempt_TX() {
 		case MAC_RAP2: 
 		case MAC_CAP: 
 			SF.IN_CAP_PHASE = OPC_TRUE;
+			SF.IN_MAP_PHASE = OPC_FALSE;
 			break;
 		case MAC_MAP1: 
 		case MAC_MAP2: 
 			SF.IN_MAP_PHASE = OPC_TRUE;
+			SF.IN_CAP_PHASE = OPC_FALSE;
 			break;
 		default: FOUT; // none of the valid state above
 	}
@@ -1975,9 +1979,11 @@ static void wban_attempt_TX() {
 	if((pkt_to_be_sent.enable) && (current_packet_txs + current_packet_CS_fails < max_packet_tries)){
 		printf("%s retransmittion.\n", node_attr.name);
 		if(SF.IN_CAP_PHASE){
+			printf("%s retransmit with CSMA.\n", node_attr.name);
 			wban_attempt_TX_CSMA();
 		}
 		if((SF.IN_MAP_PHASE) && (can_fit_TX(&pkt_to_be_sent))) {
+			printf("%s retransmit with Scheduling.\n", node_attr.name);
 			wban_send_mac_pk_to_phy(frame_MPDU_to_be_sent);
 		}
 		FOUT;
@@ -2002,7 +2008,7 @@ static void wban_attempt_TX() {
 		printf("PK_ACCESS, pk size of frame_MPDU=%d\n", op_pk_total_size_get(frame_MPDU_to_be_sent));
 		op_prg_odb_bkpt("data_tx");
 		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &pkt_to_be_sent.user_priority);
-		if (OPC_TRUE == SF.IN_EAP_PHASE) {
+		if (SF.IN_EAP_PHASE) {
 			printf("Node %s is in EAP phase.\n", node_attr.name);
 			if (7 != pkt_to_be_sent.user_priority) {
 				printf("%s have no UP=7 traffic in the SUBQ_DATA subqueue currently.\n", node_attr.name);
