@@ -761,9 +761,9 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			 * and are only able to transmit in RAP periods.
 			 */
 			/* initialize the NID from 32 */
-			mac_attr.sender_id = current_free_connected_NID;
-			current_free_connected_NID++;
-			// printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			mac_attr.sender_id = current_free_connected_NID++;
+			// current_free_connected_NID++;
+			printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
 			fprintf(log,"NID=%d\n", mac_attr.sender_id);
 			op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
@@ -861,6 +861,7 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_schedule_next_beacon() {
+	double queue_conn_req;
 	/* Stack tracing enrty point */
 	FIN(wban_schedule_next_beacon);
 
@@ -953,7 +954,9 @@ static void wban_schedule_next_beacon() {
 	if(!IAM_BAN_HUB){
 		conn_assign_attr.interval_start = 255;
 		conn_assign_attr.interval_end = 0;
-		wban_send_conn_req_frame();
+		queue_conn_req = op_sim_time()+(node_attr.objid%4)*3*I_ACK_TX_TIME + (node_attr.objid%8)*pSIFS;
+		op_intrpt_schedule_self(queue_conn_req,SEND_CONN_REQ_CODE);
+		// wban_send_conn_req_frame();
 	}
 	/* Stack tracing exit point */
 	FOUT;
@@ -1069,6 +1072,10 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_conn_assign_frame);
+	if(assign_map[mac_attr.recipient_id%10].slot_start != 0){
+		printf("NID %d has been assigned with slot %d to %d.\n", mac_attr.recipient_id, assign_map[mac_attr.recipient_id%10].slot_start, assign_map[mac_attr.recipient_id%10].slot_end);
+		FOUT;
+	}
 
 	random_num = rand_int(256);
 	/* create a connection request frame */
@@ -1126,6 +1133,10 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	if(1 == node_attr.protocol_ver){
 		/* Scheduling for proposed protocol */
 	}
+	assign_map[mac_attr.recipient_id%10].nid = mac_attr.recipient_id;
+	assign_map[mac_attr.recipient_id%10].slot_start = conn_assign_attr.interval_start;
+	assign_map[mac_attr.recipient_id%10].slot_end = conn_assign_attr.interval_end;
+
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "EAP2 Start", conn_assign_attr.eap2_start);
 	op_pk_nfd_set (conn_assign_MSDU, "Interval Start", conn_assign_attr.interval_start);
@@ -1288,6 +1299,7 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 static void wban_mac_interrupt_process() {
 	double map_start2sec;
 	double map_end2sec;
+	int i;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
 	
@@ -1305,6 +1317,17 @@ static void wban_mac_interrupt_process() {
 			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
+					pkt_to_be_sent.enable = OPC_FALSE;
+					/* This connection is terminated. */
+					if (op_subq_empty (SUBQ_MAN) == OPC_FALSE){
+						/* Subqueue contains messages queued for processing.	*/
+						/* Flush the subqueue of messages. */
+						op_subq_flush (SUBQ_MAN);
+					}
+					for(i=32; i<current_free_connected_NID; i++){
+						assign_map[i%10].slot_start = 0;
+					}
+
 					if (enable_log) {
 						fprintf (log,"t=%f  -> ++++++++++ END OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
@@ -1593,7 +1616,7 @@ static void wban_mac_interrupt_process() {
 						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 						csma.backoff_counter_lock = OPC_TRUE;
 						// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
-						op_intrpt_schedule_self (wban_backoff_period_boundary_get()+2*pCSMASlotLength2Sec, CCA_START_CODE);
+						op_intrpt_schedule_self (op_sim_time()+2*pCSMASlotLength2Sec, CCA_START_CODE);
 					} else {
 						csma.backoff_counter--;
 						printf("t = %f, CCA with IDLE, backoff_counter decrement to %d.\n", op_sim_time(), csma.backoff_counter);
@@ -1601,12 +1624,14 @@ static void wban_mac_interrupt_process() {
 							// printf("CCA at next available backoff boundary = %f sec.\n", csma.next_slot_start);
 							// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
 							printf("CCA at next available backoff boundary = %f sec.\n", wban_backoff_period_boundary_get());
-							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
+							// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
+							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, CCA_START_CODE);
 						} else {
-							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, wban_backoff_period_boundary_get());
+							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, op_sim_time()+pCSMAMACPHYTime);
 							// op_intrpt_schedule_self (csma.next_slot_start, START_TRANSMISSION_CODE);
 							op_prg_odb_bkpt("send_packet");
-							op_intrpt_schedule_self (wban_backoff_period_boundary_get(), START_TRANSMISSION_CODE);
+							// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), START_TRANSMISSION_CODE);
+							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, START_TRANSMISSION_CODE);
 						}
 					}
 					break;
@@ -1697,12 +1722,14 @@ static void wban_mac_interrupt_process() {
 
 				case SEND_CONN_REQ_CODE:
 				{
-					op_prg_odb_bkpt("send_conn_req");
-					printf("t = %f, Node %s start sending connection request frame to Hub.\n", op_sim_time(), node_attr.name);
-					current_packet_txs = 0;
-					current_packet_CS_fails = 0;
-					wban_send_mac_pk_to_phy(CONN_REQ_MPDU);
+					// op_prg_odb_bkpt("send_conn_req");
+					// printf("t = %f, Node %s start sending connection request frame to Hub.\n", op_sim_time(), node_attr.name);
+					// current_packet_txs = 0;
+					// current_packet_CS_fails = 0;
+					// wban_send_mac_pk_to_phy(CONN_REQ_MPDU);
 					// wban_send_connection_request_frame();
+					wban_send_conn_req_frame();
+					op_intrpt_schedule_self(op_sim_time(),TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				};
 				
@@ -2118,7 +2145,8 @@ static void wban_attempt_TX_CSMA() {
 	}
 	attemptingToTX = OPC_TRUE;
 	//CCA
-	op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
+	// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
+	op_intrpt_schedule_self (op_sim_time(), CCA_START_CODE);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -2173,14 +2201,16 @@ static void wban_backoff_delay_set( int user_priority) {
 	
 	csma.backoff_time = (double) (csma.backoff_counter * pCSMASlotLength2Sec);
 	// op_stat_write(statistic_vector.backoff_delay, csma.backoff_time);
-	csma.backoff_expiration_time = wban_backoff_period_boundary_get() + csma.backoff_time;
+	// csma.backoff_expiration_time = wban_backoff_period_boundary_get() + csma.backoff_time;
+	csma.backoff_expiration_time = op_sim_time() + csma.backoff_time;
 	
-	phase_remaining_time = phase_end_timeG - wban_backoff_period_boundary_get();
+	// phase_remaining_time = phase_end_timeG - wban_backoff_period_boundary_get();
+	phase_remaining_time = phase_end_timeG - op_sim_time();
 	// op_intrpt_schedule_self (csma.backoff_expiration_time, BACKOFF_EXPIRATION_CODE);
 
 	if (enable_log) {	
 		printf ("-------------------------- BACKOFF -----------------------------------\n");
-		printf (" [Node %s] ENTERS BACKOFF STATUT AT %f\n", node_attr.name, op_sim_time());
+		printf (" [Node %s] ENTERS BACKOFF STATUS AT %f\n", node_attr.name, op_sim_time());
 		printf ("  Beacon Boundary = %f\n", SF.BI_Boundary);
 		printf ("  CW = %d\n", csma.CW);
 		printf ("  Random Backoff counter = %d\n", csma.backoff_counter);
