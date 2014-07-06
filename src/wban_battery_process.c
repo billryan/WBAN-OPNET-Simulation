@@ -106,8 +106,7 @@ static void wban_battery_update() {
 	Ici * iciptr;
 	double tx_time;
 	double rx_time;
-	double pksize;
-	double wban_data_rate;
+	int pksize;
 	double consumed_energy;
 	double tx_energy;
 	double rx_energy;
@@ -124,24 +123,22 @@ static void wban_battery_update() {
 	/* get the value to check if this node is Hub or not */
 	is_BANhub = OPC_FALSE;
 	if (strcmp(battery.Device_Mode, "Hub") == 0) {
-		is_BANhub = OPC_TRUE;	
+		is_BANhub = OPC_TRUE;
 	}
 
 	if (op_intrpt_type() == OPC_INTRPT_REMOTE) {
-	
 	  switch (op_intrpt_code()) {		
 		case PACKET_TX_CODE :
 		{
 			/* get the ICI information associated to the remote interrupt */
 			iciptr = op_intrpt_ici();
 			
-			op_ici_attr_get(iciptr, "MPDU Packet Size", &pksize);
-			op_ici_attr_get(iciptr, "WBAN DATA RATE", &wban_data_rate);
+			op_ici_attr_get(iciptr, "PPDU Packet Size", &pksize);
 			
 			op_ici_destroy(iciptr);
 			
 			/* compute the transmission time of the transmitted packet */
-			tx_time = (1/SYMBOL_RATE) * (N_preamble + N_header*S_header) + pksize/(1000*wban_data_rate);
+			tx_time = pksize/WBAN_DATA_RATE;
 			
 			/* compute the consumed energy when transmitting a packet */
 			tx_energy = (battery.current_tx_mA * MILLI) * tx_time * battery.power_supply;
@@ -176,22 +173,21 @@ static void wban_battery_update() {
 			/* get the ICI information associated to the remote interrupt */
 			iciptr=op_intrpt_ici();
 			
-			op_ici_attr_get(iciptr, "MPDU Packet Size",&pksize);
-			op_ici_attr_get(iciptr, "WBAN DATA RATE",&wban_data_rate);
+			op_ici_attr_get(iciptr, "PPDU Packet Size",&pksize);
 			
 			op_ici_destroy(iciptr);
 			
 			// printf("battery entered into RX.\n");
 			/* compute the packet size of the transmitted packet */
-			rx_time = (1/SYMBOL_RATE) * (N_preamble + N_header*S_header) + pksize/(1000*wban_data_rate);
+			rx_time = pksize/WBAN_DATA_RATE;
 
 			/* compute the consumed energy when receiving a packet */
 			rx_energy = (battery.current_rx_mA * MILLI) * rx_time * battery.power_supply;
 			
 			/* compute the time spent by the node in idle state */
 			idle_duration = op_sim_time()-rx_time-activity.last_idle_time;
-			printf("op_sim_time()=%f, rx_time=%f, activity.last_idle_time=%f.\n", op_sim_time(), rx_time, activity.last_idle_time);
-			printf("idle_duration=%f\n", idle_duration);
+			// printf("op_sim_time()=%f, rx_time=%f, activity.last_idle_time=%f.\n", op_sim_time(), rx_time, activity.last_idle_time);
+			// printf("idle_duration=%f\n", idle_duration);
 			op_prg_odb_bkpt("rx_e");
 			if(compare_doubles(op_sim_time(), idle_duration) != 1){
 				idle_duration = 0;
@@ -201,8 +197,8 @@ static void wban_battery_update() {
 			if(is_BANhub){
 				idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 			}
-			printf("ENERGY,RX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time()-rx_time, idle_energy);
-			printf("ENERGY,RX_CODE,RX,t=%f,rx_energy=%f\n", op_sim_time(), rx_energy);
+			// printf("ENERGY,RX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time()-rx_time, idle_energy);
+			// printf("ENERGY,RX_CODE,RX,t=%f,rx_energy=%f\n", op_sim_time(), rx_energy);
 
 			fprintf(log, "ENERGY,RX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time()-rx_time, idle_energy);
 			fprintf(log, "ENERGY,RX_CODE,RX,t=%f,rx_energy=%f\n", op_sim_time(), rx_energy);
@@ -271,7 +267,7 @@ static void wban_battery_update() {
 			sleep_energy = (battery.current_sleep_microA * MICRO) * sleep_duration * battery.power_supply;
 			fprintf(log, "ENERGY,SLEEP_CODE,SLEEP,t=%f,sleep_energy=%f\n", op_sim_time(), sleep_energy);
 			
-			printf ("END_OF_SLEEP_PERIOD: current_sleep_microA = %f, time in the sleep period = %f , consumed_energy = %f mJoule\n", battery.current_sleep_microA, sleep_duration, sleep_energy*1000);
+			// printf ("END_OF_SLEEP_PERIOD: current_sleep_microA = %f, time in the sleep period = %f , consumed_energy = %f mJoule\n", battery.current_sleep_microA, sleep_duration, sleep_energy*1000);
 			
 			/* update the current energy level */
 			battery.current_energy = battery.current_energy - sleep_energy;
