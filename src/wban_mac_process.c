@@ -1604,23 +1604,29 @@ static void wban_mac_interrupt_process() {
 				case CCA_START_CODE: /*At the start of the CCA */
 				{
 					if(!can_fit_TX(&pkt_to_be_sent)) {
-						attemptingToTX = OPC_FALSE;
+						// attemptingToTX = OPC_FALSE;
 						current_packet_CS_fails++;
 						break;
 					}
 					/* do check if the channel is idle at the start of cca */
 					/* at the start the channel is assumed idle, any change to busy, the CCA will report a busy channel */
 				
-					/* check at the beginning of CCA, if the channel is busy */
-					csma.CCA_CHANNEL_IDLE = OPC_TRUE;
-					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
-						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-					}
 
 					if (enable_log) {
 						// fprintf (log,"t=%f  -------- START CCA CW = %d\n",op_sim_time(),csma.CW);
 						printf (" [Node %s] t=%f --- START CCA CW = %d, retry_times=%d\n",node_attr.name, op_sim_time(), csma.CW, current_packet_txs+current_packet_CS_fails);
 					}
+					/* check at the beginning of CCA, if the channel is busy */
+					csma.CCA_CHANNEL_IDLE = OPC_TRUE;
+					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
+						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
+					}
+					// if(!csma.CCA_CHANNEL_IDLE){
+					// 	printf("t=%f, CCA with BUSY.\n", op_sim_time());
+					// }else{
+					// 	printf("t=%f, CCA with IDLE.\n", op_sim_time());
+					// }
+					op_prg_odb_bkpt("debug");
 					wban_battery_cca();
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
@@ -1628,17 +1634,24 @@ static void wban_mac_interrupt_process() {
 			
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
+					// if(!csma.CCA_CHANNEL_IDLE){
+					// 	printf("t=%f, csma.CCA_CHANNEL_IDLE with BUSY.\n", op_sim_time());
+					// }else{
+					// 	printf("t=%f, csma.CCA_CHANNEL_IDLE with IDLE.\n", op_sim_time());
+					// }
+					// if(op_stat_local_read (RX_BUSY_STAT) == 1.0){
+					// 	printf("t=%f, RX_BUSY_STAT with BUSY.\n", op_sim_time());
+					// }else{
+					// 	printf("t=%f, RX_BUSY_STAT with IDLE.\n", op_sim_time());
+					// }
 					/* bug with open-zigbee, for statwire interupt can sustain a duration */
-					if ((OPC_FALSE == csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
+					if ((!csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
 						printf("t = %f, %s CCA with BUSY.\n", op_sim_time(), node_attr.name);
 						// op_intrpt_schedule_self (csma.next_slot_start, CCA_START_CODE);
-						op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime+2*pCSMASlotLength2Sec, CCA_START_CODE);
+						op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime+I_ACK_TX_TIME, CCA_START_CODE);
 					} else {
 						csma.backoff_counter--;
 						printf("t = %f, %s CCA with IDLE, backoff_counter decrement to %d\n", op_sim_time(), node_attr.name, csma.backoff_counter);
-						if(attemptingToTX){
-							printf("attemptingToTX=True\n");
-						}else{printf("attemptingToTX=False\n");}
 
 						if (csma.backoff_counter > 0) {
 							printf("CCA at next available backoff boundary = %f sec.\n", op_sim_time()+pCSMAMACPHYTime);
@@ -1646,7 +1659,12 @@ static void wban_mac_interrupt_process() {
 							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, CCA_START_CODE);
 						} else {
 							if(csma.backoff_counter < 0){
-								op_sim_end("ERROR : TRY TO SEND Packet WHILE backoff_counter < 0","PK_SEND_CODE","","");
+								if(waitForACK) printf("waitForACK=True,");
+								if(attemptingToTX) printf("attemptingToTX=True,");
+								if(TX_ING) printf("TX_ING=True\n");
+								break;
+								csma.backoff_counter = 0;
+								// op_sim_end("ERROR : TRY TO SEND Packet WHILE backoff_counter < 0","PK_SEND_CODE","","");
 							}
 							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, op_sim_time()+pCSMAMACPHYTime);
 							// op_intrpt_schedule_self (csma.next_slot_start, START_TRANSMISSION_CODE);
@@ -1702,6 +1720,9 @@ static void wban_mac_interrupt_process() {
 						waitForACK = OPC_FALSE;
 						current_packet_txs = 0;
 						current_packet_CS_fails = 0;
+					} else {
+						TX_ING = OPC_FALSE;
+						// attemptingToTX = OPC_FALSE;
 					}
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
@@ -1747,7 +1768,7 @@ static void wban_mac_interrupt_process() {
 				case N_ACK_PACKET_SENT:
 				{
 					TX_ING = OPC_FALSE;
-					attemptingToTX = OPC_FALSE;
+					// attemptingToTX = OPC_FALSE;
 					waitForACK = OPC_FALSE;
 					pkt_to_be_sent.enable = OPC_FALSE;
 					current_packet_txs = 0;
@@ -1790,7 +1811,7 @@ static void wban_mac_interrupt_process() {
 				{
 					/* if during the CCA the channel was busy for a while, then csma.CCA_CHANNEL_IDLE = OPC_FALSE*/
 					if (op_stat_local_read(RX_BUSY_STAT) == 1.0) {
-						// csma.CCA_CHANNEL_IDLE = OPC_FALSE;
+						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 					}
 
 					/*Try to send a packet if any*/
@@ -1926,7 +1947,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 				// stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
 			}
 			waitForACK = OPC_FALSE;
-			attemptingToTX = OPC_FALSE;
+			// attemptingToTX = OPC_FALSE;
 			pkt_to_be_sent.enable = OPC_FALSE;
 			current_packet_txs = 0;
 			current_packet_CS_fails = 0;
@@ -1984,6 +2005,9 @@ static void wban_attempt_TX() {
 	FIN(wban_attempt_TX);
 
 	if(waitForACK || attemptingToTX || TX_ING){
+		if(waitForACK) printf("waitForACK=True,");
+		if(attemptingToTX) printf("attemptingToTX=True,");
+		if(TX_ING) printf("TX_ING=True,");
 		printf("t=%f, %s A packet is TX.\n", op_sim_time(), node_attr.name);
 		FOUT;
 	}
