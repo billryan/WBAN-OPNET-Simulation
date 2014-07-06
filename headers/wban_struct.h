@@ -36,7 +36,7 @@ typedef struct {
 	int beacon_period_length;
 	int allocation_slot_length;
 	int rap1_start;
-	int rap_length;
+	int rap1_length;
 	int rap1_end;
 	int rap2_start;
 	int rap2_end;
@@ -177,6 +177,7 @@ typedef struct {
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
 	Boolean CFP_ACTIVE;	// Contention Free Period (Scheduling) is active
 	Boolean IN_MAP_PHASE; //true if in MAP phase
+	Boolean IN_CAP_PHASE; //true if in Contention access Phase
 	Boolean IN_EAP_PHASE; //true if in EAP1/EAP2 phase
 	Boolean ENABLE_TX_NEW; // Enable new transmission
 	Boolean IN_CONN_SETUP; // whether in connection setup
@@ -196,6 +197,7 @@ typedef struct {
 
 	int max_packet_tries;
 	int MGMT_buffer_size;
+	int DATA_buffer_size;
 	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;
@@ -208,12 +210,12 @@ typedef struct
 	int	recipient_id; // Recipient ID of the node
 	int ack_policy;
 	int seq_num;
-	int total_bits; // length of PPDU
+	int ppdu_bits; // length of PPDU
 	int ack_bits; // length of ack PPDU
 	int user_priority;
 	int frame_type;
 	int frame_subtype;
-	Boolean enable;
+	Boolean enable; // indicate whether a packet is deleted
 } packet_to_be_sent_attributes;
 
 /* define the subqueue infomation parameters */
@@ -223,7 +225,6 @@ typedef struct {
 	double free_pksize;
 	double free_bitsize;
 	double pk_overflows;
-	double lambda;
 	int up; // user priority
 } subqueue_info;
 
@@ -305,4 +306,11 @@ typedef struct
 	// nbr_pkt_rcv = 0;	
 	// Umax = 1.0/((900.0+MAC_HEADER_SIZE)/WPAN_DATA_RATE);
 } wban_anlyzer_vector;
+
+typedef struct
+{
+	int nid;
+	int slot_start;
+	int slot_end;
+} assignment_map;
 #endif
