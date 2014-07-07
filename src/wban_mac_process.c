@@ -640,9 +640,9 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get (frame_MPDU, "Sequence Number", &ack_seq_num);
 	op_pk_nfd_get (frame_MPDU, "Sender ID", &mac_attr.recipient_id);
 	// op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
-	if(op_sim_time()+2*pSIFS+I_ACK_TX_TIME < phase_end_timeG){
-		op_intrpt_schedule_self(op_sim_time()+2*pSIFS+I_ACK_TX_TIME, TRY_PACKET_TRANSMISSION_CODE);
-	}
+	// if(op_sim_time()+2*pSIFS+I_ACK_TX_TIME < phase_end_timeG){
+	// 	op_intrpt_schedule_self(op_sim_time()+2*pSIFS+I_ACK_TX_TIME, TRY_PACKET_TRANSMISSION_CODE);
+	// }
 
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	op_pk_nfd_get (frame_MSDU, "Allocation Length", &allocation_length);
@@ -1949,6 +1949,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 				// stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
 			}
 			waitForACK = OPC_FALSE;
+			TX_ING = OPC_TRUE;
 			// attemptingToTX = OPC_FALSE;
 			pkt_to_be_sent.enable = OPC_FALSE;
 			current_packet_txs = 0;
