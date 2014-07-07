@@ -640,7 +640,9 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get (frame_MPDU, "Sequence Number", &ack_seq_num);
 	op_pk_nfd_get (frame_MPDU, "Sender ID", &mac_attr.recipient_id);
 	// op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
-	op_intrpt_schedule_self(op_sim_time()+2*pSIFS+I_ACK_TX_TIME, TRY_PACKET_TRANSMISSION_CODE);
+	if(op_sim_time()+2*pSIFS+I_ACK_TX_TIME < phase_end_timeG){
+		op_intrpt_schedule_self(op_sim_time()+2*pSIFS+I_ACK_TX_TIME, TRY_PACKET_TRANSMISSION_CODE);
+	}
 
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	op_pk_nfd_get (frame_MSDU, "Allocation Length", &allocation_length);
@@ -1662,9 +1664,9 @@ static void wban_mac_interrupt_process() {
 								if(waitForACK) printf("waitForACK=True,");
 								if(attemptingToTX) printf("attemptingToTX=True,");
 								if(TX_ING) printf("TX_ING=True\n");
-								break;
-								csma.backoff_counter = 0;
-								// op_sim_end("ERROR : TRY TO SEND Packet WHILE backoff_counter < 0","PK_SEND_CODE","","");
+								// break;
+								// csma.backoff_counter = 0;
+								op_sim_end("ERROR : TRY TO SEND Packet WHILE backoff_counter < 0","PK_SEND_CODE","","");
 							}
 							printf("backoff_counter decrement to 0, %s start transmission at %f.\n", node_attr.name, op_sim_time()+pCSMAMACPHYTime);
 							// op_intrpt_schedule_self (csma.next_slot_start, START_TRANSMISSION_CODE);
@@ -2275,14 +2277,14 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* pkt_to_be_sentL) {
 	pk_tx_time = TX_TIME(wban_norm_phy_bits(frame_MPDU_to_be_sent), node_attr.data_rate);
 	phase_remaining_time = phase_end_timeG - op_sim_time();
 	if(pkt_to_be_sentL->ack_policy != N_ACK_POLICY){
-		if (compare_doubles(phase_remaining_time, pk_tx_time+I_ACK_TX_TIME+2*pSIFS) >=0) {
+		if (compare_doubles(phase_remaining_time, pk_tx_time+I_ACK_TX_TIME+pSIFS+3*MICRO) >=0) {
 			FRET(OPC_TRUE);
 		} else {
 			printf("No enougth time for I_ACK_POLICY packet transmission in this phase.\n");
 			FRET(OPC_FALSE);
 		}
 	} else {
-		if (compare_doubles(phase_remaining_time, pk_tx_time+pSIFS) >=0) {
+		if (compare_doubles(phase_remaining_time, pk_tx_time+3*MICRO) >=0) {
 			FRET(OPC_TRUE);
 		} else {
 			printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
@@ -2400,10 +2402,11 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			break;
 	}
 
-	PPDU_tx_time = TX_TIME(wban_norm_phy_bits(frame_MPDU), node_attr.data_rate);
+	PPDU_tx_time = TX_TIME(ppdu_bits, node_attr.data_rate);
 
 	switch (ack_policy){
 		case N_ACK_POLICY:
+			waitForACK = OPC_FALSE;
 			phy_to_radio(frame_MPDU);
 			// op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS, N_ACK_PACKET_SENT);
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS, N_ACK_PACKET_SENT);
