@@ -318,6 +318,7 @@ static void wban_battery_update() {
 		case END_OF_SIM :
 		{
 			if (enable_log) {
+				fprintf(log, "STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
 				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 				
 				fclose(log);
