@@ -893,10 +893,10 @@ static void wban_schedule_next_beacon() {
 	SF.current_slot = 0;
 	// SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
-	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec + pSIFS;
-	SF.eap1_end2sec = SF.rap1_start2sec - pSIFS;
+	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
+	SF.eap1_end2sec = SF.rap1_start2sec;
 	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
-	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec + pSIFS;
+	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec;
 	if(SF.b2_start == 0){
 		SF.b2_start2sec = 0;
 	}
@@ -1397,7 +1397,7 @@ static void wban_mac_interrupt_process() {
 				{
 					mac_state = MAC_EAP1;
 					phase_start_timeG = SF.eap1_start2sec;
-					phase_end_timeG = SF.rap1_start2sec;
+					phase_end_timeG = SF.eap1_end2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_TRUE;
 					pkt_to_be_sent.enable = OPC_FALSE;
@@ -1949,7 +1949,7 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 				// stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
 			}
 			waitForACK = OPC_FALSE;
-			TX_ING = OPC_TRUE;
+			TX_ING = OPC_FALSE;
 			// attemptingToTX = OPC_FALSE;
 			pkt_to_be_sent.enable = OPC_FALSE;
 			current_packet_txs = 0;
@@ -2281,14 +2281,14 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* pkt_to_be_sentL) {
 		if (compare_doubles(phase_remaining_time, pk_tx_time+I_ACK_TX_TIME+pSIFS+3*MICRO) >=0) {
 			FRET(OPC_TRUE);
 		} else {
-			printf("No enougth time for I_ACK_POLICY packet transmission in this phase.\n");
+			printf("%s No enougth time for I_ACK_POLICY packet transmission in this phase.\n", node_attr.name);
 			FRET(OPC_FALSE);
 		}
 	} else {
 		if (compare_doubles(phase_remaining_time, pk_tx_time+3*MICRO) >=0) {
 			FRET(OPC_TRUE);
 		} else {
-			printf("No enougth time for N_ACK_POLICY packet transmission in this phase.\n");
+			printf("%s No enougth time for N_ACK_POLICY packet transmission in this phase.\n", node_attr.name);
 			FRET(OPC_FALSE);
 		}
 	}
@@ -2414,6 +2414,9 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			break;
 		case I_ACK_POLICY:
 			ack_expire_time = op_sim_time() + PPDU_tx_time + I_ACK_TX_TIME + 2*pSIFS;
+			if(ack_expire_time > phase_end_timeG){
+				ack_expire_time = op_sim_time() + PPDU_tx_time + I_ACK_TX_TIME + 3*MICRO;
+			}
 			waitForACK = OPC_TRUE;
 			mac_attr.wait_ack_seq_num = seq_num;
 			current_packet_txs++;
