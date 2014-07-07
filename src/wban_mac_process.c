@@ -118,7 +118,7 @@ static void wban_mac_init() {
 		SF.cap_end = b2_attr.cap_end;
 		SF.map2_end = b2_attr.map2_end;
 
-		SF.current_first_free_slot = SF.rap1_end + 1;
+		SF.current_first_free_slot = beacon_attr.rap2_end + 1;
 
 		// register the beacon frame statistics
 		beacon_frame_hndl = op_stat_reg ("MANAGEMENT.Number of Generated Beacon Frame", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
