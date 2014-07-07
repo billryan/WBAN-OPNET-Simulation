@@ -129,6 +129,8 @@ static void wban_mac_init() {
 		//node_attr.unconnectedNID = 1 + (unconnectedNID - 1) % 16;
 		//unconnectedNID++;
 		node_attr.unconnectedNID = node_attr.objid;
+		conn_assign_attr.interval_start = 255;
+		conn_assign_attr.interval_end = 0;
 		
 		if (enable_log) {
 			// fprintf (log," [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
@@ -696,6 +698,7 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	// }
 
 	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+	fprintf(log, "MAP_allocation,Interval_Start=%d,Interval_End=%d\n", conn_assign_attr.interval_start,conn_assign_attr.interval_end);
 	op_prg_odb_bkpt("rcv_assign");
 	/* Stack tracing exit point */
 	FOUT;
@@ -904,7 +907,7 @@ static void wban_schedule_next_beacon() {
 	// SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
 	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
 
-	SF.current_first_free_slot = SF.rap1_end + 1; // spec for hub assignment
+	// SF.current_first_free_slot = SF.rap1_end + 1; // spec for hub assignment
 
 	/* for node we should calculate the slot boundary */
 	SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);
@@ -1104,7 +1107,8 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 
 	if(0 == node_attr.protocol_ver){
 		if(SF.current_first_free_slot <= SF.current_slot){
-			SF.current_first_free_slot = SF.current_slot + 1;
+			op_sim_end("ERROR : MAP allocation ERROR","MAP allocation","","");
+			// SF.current_first_free_slot = SF.current_slot + 1;
 		}
 		if(0 < SF.b2_start){
 			/* do not use the second part of EAP2/RAP2/MAP */
@@ -1726,6 +1730,8 @@ static void wban_mac_interrupt_process() {
 						// op_pk_destroy(frame_MPDU_to_be_sent);
 						pkt_to_be_sent.enable = OPC_FALSE;
 						waitForACK = OPC_FALSE;
+						TX_ING = OPC_FALSE;
+						attemptingToTX = OPC_FALSE;
 						current_packet_txs = 0;
 						current_packet_CS_fails = 0;
 					} else {
