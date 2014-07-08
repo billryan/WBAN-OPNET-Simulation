@@ -915,18 +915,19 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 			SF.cap_start2sec = SF.BI_Boundary + (b2_attr.map2_end+1) * SF.slot_length2sec;
 			printf("SF.cap_start2sec replaced with %f for protocol version 1.\n", SF.cap_start2sec);
 			
-			if(assign_map[mac_attr.sender_id%10].map2_slot_start > 0){
-				SF.map2_start = assign_map[mac_attr.sender_id%10].map2_slot_start;
-				SF.map2_end = assign_map[mac_attr.sender_id%10].map2_slot_end;
+			if(assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start > 0){
+				SF.map2_start = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start;
+				SF.map2_end = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_end;
 				SF.map2_start2sec = SF.BI_Boundary + SF.map2_start * SF.slot_length2sec;
 				SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
 				if (SF.map2_start == SF.b2_start){
 					SF.map2_start2sec = op_sim_time() + pSIFS;
 				}
-				printf("%s allocated with map2_start=%d, map2_end=%d\n", node_attr.name, SF.map2_start, SF.map2_end);
+				printf("NID=%d allocated with map2_start=%d, map2_end=%d\n", mac_attr.sender_id, SF.map2_start, SF.map2_end);
 				op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
 				op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
 			}
+			op_prg_odb_bkpt("debug");
 		}
 		op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
 		op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
