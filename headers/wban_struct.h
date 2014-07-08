@@ -311,7 +311,9 @@ typedef struct
 {
 	int nid;
 	int slot_start;
+	int map2_slot_start;
+	int map2_slot_end;
 	int slot_end;
-	int pktnum;
+	int slotnum;
 } assignment_map;
 #endif
