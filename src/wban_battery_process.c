@@ -138,8 +138,7 @@ static void wban_battery_update() {
 			op_ici_destroy(iciptr);
 			
 			/* compute the transmission time of the transmitted packet */
-			tx_time = pksize/WBAN_DATA_RATE;
-			
+			tx_time = 1.0*pksize/WBAN_DATA_RATE;
 			/* compute the consumed energy when transmitting a packet */
 			tx_energy = (battery.current_tx_mA * MILLI) * tx_time * battery.power_supply;
 
@@ -179,7 +178,7 @@ static void wban_battery_update() {
 			
 			// printf("battery entered into RX.\n");
 			/* compute the packet size of the transmitted packet */
-			rx_time = pksize/WBAN_DATA_RATE;
+			rx_time = 1.0*pksize/WBAN_DATA_RATE;
 
 			/* compute the consumed energy when receiving a packet */
 			rx_energy = (battery.current_rx_mA * MILLI) * rx_time * battery.power_supply;
