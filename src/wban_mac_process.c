@@ -1808,7 +1808,8 @@ static void wban_mac_interrupt_process() {
 			fprintf(log,"STAT,PPDU_rcv_nbr=%f\n", PPDU_rcv_nbr);
 			fprintf(log,"STAT,CHANNEL_TRAFFIC_G=%f\n", PPDU_sent_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
 			fprintf(log,"STAT,CHANNEL_THROUGHPUT_S=%f\n", PPDU_rcv_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
-			op_intrpt_schedule_remote (op_sim_time(), END_OF_SIM, node_attr.my_battery); 
+			
+			wban_battery_end();
 			if (enable_log) {
 				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 				printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
