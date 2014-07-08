@@ -618,8 +618,8 @@ static void wban_send_beacon2_frame () {
 		SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
 		free_slot = SF.b2_start;
 		for(i=32; i < current_free_connected_NID; i++){
-			if(assign_map[i%10].pktnum > 0){
-				slot_num = (int)((assign_map[i%10].pktnum * 800.0)/(WBAN_DATA_RATE*SF.slot_length2sec) + (assign_map[i%10].pktnum*(I_ACK_TX_TIME+pSIFS))/SF.slot_length2sec);
+			if(assign_map[i%10].slotnum > 0){
+				slot_num = (int)((assign_map[i%10].slotnum * 800.0)/(WBAN_DATA_RATE*SF.slot_length2sec) + (assign_map[i%10].slotnum*(I_ACK_TX_TIME+pSIFS))/SF.slot_length2sec);
 				if(slot_num <= 0){
 					assign_map[i%10].map2_slot_start = 0;
 					assign_map[i%10].map2_slot_end = 0;
@@ -816,6 +816,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			mac_attr.sender_id = current_free_connected_NID++;
 			// current_free_connected_NID++;
 			printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			op_prg_odb_bkpt("debug");
 			fprintf(log, "NID=%d\n", mac_attr.sender_id);
 			op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
@@ -1973,7 +1974,7 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
 	Packet* frame_MSDU;
 	// double ete_delay;
 	// int pk_size;
-	int pkt_num;
+	int slotnum;
 	int up_prio;
 	int sender_id;
 	
@@ -1982,23 +1983,20 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy);
 	op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
 	op_pk_nfd_get (frame_MPDU, "Frame Subtype", &up_prio);
-	op_pk_nfd_get (frame_MPDU, "pktnum", &pkt_num);
+	op_pk_nfd_get (frame_MPDU, "slotnum", &slotnum);
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
-	// pk_size = op_pk_total_size_get(frame_MSDU);
-	// ete_delay = op_sim_time() - op_pk_creation_time_get(frame_MSDU);
-	// printf("t = %f, ete_delay-MSDU = %f\n", op_sim_time(), ete_delay);
 	if(1 == node_attr.protocol_ver){
-		if((SF.current_slot > SF.rap1_end) && (SF.current_slot < SF.b2_start)) {
+		if(MAC_MAP1 == mac_state) {
 			if(assign_map[mac_attr.recipient_id%10].slot_start > 0){
 				if(assign_map[mac_attr.recipient_id%10].slot_end == SF.current_slot){
-					assign_map[mac_attr.recipient_id%10].pktnum = pkt_num;
+					assign_map[mac_attr.recipient_id%10].slotnum = slotnum;
 				}
 			}
+			printf("NID=%d,slotnum=%d\n", mac_attr.recipient_id, slotnum);
+			op_prg_odb_bkpt("debug");
 		}
 	}
 	op_prg_odb_bkpt("rcv_data");
-	// fprintf(log, "RX,DATA_MAC_STATE=%d,RAP_Length=%d,", mac_state, beacon_attr.rap1_length);
-	// fprintf(log, "t=%f,pk size of DATA_MSDU=%d,UPx=%d,received from ID=%d,", op_sim_time(), pk_size, up_prio, sender_id);
 
 	/* check if any ACK is requested */
 	switch (ack_policy) {
@@ -2202,6 +2200,7 @@ static void wban_attempt_TX() {
 				FOUT;
 			}
 		}
+		frame_MPDU_to_be_sent = op_subq_pk_remove(SUBQ_DATA, OPC_QPOS_PRIO);
 		if((1 == node_attr.protocol_ver) && (MAC_MAP1 == mac_state)){
 			subq_info_get(SUBQ_DATA);
 			slotnum = (int)((subq_info.bitsize + subq_info.pksize *2* header4mac2phy())/(WBAN_DATA_RATE*SF.slot_length2sec));
@@ -2209,7 +2208,6 @@ static void wban_attempt_TX() {
 			printf("header4mac2phy=%d,slotnum=%d\n",header4mac2phy(),slotnum);
 			op_prg_odb_bkpt("debug");
 		}
-		frame_MPDU_to_be_sent = op_subq_pk_remove(SUBQ_DATA, OPC_QPOS_PRIO);
 		pkt_to_be_sent.enable = OPC_TRUE;
 	} else {
 		pkt_to_be_sent.enable = OPC_FALSE;
