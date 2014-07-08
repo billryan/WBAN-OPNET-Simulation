@@ -234,6 +234,7 @@ static int compare_doubles (double a, double b) {
 	}
 }
 
+
 /*--------------------------------------------------------------------------------
  * Function:	rand_int(int seed)
  *

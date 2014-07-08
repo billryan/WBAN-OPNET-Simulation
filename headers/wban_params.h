@@ -89,6 +89,9 @@
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
 
+// max nodes in a wban
+#define NODE_MAX 10
+
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
 #define UNCONNECTED_NID 1 // For unicast from/to unconnected nodes in a BAN
