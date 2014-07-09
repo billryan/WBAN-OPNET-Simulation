@@ -20,7 +20,6 @@ static void wban_battery_init() {
 	time_t timep;
 	struct tm *p;
 	int protocol_ver;
-	int map_schedule;
 	
 	/* Stack tracing enrty point */
 	FIN(wban_battery_init);
@@ -36,7 +35,6 @@ static void wban_battery_init() {
 
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (battery.parent_id, "Protocol Version", &protocol_ver);
-	op_ima_obj_attr_get (battery.parent_id, "MAP Schedule", &map_schedule);
 
 
 	enable_log = OPC_TRUE;
@@ -54,7 +52,7 @@ static void wban_battery_init() {
 	printf("%d;%d;%d\n", p->tm_hour, p->tm_min, p->tm_sec);
 
 	if (enable_log) {
-		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d-map%d.energy", directory_path_name, node_name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, protocol_ver, map_schedule);
+		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d.energy", directory_path_name, node_name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, protocol_ver);
 		printf ("Log file name: %s \n\n", log_name);
 		log = fopen(log_name,"w");
 	}

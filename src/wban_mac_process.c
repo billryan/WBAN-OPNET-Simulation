@@ -46,7 +46,6 @@ static void wban_mac_init() {
 	}
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (node_attr.objid, "Protocol Version", &node_attr.protocol_ver);
-	op_ima_obj_attr_get (node_attr.objid, "MAP Schedule", &node_attr.map_schedule);
 	
 	/* obtain object ID of the Traffic Source node */
 	traffic_source_up_id = op_id_from_name(node_attr.objid, OPC_OBJTYPE_PROC, "Traffic Source_UP");
@@ -226,7 +225,7 @@ static void wban_log_file_init() {
 	printf("%d;%d;%d\n", p->tm_hour, p->tm_min, p->tm_sec);
 
 	if (enable_log) {
-		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d-map%d.trace", directory_path_name, node_attr.name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, node_attr.protocol_ver, node_attr.map_schedule);
+		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d.trace", directory_path_name, node_attr.name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, node_attr.protocol_ver);
 		printf ("Log file name: %s \n\n", log_name);
 		log = fopen(log_name,"w");
 	}
@@ -1065,22 +1064,9 @@ static void wban_send_conn_req_frame () {
 	Packet* conn_req_MSDU;
 	Packet* conn_req_MPDU;
 	int random_num;
-	// double ph_tx_time; // PHY Header tx time
-	// double subq_data_tx_time_total;
-	// double conn_req_tx_time;
-	// double conn_req_round;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_conn_req_frame);
-	// calculate the normalized PHY bits
-	// op_pk_total_size_set (empty_MPDU, 0);
-	// ph_tx_time = TX_TIME(wban_norm_phy_bits(empty_MPDU), node_attr.data_rate);
-	// printf("PHY Header tx time=%f.\n", ph_tx_time);
-	/* get the queue infomation of SUBQ_DATA */
-	// subq_data_tx_time_total = subq_info.pksize*pSIFS + subq_info.bitsize / (node_attr.data_rate*1000);
-	// if(0 == node_attr.map_schedule){
-	// 	conn_req_attr.allocation_length = (int)(subq_data_tx_time_total / SF.slot_length2sec + 0.4);
-	// }
 	printf("Connection Request allocation_length=%d for Node %s\n", conn_req_attr.allocation_length, node_attr.name);
 	if (conn_req_attr.allocation_length > 0) {
 		if(conn_req_attr.allocation_length > 3){
@@ -1340,9 +1326,9 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	/* Stack tracing enrty point */
 	FIN(wban_encapsulate_and_enqueue_data_frame);
 
-	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
 	op_pk_nfd_get (data_frame_up, "User Priority", &user_priority);
 	op_pk_nfd_get (data_frame_up, "App Sequence Number", &seq_num);
+	op_pk_nfd_get_pkt (data_frame_up, "MSDU Payload", &data_frame_msdu);
 
 	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
 	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
@@ -1365,6 +1351,7 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	/* put it into the queue with priority waiting for transmission */
 	op_pk_priority_set (data_frame_mpdu, (double)user_priority);
 	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_TAIL) == OPC_QINS_OK) {
+		// fprintf(log, "NID=%d,\n", );
 		if (enable_log) {
 			// fprintf (log,"t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", op_sim_time(), seq_num, ack_policy);
 			printf (" [Node %s] t=%f  -> Enqueuing of MAC DATA frame [SEQ = %d, ACK? = %d] and try to send \n\n", node_attr.name, op_sim_time(), seq_num, ack_policy);
