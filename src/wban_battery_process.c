@@ -15,12 +15,13 @@ static void wban_battery_init() {
 	Objid current_draw_comp_id; 
 	Objid current_draw_id;
 	char node_name[15];
-	char directory_path_name[80];
-	char log_name[250];
-	time_t timep;
-	struct tm *p;
 	int protocol_ver;
-	
+	char directory_path_name[200];
+	char log_name[250];
+	char buffer[30];
+	time_t rawtime;
+	struct tm *p;
+
 	/* Stack tracing enrty point */
 	FIN(wban_battery_init);
 	/* get the ID of this module */
@@ -36,24 +37,27 @@ static void wban_battery_init() {
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (battery.parent_id, "Protocol Version", &protocol_ver);
 
+	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", directory_path_name);
 
 	/* verification if the directory_path_name is a valid directory */
 	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
-		char msg[128];
-		sprintf (msg, " \"%s\" is not valid directory name. The output will not be logged.\n", directory_path_name);
-		/* Display an appropriate warning.	*/
-		op_prg_odb_print_major ("Warning from wban_mac process: ", msg, OPC_NIL);
+		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
 	}
-	time(&timep);
-	p=localtime(&timep);
-	printf("%d%d%d",(1900+p->tm_year), (1+p->tm_mon),p->tm_mday);
-	printf("%d;%d;%d\n", p->tm_hour, p->tm_min, p->tm_sec);
 
+	time(&rawtime);
+	p=localtime(&rawtime);
+    // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
+    strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+    sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, protocol_ver);
 
-		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d.energy", directory_path_name, node_name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, protocol_ver);
-		printf ("Log file name: %s \n\n", log_name);
-		log = fopen(log_name,"w");
-	
+    /* Check for existence */
+    if((_access( log_name, 0 )) != -1){
+        printf("File %s exists\n", log_name);
+    	log = fopen(log_name, "a");
+    } else {
+    	printf("File %s unexists.\n", log_name);
+    	log = fopen(log_name, "w");
+    }
 
 	op_ima_obj_attr_get (battery.own_id, "Power Supply", &battery.power_supply);
 	op_ima_obj_attr_get (battery.own_id, "Initial Energy", &battery.initial_energy);
@@ -123,7 +127,7 @@ static void wban_battery_update() {
 	}
 
 	if (op_intrpt_type() == OPC_INTRPT_REMOTE) {
-	  switch (op_intrpt_code()) {		
+	  switch (op_intrpt_code()) {
 		case PACKET_TX_CODE :
 		{
 			/* get the ICI information associated to the remote interrupt */
@@ -310,23 +314,17 @@ static void wban_battery_update() {
 			break;
 		}
 
-		case END_OF_SIM :
-		{
-			
-				fprintf(log, "STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
-				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
-				
-				fclose(log);
-			
-			break;
-		}
 		
 		default :
 		{
 		};		
 	  }	
+	} else if (op_intrpt_type() == OPC_INTRPT_ENDSIM){
+		fprintf(log, "STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
+		fprintf(log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
+		
+		fclose(log);
 	}
-	
 	/* Stack tracing exit point */
 	FOUT;
 }
