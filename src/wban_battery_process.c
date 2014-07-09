@@ -17,7 +17,6 @@ static void wban_battery_init() {
 	char node_name[15];
 	int protocol_ver;
 	char directory_path_name[200];
-	char log_name[250];
 	char buffer[30];
 	time_t rawtime;
 	struct tm *p;
@@ -27,7 +26,8 @@ static void wban_battery_init() {
 	/* get the ID of this module */
 	battery.own_id = op_id_self ();
 	/* get the ID of the node */
-	battery.parent_id = op_topo_parent (battery.own_id);	
+	battery.parent_id = op_topo_parent (battery.own_id);
+	node_id = battery.parent_id;
 	
 	/* get the value to check if this node is PAN Coordinator or not */
 	op_ima_obj_attr_get (battery.parent_id, "Device Mode", &battery.Device_Mode);
@@ -36,7 +36,6 @@ static void wban_battery_init() {
 
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (battery.parent_id, "Protocol Version", &protocol_ver);
-
 	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", directory_path_name);
 
 	/* verification if the directory_path_name is a valid directory */
@@ -51,17 +50,16 @@ static void wban_battery_init() {
     sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, protocol_ver);
 
     /* Check for existence */
-    if((_access( log_name, 0 )) != -1){
-        printf("File %s exists\n", log_name);
-    	log = fopen(log_name, "a");
-    } else {
-    	printf("File %s unexists.\n", log_name);
-    	log = fopen(log_name, "w");
-    }
+    // if((_access( log_name, 0 )) != -1){
+    //     printf("File %s exists\n", log_name);
+    // 	log = fopen(log_name, "a");
+    // } else {
+    // 	printf("File %s unexists.\n", log_name);
+    // 	log = fopen(log_name, "w");
+    // }
 
 	op_ima_obj_attr_get (battery.own_id, "Power Supply", &battery.power_supply);
 	op_ima_obj_attr_get (battery.own_id, "Initial Energy", &battery.initial_energy);
-	
 	op_ima_obj_attr_get (battery.own_id, "Current Draw", &current_draw_id);	
 	current_draw_comp_id = op_topo_child (current_draw_id, OPC_OBJTYPE_GENERIC, 0);
 	
@@ -73,14 +71,14 @@ static void wban_battery_init() {
 	battery.current_energy = battery.initial_energy;
 	
 	/* register the statistics that will be maintained by this model */
-	statistics.remaining_energy	= op_stat_reg ("Battery.Remaining Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
-	statistics.consumed_energy	= op_stat_reg ("Battery.Consumed Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
-	statisticsG.consumed_energy	= op_stat_reg ("Battery.Consumed Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// statistics.remaining_energy	= op_stat_reg ("Battery.Remaining Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	// statistics.consumed_energy	= op_stat_reg ("Battery.Consumed Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
+	// statisticsG.consumed_energy	= op_stat_reg ("Battery.Consumed Energy (Joule)", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	
-	op_stat_write(statistics.remaining_energy,battery.current_energy);
-	op_stat_write(statistics.consumed_energy,0.0);
+	// op_stat_write(statistics.remaining_energy,battery.current_energy);
+	// op_stat_write(statistics.consumed_energy,0.0);
 
-	op_stat_write(statisticsG.consumed_energy,0.0);
+	// op_stat_write(statisticsG.consumed_energy,0.0);
 	
 	activity.is_idle = OPC_TRUE;
 	activity.is_sleep = OPC_FALSE;
@@ -91,22 +89,20 @@ static void wban_battery_init() {
 	FOUT;
 }
 
-
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_update
  *
  * Description:	compute the energy consumed and update enregy level
- *              ---------> consumed energy (JOULE) = current * time * voltage  = (AMPERE * SEC * VOLT) <--------------
+ *---------> consumed energy (JOULE) = current * time * voltage  = (AMPERE * SEC * VOLT) <--------------
  *
  * No parameters
  *--------------------------------------------------------------------------------*/
-
 static void wban_battery_update() {
-
 	Ici * iciptr;
 	double tx_time;
 	double rx_time;
-	int pksize;
+	int ppdu_bits;
+	int mac_state;
 	double consumed_energy;
 	double tx_energy;
 	double rx_energy;
@@ -132,13 +128,12 @@ static void wban_battery_update() {
 		{
 			/* get the ICI information associated to the remote interrupt */
 			iciptr = op_intrpt_ici();
-			
-			op_ici_attr_get(iciptr, "PPDU Packet Size", &pksize);
-			
+			op_ici_attr_get(iciptr, "PPDU BITS", &ppdu_bits);
+			op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
 			op_ici_destroy(iciptr);
 			
 			/* compute the transmission time of the transmitted packet */
-			tx_time = 1.0*pksize/WBAN_DATA_RATE;
+			tx_time = 1.0*ppdu_bits/WBAN_DATA_RATE;
 			/* compute the consumed energy when transmitting a packet */
 			tx_energy = (battery.current_tx_mA * MILLI) * tx_time * battery.power_supply;
 
@@ -150,8 +145,10 @@ static void wban_battery_update() {
 			}
 			/* update the consumed energy with the one of in idle state */
 			consumed_energy= tx_energy +idle_energy;
-			fprintf(log, "ENERGY,TX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time(), idle_energy);
-			fprintf(log, "ENERGY,TX_CODE,TX,t=%f,tx_energy=%f\n", op_sim_time()+tx_time, tx_energy);
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,TX,tx_energy=%f\n", op_sim_time()+tx_time, node_id, mac_state, tx_energy);
+			fclose(log);
 			/* update the current energy level */
 			battery.current_energy = battery.current_energy - consumed_energy;
 			
@@ -159,10 +156,10 @@ static void wban_battery_update() {
 			activity.last_idle_time = op_sim_time()+tx_time;
 			
 			/* update the statistics */
-			op_stat_write(statistics.remaining_energy, battery.current_energy);
-			op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
+			// op_stat_write(statistics.remaining_energy, battery.current_energy);
+			// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 			
-			op_stat_write(statisticsG.consumed_energy, consumed_energy);
+			// op_stat_write(statisticsG.consumed_energy, consumed_energy);
 			
 			break;
 		}
@@ -171,37 +168,31 @@ static void wban_battery_update() {
 		{
 			/* get the ICI information associated to the remote interrupt */
 			iciptr=op_intrpt_ici();
-			
-			op_ici_attr_get(iciptr, "PPDU Packet Size",&pksize);
-			
+			op_ici_attr_get(iciptr, "PPDU BITS", &ppdu_bits);
+			op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
 			op_ici_destroy(iciptr);
 			
 			// printf("battery entered into RX.\n");
 			/* compute the packet size of the transmitted packet */
-			rx_time = 1.0*pksize/WBAN_DATA_RATE;
+			rx_time = 1.0*ppdu_bits/WBAN_DATA_RATE;
 
 			/* compute the consumed energy when receiving a packet */
 			rx_energy = (battery.current_rx_mA * MILLI) * rx_time * battery.power_supply;
 			
 			/* compute the time spent by the node in idle state */
 			idle_duration = op_sim_time()-rx_time-activity.last_idle_time;
-			// printf("op_sim_time()=%f, rx_time=%f, activity.last_idle_time=%f.\n", op_sim_time(), rx_time, activity.last_idle_time);
-			// printf("idle_duration=%f\n", idle_duration);
-			op_prg_odb_bkpt("rx_e");
 			if(compare_doubles(op_sim_time(), idle_duration) != 1){
 				idle_duration = 0;
-				// break;
 			}
 			idle_energy = (battery.current_idle_microA * MICRO) * idle_duration * battery.power_supply;
 			if(is_BANhub){
 				idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 			}
-			// printf("ENERGY,RX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time()-rx_time, idle_energy);
-			// printf("ENERGY,RX_CODE,RX,t=%f,rx_energy=%f\n", op_sim_time(), rx_energy);
-
-			fprintf(log, "ENERGY,RX_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time()-rx_time, idle_energy);
-			fprintf(log, "ENERGY,RX_CODE,RX,t=%f,rx_energy=%f\n", op_sim_time(), rx_energy);
-			op_prg_odb_bkpt("rx_e");
+			
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,IDLE,idle_energy=%f\n", op_sim_time()-rx_time, node_id, mac_state, idle_energy);
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,RX,rx_energy=%f\n", op_sim_time(), node_id, mac_state, rx_energy);
+			fclose(log);
 
 			/* update the consumed energy with the one of in idle state */
 			consumed_energy= rx_energy + idle_energy;
@@ -213,17 +204,20 @@ static void wban_battery_update() {
 			activity.last_idle_time = op_sim_time();
 			
 			/* update the statistics */
-			op_stat_write(statistics.remaining_energy, battery.current_energy);
-			op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
+			// op_stat_write(statistics.remaining_energy, battery.current_energy);
+			// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 			
-			op_stat_write(statisticsG.consumed_energy, consumed_energy);
+			// op_stat_write(statisticsG.consumed_energy, consumed_energy);
 			
 			break;
 		}
 
-		
 		case CCA_CODE :
 		{
+			/* get the ICI information associated to the remote interrupt */
+			iciptr=op_intrpt_ici();
+			op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
+			op_ici_destroy(iciptr);
 			idle_duration = op_sim_time()-activity.last_idle_time;
 			/* compute the time spent by the node in idle state */
 			if(compare_doubles(op_sim_time(), idle_duration) != 1){
@@ -240,8 +234,10 @@ static void wban_battery_update() {
 
 			/* update the consumed energy with the one of in idle state */
 			consumed_energy= cca_energy +idle_energy;
-			fprintf(log, "ENERGY,CCA_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time(), idle_energy);
-			fprintf(log, "ENERGY,CCA_CODE,CCA,t=%f,cca_energy=%f\n", op_sim_time()+pCCATime, cca_energy);
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,CCA,cca_energy=%f\n", op_sim_time()+pCCATime, node_id, mac_state, cca_energy);
+			fclose(log);
 			/* update the current energy level */
 			battery.current_energy = battery.current_energy - consumed_energy;
 			
@@ -249,32 +245,38 @@ static void wban_battery_update() {
 			activity.last_idle_time = op_sim_time()+pCCATime;
 			
 			/* update the statistics */
-			op_stat_write(statistics.remaining_energy, battery.current_energy);
-			op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
+			// op_stat_write(statistics.remaining_energy, battery.current_energy);
+			// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 			
-			op_stat_write(statisticsG.consumed_energy, consumed_energy);
+			// op_stat_write(statisticsG.consumed_energy, consumed_energy);
 			
 			break;
 		}
 
-		case END_OF_SLEEP_PERIOD :
+		case END_OF_SLEEP_PERIOD_CODE :
 		{
+			/* get the ICI information associated to the remote interrupt */
+			iciptr=op_intrpt_ici();
+			op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
+			op_ici_destroy(iciptr);
 			/* compute the time spent by the node in sleep state */
 			sleep_duration = op_sim_time()-activity.sleeping_time;
 			
 			/* energy consumed during sleeping mode */
 			sleep_energy = (battery.current_sleep_microA * MICRO) * sleep_duration * battery.power_supply;
-			fprintf(log, "ENERGY,SLEEP_CODE,SLEEP,t=%f,sleep_energy=%f\n", op_sim_time(), sleep_energy);
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,SLEEP_CODE,SLEEP,sleep_energy=%f\n", op_sim_time(), node_id, mac_state, sleep_energy);
+			fclose(log);
 			
 			// printf ("END_OF_SLEEP_PERIOD: current_sleep_microA = %f, time in the sleep period = %f , consumed_energy = %f mJoule\n", battery.current_sleep_microA, sleep_duration, sleep_energy*1000);
 			
 			/* update the current energy level */
 			battery.current_energy = battery.current_energy - sleep_energy;
 			
-			op_stat_write(statistics.remaining_energy, battery.current_energy);
-			op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
+			// op_stat_write(statistics.remaining_energy, battery.current_energy);
+			// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 				
-			op_stat_write(statisticsG.consumed_energy, sleep_energy);
+			// op_stat_write(statisticsG.consumed_energy, sleep_energy);
 
 			activity.last_idle_time = op_sim_time();
 			activity.is_idle = OPC_TRUE;
@@ -283,8 +285,12 @@ static void wban_battery_update() {
 			break;		
 		}
 		
-		case END_OF_ACTIVE_PERIOD_CODE :
+		case START_OF_SLEEP_PERIOD_CODE :
 		{
+			/* get the ICI information associated to the remote interrupt */
+			iciptr=op_intrpt_ici();
+			op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
+			op_ici_destroy(iciptr);
 			/* compute the time spent by the node in idle state */
 			idle_duration = op_sim_time()-activity.last_idle_time;
 			if(compare_doubles(idle_duration, 0) != 1){
@@ -297,15 +303,17 @@ static void wban_battery_update() {
 			if(is_BANhub){
 				idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 			}
-			fprintf(log, "ENERGY,IDLE_CODE,IDLE,t=%f,idle_energy=%f\n", op_sim_time(), idle_energy);
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,IDLE_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+			fclose(log);
 				
 			/* update the current energy level */
 			battery.current_energy = battery.current_energy - idle_energy;
 			
-			op_stat_write(statistics.remaining_energy, battery.current_energy);
-			op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
+			// op_stat_write(statistics.remaining_energy, battery.current_energy);
+			// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 			
-			op_stat_write(statisticsG.consumed_energy, idle_energy);
+			// op_stat_write(statisticsG.consumed_energy, idle_energy);
 			
 			activity.sleeping_time = op_sim_time();
 			activity.is_idle = OPC_FALSE;
@@ -314,13 +322,13 @@ static void wban_battery_update() {
 			break;
 		}
 
-		
 		default :
 		{
 		};		
 	  }	
 	} else if (op_intrpt_type() == OPC_INTRPT_ENDSIM){
-		fprintf(log, "STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
+		log = fopen(log_name, "a");
+		fprintf(log, "t=%f,NODE_ID=%d,STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
 		fprintf(log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 		
 		fclose(log);

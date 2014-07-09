@@ -53,7 +53,7 @@ static void wban_mac_init() {
 	/* get the MAC settings */
 	op_ima_obj_attr_get (mac_attr.objid, "MAC Attributes", &mac_attr_id);
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
-	op_ima_obj_attr_get (mac_attr_comp_id, "Batterie Life Extension", &mac_attr.Battery_Life_Extension);
+	// op_ima_obj_attr_get (mac_attr_comp_id, "Batterie Life Extension", &mac_attr.Battery_Life_Extension);
 	op_ima_obj_attr_get (mac_attr_comp_id, "Max Packet Tries", &max_packet_tries);
 	op_ima_obj_attr_get (mac_attr_comp_id, "MGMT Buffer Size", &mac_attr.MGMT_buffer_size);
 	op_ima_obj_attr_get (mac_attr_comp_id, "DATA Buffer Size", &mac_attr.DATA_buffer_size);
@@ -169,13 +169,13 @@ static void wban_mac_init() {
 	stat_vec.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	stat_vec.data_pkt_rec_map1 = op_stat_reg("DATA.Data Packet Received MAP1", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	/* register the GLOBAL statistics */
-	stat_vecG.data_pkt_fail = op_stat_reg("DATA.Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.data_pkt_suc1 = op_stat_reg("DATA.Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.data_pkt_suc2 = op_stat_reg("DATA.Data Packet Succed 2", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.data_pkt_sent = op_stat_reg("DATA.Data Packet Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.up7_sent = op_stat_reg("DATA.UP7 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
-	stat_vecG.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.data_pkt_fail = op_stat_reg("DATA.Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.data_pkt_suc1 = op_stat_reg("DATA.Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.data_pkt_suc2 = op_stat_reg("DATA.Data Packet Succed 2", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.data_pkt_sent = op_stat_reg("DATA.Data Packet Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.up7_sent = op_stat_reg("DATA.UP7 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+	// stat_vecG.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 
 
 	stat_vec.ppdu_sent_kbits = 0;
@@ -200,7 +200,6 @@ static void wban_mac_init() {
  *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
 	char directory_path_name[200];
-	char log_name[250];
 	char buffer[30];
 	time_t rawtime;
 	struct tm *p;
@@ -222,13 +221,13 @@ static void wban_log_file_init() {
     sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, node_attr.protocol_ver);
 
     /* Check for existence */
-    if((_access( log_name, 0 )) != -1){
-        printf("File %s exists\n", log_name);
-    	log = fopen(log_name, "a");
-    } else {
-    	printf("File %s unexists.\n", log_name);
-    	log = fopen(log_name, "w");
-    }
+    // if((_access( log_name, 0 )) != -1){
+    //     printf("File %s exists\n", log_name);
+    // 	log = fopen(log_name, "a");
+    // } else {
+    // 	printf("File %s unexists.\n", log_name);
+    // 	log = fopen(log_name, "w");
+    // }
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -255,9 +254,6 @@ static void wban_parse_incoming_frame() {
 	int beacon2_enabled_fd;
 	int sequence_number_fd;
 	int inactive_fd;
-	//int source_address;
-	//int dest_address;
-	// int packet_size;
 	int ppdu_bits;
 	double ete_delay;
 
@@ -284,7 +280,6 @@ static void wban_parse_incoming_frame() {
 				FOUT;
 			}
 			
-			// wban_battery_update_rx (frame_MPDU);
 			op_pk_nfd_get (frame_MPDU, "BAN ID", &ban_id);
 			op_pk_nfd_get (frame_MPDU, "Recipient ID", &recipient_id);
 			op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
@@ -292,7 +287,7 @@ static void wban_parse_incoming_frame() {
     		if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
     			FOUT;
     		} else {
-				wban_battery_update_rx (frame_MPDU);
+				// wban_battery_update_rx(ppdu_bits, mac_state);
     		}
 
     		/* repalce the mac_attr.receipient_id with Sender ID */
@@ -306,10 +301,10 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "B2", &beacon2_enabled_fd);
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
-
-			fprintf(log, "RX,MAC_STATE=%d,RAP1_Length=%d,SenderID=%d,RecipientID=%d,", mac_state, beacon_attr.rap1_length, sender_id, recipient_id);
-			fprintf(log, "t=%f,FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", op_sim_time(), frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
-
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,NODE_ID=%d,RX,MAC_STATE=%d,RAP1_Length=%d,SenderID=%d,RecipientID=%d,", mac_state, beacon_attr.rap1_length, sender_id, recipient_id);
+			fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", op_sim_time(), frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			fclose(log);
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
@@ -751,7 +746,9 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	// }
 
 	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+	log = fopen(log_name, "a");
 	fprintf(log, "MAP_allocation,Interval_Start=%d,Interval_End=%d\n", conn_assign_attr.interval_start,conn_assign_attr.interval_end);
+	fclose(log);
 	op_prg_odb_bkpt("rcv_assign");
 	/* Stack tracing exit point */
 	FOUT;
@@ -835,7 +832,9 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			// current_free_connected_NID++;
 			printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
 			// op_prg_odb_bkpt("debug");
+			log = fopen(log_name, "a");
 			fprintf(log, "NID=%d\n", mac_attr.sender_id);
+			fclose(log);
 			op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
 		}
@@ -1019,10 +1018,7 @@ static void wban_schedule_next_beacon() {
 			SF.map1_end2sec = SF.BI_Boundary + SF.BI*SF.slot_length2sec;
 		}
 	}
-	// op_intrpt_schedule_self (SF.BI_Boundary + SF.SD*SF.slot_length2sec, START_OF_SLEEP_PERIOD);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
-	// op_intrpt_schedule_remote (SF.BI_Boundary + SF.BI*SF.slot_length2sec, END_OF_SLEEP_PERIOD, node_attr.my_battery);
-	//op_intrpt_priority_set (OPC_INTRPT_SELF, END_OF_CAP_PERIOD_CODE, -2);
 	
 		printf("Node %s Superframe parameters:\n", node_attr.name);
 		printf("\tSF.eap1_start2sec=%f\n", SF.eap1_start2sec);
@@ -1404,6 +1400,7 @@ static void wban_mac_interrupt_process() {
 					pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 					TX_ING = OPC_FALSE;
+					wban_battery_sleep_end(mac_state);
 
 					/* This connection is terminated. */
 					if (op_subq_empty (SUBQ_MAN) == OPC_FALSE){
@@ -1415,11 +1412,12 @@ static void wban_mac_interrupt_process() {
 						assign_map[i%10].map2_slot_start = 0;
 					}
 
-					
+						log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ END OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
+						fclose(log);
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
 					
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_SLEEP_PERIOD, node_attr.my_battery); 
+					 
 					op_prg_odb_bkpt ("beacon_end");
 					if (IAM_BAN_HUB) {
 						/* value for the next superframe. End Device will obtain this value from beacon */
@@ -1463,6 +1461,7 @@ static void wban_mac_interrupt_process() {
 
 				case START_OF_EAP1_PERIOD_CODE: /* start of EAP1 Period */
 				{
+					wban_battery_sleep_end(mac_state);
 					mac_state = MAC_EAP1;
 					phase_start_timeG = SF.eap1_start2sec;
 					phase_end_timeG = SF.eap1_end2sec;
@@ -1471,10 +1470,10 @@ static void wban_mac_interrupt_process() {
 					pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 				
-					
+						log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE EAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
+						fclose(log);
 
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
@@ -1482,18 +1481,19 @@ static void wban_mac_interrupt_process() {
 
 				case END_OF_EAP1_PERIOD_CODE: /* end of EAP1 Period */
 				{
+					wban_battery_sleep_start(mac_state);
 					mac_state = MAC_SLEEP;
 					// pkt_to_be_sent.enable = OPC_FALSE;
-					
-						fprintf (log,"t=%f  -> ++++++++++ END OF THE EAP1 ++++++++++ \n\n", op_sim_time());
-						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_ACTIVE_PERIOD_CODE, node_attr.my_battery);
+					log = fopen(log_name, "a");
+					fprintf (log,"t=%f  -> ++++++++++ END OF THE EAP1 ++++++++++ \n\n", op_sim_time());
+					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					fclose(log);
 					break;
 				};/* end of END_OF_EAP1_PERIOD_CODE */
 
 				case START_OF_RAP1_PERIOD_CODE: /* start of RAP1 Period */
 				{
+					wban_battery_sleep_end(mac_state);
 					mac_state = MAC_RAP1;
 					phase_start_timeG = SF.rap1_start2sec;
 					phase_end_timeG = SF.rap1_end2sec;
@@ -1508,8 +1508,9 @@ static void wban_mac_interrupt_process() {
 					stat_vec.ppdu_rap_sent_start = stat_vec.ppdu_sent_kbits;
 					stat_vec.ppdu_rap_rcv_start = stat_vec.ppdu_rcv_kbits;
 				
-					
+						log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time());
+						fclose(log);
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					
 					op_prg_odb_bkpt("rap1");
@@ -1520,13 +1521,15 @@ static void wban_mac_interrupt_process() {
 
 				case END_OF_RAP1_PERIOD_CODE: /* END of RAP1 Period */
 				{
+					wban_battery_sleep_start(mac_state);
 					mac_state = MAC_SLEEP;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 
-					
+						log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ END OF THE RAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+						fclose(log);
 					
 					stat_vec.ppdu_rap_sent_end = stat_vec.ppdu_sent_kbits;
 					stat_vec.ppdu_rap_rcv_end = stat_vec.ppdu_rcv_kbits;
@@ -1534,9 +1537,10 @@ static void wban_mac_interrupt_process() {
 					stat_vec.ppdu_rcv_kbits_rap = stat_vec.ppdu_rap_rcv_end - stat_vec.ppdu_rap_rcv_start;
 					stat_vec.traffic_G = stat_vec.ppdu_sent_kbits_rap/(WBAN_DATA_RATE_KBITS*SF.rap1_length2sec);
 					stat_vec.throughput_S = stat_vec.ppdu_rcv_kbits_rap/(WBAN_DATA_RATE_KBITS*SF.rap1_length2sec);
+					log = fopen(log_name, "a");
 					fprintf(log,"STAT,CHANNEL_TRAFFIC_RAP_G=%f\n", stat_vec.traffic_G);
 					fprintf(log,"STAT,CHANNEL_THROUGHPUT_RAP_S=%f\n", stat_vec.throughput_S);
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_ACTIVE_PERIOD_CODE, node_attr.my_battery);
+					fclose(log);
 					// if(!node_attr.is_BANhub){
 					// 	mac_state = CONN_SETUP;
 					// 	phase_start_timeG = SF.rap1_end2sec;
@@ -1553,6 +1557,7 @@ static void wban_mac_interrupt_process() {
 
 				case START_OF_MAP1_PERIOD_CODE: /* start of RAP1 Period */
 				{
+					wban_battery_sleep_end(mac_state);
 					mac_state = MAC_MAP1;
 					// mac_state = MAC_SLEEP;
 					phase_start_timeG = SF.map1_start2sec;
@@ -1566,10 +1571,10 @@ static void wban_mac_interrupt_process() {
 						map_attr.TX_state = OPC_TRUE;
 					}
 
-					
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
+					fclose(log);
 					printf("Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
 
 					op_prg_odb_bkpt("map1_start");
@@ -1579,15 +1584,15 @@ static void wban_mac_interrupt_process() {
 
 				case END_OF_MAP1_PERIOD_CODE: /* end of MAP1 Period */
 				{
+					wban_battery_sleep_start(mac_state);
 					mac_state = MAC_SLEEP;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 				
-					
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ END OF THE MAP1 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_ACTIVE_PERIOD_CODE, node_attr.my_battery);
+					fclose(log);
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 
@@ -1607,6 +1612,7 @@ static void wban_mac_interrupt_process() {
 
 				case START_OF_MAP2_PERIOD_CODE: /* start of MAP2 Period */
 				{
+					wban_battery_sleep_end(mac_state);
 					mac_state = MAC_MAP2;
 					// mac_state = MAC_SLEEP;
 					phase_start_timeG = SF.map2_start2sec;
@@ -1620,10 +1626,10 @@ static void wban_mac_interrupt_process() {
 						map_attr.TX_state = OPC_TRUE;
 					}
 
-				
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE MAP2 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
+					fclose(log);
 					printf("Node %s Start MAP2 at %f, End MAP2 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
 
 					op_prg_odb_bkpt("map2_start");
@@ -1633,20 +1639,21 @@ static void wban_mac_interrupt_process() {
 
 				case END_OF_MAP2_PERIOD_CODE: /* end of MAP2 Period */
 				{
+					wban_battery_sleep_start(mac_state);
 					mac_state = MAC_SLEEP;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 				
-				
+				log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ END OF THE MAP2 ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
-				
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_ACTIVE_PERIOD_CODE, node_attr.my_battery);
+				fclose(log);
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 
 				case START_OF_CAP_PERIOD_CODE:
 				{
+					wban_battery_sleep_end(mac_state);
 					printf("Node %s enters into CAP Period.\n", node_attr.name);
 					mac_state = MAC_CAP;
 					phase_start_timeG = SF.cap_start2sec;
@@ -1656,25 +1663,25 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_TRUE;
 					attemptingToTX = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_FALSE;
-					
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF THE CAP ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
+					fclose(log);
 					op_intrpt_schedule_self(op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				}
 
 				case END_OF_CAP_PERIOD_CODE: /* end of CAP Period */
 				{
+					wban_battery_sleep_start(mac_state);
 					mac_state = MAC_SLEEP;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 				
-					
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ END OF THE CAP ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  END OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
-					op_intrpt_schedule_remote(op_sim_time(), END_OF_ACTIVE_PERIOD_CODE, node_attr.my_battery);
+					fclose(log);
 					break;
 				};/* end of END_OF_CAP_PERIOD_CODE */
 
@@ -1684,10 +1691,10 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 				
-					
+					log = fopen(log_name, "a");
 						fprintf (log,"t=%f  -> ++++++++++ START OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time());
 						printf (" [Node %s] t=%f  -> ++++++++++  START OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
-					
+					fclose(log);
 					break;
 				};/* end of Start of Sleep Period */
 
@@ -1736,7 +1743,7 @@ static void wban_mac_interrupt_process() {
 					// }else{
 					// 	printf("t=%f, CCA with IDLE.\n", op_sim_time());
 					// }
-					wban_battery_cca();
+					wban_battery_cca(mac_state);
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
@@ -1901,6 +1908,7 @@ static void wban_mac_interrupt_process() {
 		{
 			// extern int i_test;
 			subq_info_get(SUBQ_DATA);
+			log = fopen(log_name, "a");
 			fprintf(log,"STAT,SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
 			fprintf(log,"STAT,PPDU_sent_nbr=%f\n", PPDU_sent_nbr);
 			fprintf(log,"STAT,PPDU_rcv_nbr=%f\n", PPDU_rcv_nbr);
@@ -1912,7 +1920,7 @@ static void wban_mac_interrupt_process() {
 			
 			fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 			printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
-			fflush(log);
+			fclose(log);
 			// fclose(log);
 			op_prg_odb_bkpt("debug_end");
 			
@@ -2063,7 +2071,9 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			//collect statistics
 			if(DATA == pkt_to_be_sent.frame_type){
 				retry_times = current_packet_txs + current_packet_CS_fails;
+				log = fopen(log_name, "a");
 				fprintf(log,"STAT,MAC_STATE=%d,PKT_TX_RETRY=%d,t=%f,DATA_PPDU_BITS=%d,UPx=%d\n",mac_state,retry_times,op_sim_time(),pkt_to_be_sent.ppdu_bits,pkt_to_be_sent.frame_subtype);
+				fclose(log);
 				// fprintf(log, "RX,MAC_STATE=%d,RAP_Length=%d,", mac_state, beacon_attr.rap1_length);
 				// fprintf(log, "t=%f,DATA_PPDU=%d,UPx=%d,", op_sim_time(), pk_size, up_prio);
 				// fprintf(log, "ETE_DELAY=%f\n", ete_delay);
@@ -2468,9 +2478,10 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 	pkt_to_be_sent.ppdu_bits = ppdu_bits;
 	printf("MAC_TO_PHY, pk size of frame_PPDU=%d\n", ppdu_bits);
 	op_prg_odb_bkpt("mpdu_size");
+	log = fopen(log_name, "a");
 	fprintf(log, "TX,MAC_STATE=%d,RAP1_Length=%d,SenderID=%d,RecipientID=%d,", mac_state, beacon_attr.rap1_length, mac_attr.sender_id, mac_attr.recipient_id);
 	fprintf(log, "t=%f,FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d\n", op_sim_time(), frame_type, frame_subtype, ppdu_bits);
-
+	fclose(log);
 	switch (frame_type) {
 		case DATA:
 		{
@@ -2622,10 +2633,12 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	bulk_size = wban_norm_phy_bits(frame_MPDU) - op_pk_total_size_get(frame_PPDU);
 	op_pk_bulk_size_set (frame_PPDU, bulk_size);
 
-	wban_battery_update_tx (frame_PPDU);
+	wban_battery_update_tx ((int)(op_pk_total_size_get(frame_PPDU)), mac_state);
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0){
+		log = fopen(log_name, "a");
 		fprintf(log, "TX_BUSY,MAC_STATE=%d,RAP1_Length=%d,SenderID=%d,RecipientID=%d,", mac_state, beacon_attr.rap1_length, mac_attr.sender_id, mac_attr.recipient_id);
 		fprintf(log, "t=%f,FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d\n", op_sim_time(),pkt_to_be_sent.frame_type,pkt_to_be_sent.frame_subtype,pkt_to_be_sent.ppdu_bits);
+		fclose(log);
 		// op_intrpt_schedule_self(op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		// FOUT;
 		op_sim_end("ERROR : TRY TO SEND Packet WHILE THE TX CHANNEL IS BUSY","PK_SEND_CODE","","");
@@ -2641,18 +2654,17 @@ static void phy_to_radio(Packet* frame_MPDU) {
  *
  * Description:	send information about the operation to do to the battery module 
  *
- * Input : 	Packet* frame_PPDU
+ * Input : 	PPDU BITS and MAC STATE
  *--------------------------------------------------------------------------------*/
-static void wban_battery_update_tx(Packet* frame_PPDU) {
+static void wban_battery_update_tx(int ppdu_bitsL, int mac_stateL) {
 	Ici * iciptr;
-	int PPDU_pksize;
 	
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_tx);
 	
-	PPDU_pksize = op_pk_total_size_get(frame_PPDU);
 	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "PPDU Packet Size", PPDU_pksize);
+	op_ici_attr_set (iciptr, "PPDU BITS", ppdu_bitsL);
+	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), PACKET_TX_CODE, node_attr.my_battery); 
 	op_ici_install (OPC_NIL);
@@ -2666,44 +2678,19 @@ static void wban_battery_update_tx(Packet* frame_PPDU) {
  *
  * Description:	send information about the operation to do to the battery module 
  *
- * Input : 	Packet* frame_PPDU
+ * Input : 	PPDU BITS and MAC STATE
  *--------------------------------------------------------------------------------*/
-static void wban_battery_update_rx(Packet* frame_PPDU) {
+static void wban_battery_update_rx(int ppdu_bitsL, int mac_stateL) {
 	Ici * iciptr;
-	int PPDU_pksize;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_rx);
 	
-	PPDU_pksize = op_pk_total_size_get(frame_PPDU);
 	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "PPDU Packet Size", PPDU_pksize);
-	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
+	op_ici_attr_set (iciptr, "PPDU BITS", ppdu_bitsL);
+	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), PACKET_RX_CODE, node_attr.my_battery);
-	op_ici_install (OPC_NIL);
-	
-	/* Stack tracing exit point */
-	FOUT;
-}
-
-/*--------------------------------------------------------------------------------
- * Function:	wban_battery_end
- *
- * Description:	send information about the operation to do to the battery module 
- *
- * Input : 	Packet* frame_MPDU
- *--------------------------------------------------------------------------------*/
-static void wban_battery_end() {
-	Ici * iciptr;
-	
-	/* Stack tracing enrty point */
-	FIN(wban_battery_end);
-	
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), END_OF_SIM, node_attr.my_battery);
 	op_ici_install (OPC_NIL);
 	
 	/* Stack tracing exit point */
@@ -2717,16 +2704,62 @@ static void wban_battery_end() {
  *
  * Input : 
  *--------------------------------------------------------------------------------*/
-static void wban_battery_cca() {
+static void wban_battery_cca(int mac_stateL) {
 	Ici * iciptr;
 	
 	/* Stack tracing enrty point */
 	FIN(wban_battery_cca);
-	
+
 	iciptr = op_ici_create ("wban_battery_ici_format");
-	// op_ici_attr_set (iciptr, "Frame Type", frame_type);
+	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
 	op_ici_install (iciptr);
 	op_intrpt_schedule_remote (op_sim_time(), CCA_CODE, node_attr.my_battery);
+	op_ici_install (OPC_NIL);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	wban_battery_sleep_start
+ *
+ * Description:	send information about the operation to do to the battery module 
+ *
+ * Input : 
+ *--------------------------------------------------------------------------------*/
+static void wban_battery_sleep_start(int mac_stateL) {
+	Ici * iciptr;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_battery_sleep_start);
+
+	iciptr = op_ici_create ("wban_battery_ici_format");
+	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
+	op_ici_install (iciptr);
+	op_intrpt_schedule_remote (op_sim_time(), START_OF_SLEEP_PERIOD_CODE, node_attr.my_battery);
+	op_ici_install (OPC_NIL);
+	
+	/* Stack tracing exit point */
+	FOUT;
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	wban_battery_sleep_end
+ *
+ * Description:	send information about the operation to do to the battery module 
+ *
+ * Input : 
+ *--------------------------------------------------------------------------------*/
+static void wban_battery_sleep_end(int mac_stateL) {
+	Ici * iciptr;
+	
+	/* Stack tracing enrty point */
+	FIN(wban_battery_sleep_end);
+
+	iciptr = op_ici_create ("wban_battery_ici_format");
+	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
+	op_ici_install (iciptr);
+	op_intrpt_schedule_remote (op_sim_time(), END_OF_SLEEP_PERIOD_CODE, node_attr.my_battery);
 	op_ici_install (OPC_NIL);
 	
 	/* Stack tracing exit point */
