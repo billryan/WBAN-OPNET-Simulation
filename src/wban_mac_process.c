@@ -201,6 +201,7 @@ static void wban_mac_init() {
 static void wban_log_file_init() {
 	char directory_path_name[200];
 	char log_name[250];
+	char buffer[30];
 	time_t rawtime;
 	struct tm *p;
 
@@ -216,10 +217,18 @@ static void wban_log_file_init() {
 
 	time(&rawtime);
 	p=localtime(&rawtime);
+    // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
+    strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+    sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, node_attr.protocol_ver);
 
-	sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d.trace", directory_path_name, node_attr.name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, node_attr.protocol_ver);
-	printf ("Log file name: %s \n\n", log_name);
-	log = fopen(log_name,"w");
+    /* Check for existence */
+    if((_access( log_name, 0 )) != -1){
+        printf("File %s exists\n", log_name);
+    	log = fopen(log_name, "a");
+    } else {
+    	printf("File %s unexists.\n", log_name);
+    	log = fopen(log_name, "w");
+    }
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -1890,6 +1899,7 @@ static void wban_mac_interrupt_process() {
 		
 		case OPC_INTRPT_ENDSIM:
 		{
+			// extern int i_test;
 			subq_info_get(SUBQ_DATA);
 			fprintf(log,"STAT,SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
 			fprintf(log,"STAT,PPDU_sent_nbr=%f\n", PPDU_sent_nbr);
@@ -1897,12 +1907,14 @@ static void wban_mac_interrupt_process() {
 			fprintf(log,"STAT,CHANNEL_TRAFFIC_G=%f\n", PPDU_sent_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
 			fprintf(log,"STAT,CHANNEL_THROUGHPUT_S=%f\n", PPDU_rcv_kbits/(WBAN_DATA_RATE_KBITS*op_sim_time()));
 			
-			wban_battery_end();
+			// wban_battery_end();
+			// printf("%s i_test=%d\n", node_attr.name, i_test++);
 			
-				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
-				printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
-				
-				fclose(log);
+			fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
+			printf (" [Node %s] t=%f  ***********   GAME OVER - END OF SIMULATION  *******************\n\n", node_attr.name, op_sim_time());
+			fflush(log);
+			// fclose(log);
+			op_prg_odb_bkpt("debug_end");
 			
 			// wban_battery_end();
 
