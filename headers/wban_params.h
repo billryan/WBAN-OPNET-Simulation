@@ -121,6 +121,9 @@
 #define ACK_FRAME_SIZE_BITS 40
 #define I_ACK_PPDU_SIZE_BITS (72+121)
 #define BEACON_PPDU_BITS 321
+
+// int i_test = 0;
+
 /** APP Layer constants		**/
 enum USER_PRIORITY {
 	UP0 = 0,
