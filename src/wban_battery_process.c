@@ -16,7 +16,7 @@ static void wban_battery_init() {
 	Objid current_draw_id;
 	char node_name[15];
 	char directory_path_name[80];
-	char log_name[132];
+	char log_name[250];
 	time_t timep;
 	struct tm *p;
 	int protocol_ver;
@@ -37,25 +37,23 @@ static void wban_battery_init() {
 	op_ima_obj_attr_get (battery.parent_id, "Protocol Version", &protocol_ver);
 
 
-	enable_log = OPC_TRUE;
 	/* verification if the directory_path_name is a valid directory */
 	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
 		char msg[128];
 		sprintf (msg, " \"%s\" is not valid directory name. The output will not be logged.\n", directory_path_name);
 		/* Display an appropriate warning.	*/
 		op_prg_odb_print_major ("Warning from wban_mac process: ", msg, OPC_NIL);
-		enable_log = OPC_FALSE;
 	}
 	time(&timep);
 	p=localtime(&timep);
 	printf("%d%d%d",(1900+p->tm_year), (1+p->tm_mon),p->tm_mday);
 	printf("%d;%d;%d\n", p->tm_hour, p->tm_min, p->tm_sec);
 
-	if (enable_log) {
+
 		sprintf (log_name, "%s%s-%d%d-%d%d%d-ver%d.energy", directory_path_name, node_name, (1+p->tm_mon), p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec, protocol_ver);
 		printf ("Log file name: %s \n\n", log_name);
 		log = fopen(log_name,"w");
-	}
+	
 
 	op_ima_obj_attr_get (battery.own_id, "Power Supply", &battery.power_supply);
 	op_ima_obj_attr_get (battery.own_id, "Initial Energy", &battery.initial_energy);
@@ -314,12 +312,12 @@ static void wban_battery_update() {
 
 		case END_OF_SIM :
 		{
-			if (enable_log) {
+			
 				fprintf(log, "STAT,CONSUMED_ENERGY=%f\n", battery.initial_energy - battery.current_energy);
 				fprintf (log, "t=%f  ***********   GAME OVER END - OF SIMULATION  ********************  \n\n",op_sim_time());
 				
 				fclose(log);
-			}
+			
 			break;
 		}
 		
