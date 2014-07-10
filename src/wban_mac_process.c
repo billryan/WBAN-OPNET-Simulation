@@ -1797,14 +1797,14 @@ static void wban_mac_interrupt_process() {
 		case OPC_INTRPT_ENDSIM:
 		{
 			log = fopen(log_name, "a");
-			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,STAT,", op_sim_time(), node_id, mac_state);
+			fprintf(log, "\nt=%f,NODE_ID=%d,STAT,", op_sim_time(), node_id, mac_state);
 			if(IAM_BAN_HUB){
-				fprintf(log, "PPDU_sent_nbr=%f\nPPDU_rcv_nbr=%f\n", PPDU_sent_nbr, PPDU_rcv_nbr);
-				fprintf(log, "CHANNEL_TRAFFIC_G=%f\n", PPDU_sent_kbits/(node_attr.data_rate*op_sim_time()));
+				fprintf(log, "PPDU_sent_nbr=%f,PPDU_rcv_nbr=%f,", PPDU_sent_nbr, PPDU_rcv_nbr);
+				fprintf(log, "CHANNEL_TRAFFIC_G=%f,", PPDU_sent_kbits/(node_attr.data_rate*op_sim_time()));
 				fprintf(log, "CHANNEL_THROUGHPUT_S=%f\n\n", PPDU_rcv_kbits/(node_attr.data_rate*op_sim_time()));
 			} else {
 				subq_info_get(SUBQ_DATA);
-				fprintf(log,"STAT,SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_BITS=%f\n\n", subq_info.pksize, subq_info.bitsize);
+				fprintf(log,"SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
 			}
 			fclose(log);
 			
