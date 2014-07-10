@@ -122,6 +122,7 @@
 #define I_ACK_PPDU_SIZE_BITS (72+121)
 #define BEACON_PPDU_BITS 321
 
+#define MAC_STATE_ALL 10
 // int i_test = 0;
 
 /** APP Layer constants		**/
@@ -145,12 +146,12 @@ enum MAC_STATES {
     MAC_RAP2 = 1005,
     MAC_MAP2 = 1006,
     MAC_CAP = 1007,
-    CONN_SETUP = 1008,
+    MAC_SLEEP = 1008,
     MAC_RAP = 1009,
     MAC_FREE_TX_ACCESS = 1012,
     MAC_FREE_RX_ACCESS = 1013,
     MAC_BEACON_WAIT = 1018,
-    MAC_SLEEP = 1019
+    CONN_SETUP = 1019
 };
 
 enum SF_STATES {

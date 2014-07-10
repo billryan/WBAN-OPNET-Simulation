@@ -15,6 +15,7 @@ static void wban_battery_init() {
 	Objid current_draw_comp_id; 
 	Objid current_draw_id;
 	char node_name[15];
+	int i;
 	int protocol_ver;
 	char directory_path_name[200];
 	char buffer[30];
@@ -84,7 +85,15 @@ static void wban_battery_init() {
 	activity.is_sleep = OPC_FALSE;
 	activity.last_idle_time = 0.0;
 	activity.sleeping_time = 0.0;
-	
+
+	/* initilization for all MAC_STATE */
+	for (i=0; i<MAC_STATE_ALL; i++){
+		energy_consume[i].tx = 0;
+		energy_consume[i].rx = 0;
+		energy_consume[i].cca = 0;
+		energy_consume[i].idle = 0;
+		energy_consume[i].sleep = 0;
+	}
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -103,6 +112,7 @@ static void wban_battery_update() {
 	double rx_time;
 	int ppdu_bits;
 	int mac_state;
+	int i;
 	double consumed_energy;
 	double tx_energy;
 	double rx_energy;
@@ -143,13 +153,17 @@ static void wban_battery_update() {
 				// if(is_BANhub){
 				// 	idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 				// }
+
+				energy_consume[mac_state%MAC_STATE_ALL].tx += tx_energy;
+				energy_consume[mac_state%MAC_STATE_ALL].idle += idle_energy;
+
 				/* update the consumed energy with the one of in idle state */
 				consumed_energy= tx_energy +idle_energy;
-				log = fopen(log_name, "a");
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
-				fprintf(log, "tx_time=%f,last_idle_time=%f,idle_duration=%f ms\n", tx_time, activity.last_idle_time, 1000.0*idle_duration);
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,TX,tx_energy=%f\n\n", op_sim_time(), node_id, mac_state, tx_energy);
-				fclose(log);
+				// log = fopen(log_name, "a");
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+				// fprintf(log, "tx_time=%f,last_idle_time=%f,idle_duration=%f ms\n", tx_time, activity.last_idle_time, 1000.0*idle_duration);
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,TX_CODE,TX,tx_energy=%f\n\n", op_sim_time(), node_id, mac_state, tx_energy);
+				// fclose(log);
 				/* update the current energy level */
 				battery.current_energy = battery.current_energy - consumed_energy;
 				
@@ -190,11 +204,14 @@ static void wban_battery_update() {
 				// 	idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 				// }
 				
-				log = fopen(log_name, "a");
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
-				fprintf(log, "rx_time=%f,last_idle_time=%f,idle_duration=%f ms\n", rx_time, activity.last_idle_time, 1000.0*idle_duration);
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,RX,rx_energy=%f\n\n", op_sim_time(), node_id, mac_state, rx_energy);
-				fclose(log);
+				// log = fopen(log_name, "a");
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+				// fprintf(log, "rx_time=%f,last_idle_time=%f,idle_duration=%f ms\n", rx_time, activity.last_idle_time, 1000.0*idle_duration);
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,RX_CODE,RX,rx_energy=%f\n\n", op_sim_time(), node_id, mac_state, rx_energy);
+				// fclose(log);
+
+				energy_consume[mac_state%MAC_STATE_ALL].rx += rx_energy;
+				energy_consume[mac_state%MAC_STATE_ALL].idle += idle_energy;
 
 				/* update the consumed energy with the one of in idle state */
 				consumed_energy= rx_energy + idle_energy;
@@ -237,13 +254,16 @@ static void wban_battery_update() {
 				/* compute the consumed energy when receiving a packet */
 				cca_energy = (battery.current_rx_mA * MILLI) * pCCATime * battery.power_supply;
 
+				energy_consume[mac_state%MAC_STATE_ALL].cca += cca_energy;
+				energy_consume[mac_state%MAC_STATE_ALL].idle += idle_energy;
+
 				/* update the consumed energy with the one of in idle state */
 				consumed_energy= cca_energy +idle_energy;
-				log = fopen(log_name, "a");
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
-				fprintf(log, "last_idle_time=%f,idle_duration=%f ms\n", activity.last_idle_time, 1000.0*idle_duration);
-				fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,CCA,cca_energy=%f\n\n", op_sim_time(), node_id, mac_state, cca_energy);
-				fclose(log);
+				// log = fopen(log_name, "a");
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+				// fprintf(log, "last_idle_time=%f,idle_duration=%f ms\n", activity.last_idle_time, 1000.0*idle_duration);
+				// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,CCA_CODE,CCA,cca_energy=%f\n\n", op_sim_time(), node_id, mac_state, cca_energy);
+				// fclose(log);
 				/* update the current energy level */
 				battery.current_energy = battery.current_energy - consumed_energy;
 				
@@ -267,17 +287,19 @@ static void wban_battery_update() {
 				op_ici_destroy(iciptr);
 				/* compute the time spent by the node in idle state */
 				idle_duration = op_sim_time()-activity.last_idle_time;
-				// if(idle_duration > 0.008){
+				if(idle_duration > 0.000070){
 					/* update the consumed energy with the one of in idle state */
 					idle_energy= (battery.current_idle_microA * MICRO) * idle_duration * battery.power_supply;
 					// if(is_BANhub){
 					// 	idle_energy = (battery.current_tx_mA * MILLI) * idle_duration * battery.power_supply;
 					// }
-					log = fopen(log_name, "a");
-					fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,IDLE_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
-					fprintf(log, "last_idle_time=%f,idle_duration=%f ms\n\n", activity.last_idle_time, 1000.0*idle_duration);
-					fclose(log);
-						
+					// log = fopen(log_name, "a");
+					// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,IDLE_CODE,IDLE,idle_energy=%f\n", op_sim_time(), node_id, mac_state, idle_energy);
+					// fprintf(log, "last_idle_time=%f,idle_duration=%f ms\n\n", activity.last_idle_time, 1000.0*idle_duration);
+					// fclose(log);
+
+					energy_consume[mac_state%MAC_STATE_ALL].idle += idle_energy;
+
 					/* update the current energy level */
 					battery.current_energy = battery.current_energy - idle_energy;
 					
@@ -285,7 +307,7 @@ static void wban_battery_update() {
 					// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 					
 					// op_stat_write(statisticsG.consumed_energy, idle_energy);
-				// }
+				}
 				activity.sleeping_time = op_sim_time();
 				activity.is_idle = OPC_FALSE;
 				activity.is_sleep = OPC_TRUE;
@@ -301,21 +323,23 @@ static void wban_battery_update() {
 				op_ici_destroy(iciptr);
 				/* compute the time spent by the node in sleep state */
 				sleep_duration = op_sim_time()-activity.sleeping_time;
-				// if(sleep_duration > 0.008){
+				if(sleep_duration > 0.000070){
 					/* energy consumed during sleeping mode */
 					sleep_energy = (battery.current_sleep_microA * MICRO) * sleep_duration * battery.power_supply;
-					log = fopen(log_name, "a");
-					fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,SLEEP_CODE,SLEEP,sleep_energy=%f\n", op_sim_time(), node_id, mac_state, sleep_energy);
-					fprintf(log, "last_sleep_time=%f,sleep_duration=%f ms\n\n", activity.sleeping_time, 1000.0*sleep_duration);
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ENERGY,SLEEP_CODE,SLEEP,sleep_energy=%f\n", op_sim_time(), node_id, mac_state, sleep_energy);
+					// fprintf(log, "last_sleep_time=%f,sleep_duration=%f ms\n\n", activity.sleeping_time, 1000.0*sleep_duration);
+					// fclose(log);
 					
+					energy_consume[mac_state%MAC_STATE_ALL].sleep += sleep_energy;
+
 					/* update the current energy level */
 					battery.current_energy = battery.current_energy - sleep_energy;
 					
 					// op_stat_write(statistics.remaining_energy, battery.current_energy);
 					// op_stat_write(statistics.consumed_energy, battery.initial_energy-battery.current_energy);
 					// op_stat_write(statisticsG.consumed_energy, sleep_energy);
-				// }
+				}
 
 				activity.last_idle_time = op_sim_time();
 				activity.is_idle = OPC_TRUE;
@@ -330,7 +354,13 @@ static void wban_battery_update() {
 	    }
 	} else if (op_intrpt_type() == OPC_INTRPT_ENDSIM){
 		log = fopen(log_name, "a");
-		fprintf(log, "t=%f,NODE_ID=%d,STAT,CONSUMED_ENERGY=%f\n", op_sim_time(), node_id, battery.initial_energy - battery.current_energy);
+		for(i=0; i<MAC_STATE_ALL; i++){
+			fprintf(log, "\nt=%f,NODE_ID=%d,STAT,ENERGY,MAC_STATE=%d,", op_sim_time(), node_id, (i+1000));
+			fprintf(log, "TX=%f,RX=%f,", energy_consume[i%10].tx, energy_consume[i%10].rx);
+			fprintf(log, "CCA=%f,IDLE=%f,", energy_consume[i%10].cca, energy_consume[i%10].idle);
+			fprintf(log, "SLEEP=%f\n", energy_consume[i%10].sleep);
+		}
+		fprintf(log, "t=%f,NODE_ID=%d,STAT,ENERGY_ALL=%f\n", op_sim_time(), node_id, battery.initial_energy - battery.current_energy);
 		fclose(log);
 	}
 	/* Stack tracing exit point */
