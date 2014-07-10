@@ -1804,7 +1804,8 @@ static void wban_mac_interrupt_process() {
 				fprintf(log, "CHANNEL_THROUGHPUT_S=%f\n\n", PPDU_rcv_kbits/(node_attr.data_rate*op_sim_time()));
 			} else {
 				subq_info_get(SUBQ_DATA);
-				fprintf(log,"SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
+				fprintf(log,"SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_MAC_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
+				fprintf(log,"SUBQ_DATA_PKT_PHY_BITS=%f\n", (subq_info.pksize * header4mac2phy() + subq_info.bitsize));
 			}
 			fclose(log);
 			
