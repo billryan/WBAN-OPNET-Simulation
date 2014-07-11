@@ -360,7 +360,7 @@ static void wban_battery_update() {
 			fprintf(log, "CCA=%f,IDLE=%f,", energy_consume[i%10].cca, energy_consume[i%10].idle);
 			fprintf(log, "SLEEP=%f\n", energy_consume[i%10].sleep);
 		}
-		fprintf(log, "t=%f,NODE_ID=%d,STAT,ENERGY_ALL=%f\n\n", op_sim_time(), node_id, battery.initial_energy - battery.current_energy);
+		fprintf(log, "t=%f,NODE_ID=%d,STAT,ENERGY_ALL=%f\n", op_sim_time(), node_id, battery.initial_energy - battery.current_energy);
 		fclose(log);
 	}
 	/* Stack tracing exit point */
