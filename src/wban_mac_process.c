@@ -79,6 +79,8 @@ static void wban_mac_init() {
 		node_attr.is_BANhub = OPC_TRUE;
 	}
 
+	mac_state = MAC_SETUP;
+	init_flag = OPC_TRUE;
 	if (IAM_BAN_HUB) {
 		mac_attr.sender_id = node_attr.ban_id + 15; // set the value of HID=BAN ID + 15
 		mac_attr.recipient_id = BROADCAST_NID; // default value, usually overwritten
@@ -150,7 +152,6 @@ static void wban_mac_init() {
 		// SF.eap2_start = 0;
 		// beacon_attr.beacon_period_length = -1;
 	}
-	mac_state = MAC_SETUP;
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
 	pkt_to_be_sent.enable = OPC_FALSE;
@@ -523,6 +524,13 @@ static void wban_send_beacon_frame () {
 	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate);
 	op_prg_odb_bkpt("send_beacon");
 	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
+	if(init_flag){
+		log = fopen(log_name, "a");
+		fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
+		fclose(log);
+		init_flag = OPC_FALSE;
+	}
 
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
@@ -783,10 +791,11 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			/* initialize the NID from 32 */
 			mac_attr.sender_id = current_free_connected_NID++;
 			// current_free_connected_NID++;
-			printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			// printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
 			// op_prg_odb_bkpt("debug");
 			log = fopen(log_name, "a");
-			fprintf(log, "t=%f,NODE_ID=%d,MAC_STATE=%d,ASSIGNED_NID=%d\n", op_sim_time(), node_id, mac_state, mac_attr.sender_id);
+			fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+			fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 			fclose(log);
 			// op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
@@ -1310,9 +1319,9 @@ static void wban_mac_interrupt_process() {
 					for(i=32; i<current_free_connected_NID; i++){
 						assign_map[i%10].map2_slot_start = 0;
 					}
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
+					// fclose(log);
 					op_prg_odb_bkpt ("beacon_end");
 					if (IAM_BAN_HUB) {
 						/* value for the next superframe. End Device will obtain this value from beacon */
@@ -1362,10 +1371,10 @@ static void wban_mac_interrupt_process() {
 					pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 				
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE EAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE EAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
@@ -1375,10 +1384,10 @@ static void wban_mac_interrupt_process() {
 				{
 					mac_state = MAC_SLEEP;
 					// pkt_to_be_sent.enable = OPC_FALSE;
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE EAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE EAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE EAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					break;
 				};/* end of END_OF_EAP1_PERIOD_CODE */
 
@@ -1398,10 +1407,10 @@ static void wban_mac_interrupt_process() {
 					// stat_vec.ppdu_rap_sent_start = stat_vec.ppdu_sent_kbits;
 					// stat_vec.ppdu_rap_rcv_start = stat_vec.ppdu_rcv_kbits;
 				
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					fclose(log);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE RAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// fclose(log);
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					
 					op_prg_odb_bkpt("rap1");
 
@@ -1418,10 +1427,10 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE RAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE RAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					
 					// stat_vec.ppdu_rap_sent_end = stat_vec.ppdu_sent_kbits;
 					// stat_vec.ppdu_rap_rcv_end = stat_vec.ppdu_rcv_kbits;
@@ -1465,11 +1474,11 @@ static void wban_mac_interrupt_process() {
 						map_attr.TX_state = OPC_TRUE;
 					}
 
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
-					printf("Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
+					// printf("Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
 
 					op_prg_odb_bkpt("map1_start");
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
@@ -1485,10 +1494,10 @@ static void wban_mac_interrupt_process() {
 					// pkt_to_be_sent.enable = OPC_TRUE;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 				
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 
@@ -1525,11 +1534,11 @@ static void wban_mac_interrupt_process() {
 						map_attr.TX_state = OPC_TRUE;
 					}
 
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP2 ++++++++++ \n\n", phase_start_timeG, node_id);
-					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
-					printf("Node %s Start MAP2 at %f, End MAP2 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP2 ++++++++++ \n\n", phase_start_timeG, node_id);
+					// // printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
+					// printf("Node %s Start MAP2 at %f, End MAP2 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
 
 					op_prg_odb_bkpt("map2_start");
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
@@ -1545,10 +1554,10 @@ static void wban_mac_interrupt_process() {
 					// pkt_to_be_sent.enable = OPC_TRUE;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 				
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP2 ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP2 ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP2 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 
@@ -1566,10 +1575,10 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_TRUE;
 					attemptingToTX = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_FALSE;
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE CAP ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE CAP ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					op_intrpt_schedule_self(op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				}
@@ -1583,10 +1592,10 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 				
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE CAP ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE CAP ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE CAP ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					break;
 				};/* end of END_OF_CAP_PERIOD_CODE */
 
@@ -1596,10 +1605,10 @@ static void wban_mac_interrupt_process() {
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time(), node_id);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
-					fclose(log);
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time(), node_id);
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF SLEEP PERIOD ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// fclose(log);
 					break;
 				};/* end of Start of Sleep Period */
 
@@ -1797,14 +1806,14 @@ static void wban_mac_interrupt_process() {
 		case OPC_INTRPT_ENDSIM:
 		{
 			log = fopen(log_name, "a");
-			fprintf(log, "\nt=%f,NODE_ID=%d,STAT,", op_sim_time(), node_id, mac_state);
+			fprintf(log, "t=%f,NODE_ID=%d,STAT,DATA", op_sim_time(), node_id, mac_state);
 			if(IAM_BAN_HUB){
 				fprintf(log, "PPDU_sent_nbr=%f,PPDU_rcv_nbr=%f,", PPDU_sent_nbr, PPDU_rcv_nbr);
 				fprintf(log, "CHANNEL_TRAFFIC_G=%f,", PPDU_sent_kbits/(node_attr.data_rate*op_sim_time()));
-				fprintf(log, "CHANNEL_THROUGHPUT_S=%f\n\n", PPDU_rcv_kbits/(node_attr.data_rate*op_sim_time()));
+				fprintf(log, "CHANNEL_THROUGHPUT_S=%f\n", PPDU_rcv_kbits/(node_attr.data_rate*op_sim_time()));
 			} else {
 				subq_info_get(SUBQ_DATA);
-				fprintf(log,"SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_MAC_BITS=%f\n", subq_info.pksize, subq_info.bitsize);
+				fprintf(log,"SUBQ_DATA_PKT_NUM=%f,SUBQ_DATA_PKT_MAC_BITS=%f,", subq_info.pksize, subq_info.bitsize);
 				fprintf(log,"SUBQ_DATA_PKT_PHY_BITS=%f\n", (subq_info.pksize * header4mac2phy() + subq_info.bitsize));
 			}
 			fclose(log);
