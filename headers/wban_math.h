@@ -1,3 +1,6 @@
+#ifndef BAN_MATH_H
+#define BAN_MATH_H
+
 /*--------------------------------------------------------------------------------
  * Function:	exponent
  *
@@ -67,6 +70,17 @@ static double Symbols2ms (int SizeInSymbols, double datarateinbits){
 	return (res);
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	allocation_slot_length2ms
+ *
+ * Description:	Calculate the size of a frame from Allocation Slot Length to milliseconds
+ *
+ *           allocation_slot_length : integer
+ *--------------------------------------------------------------------------------*/
+
+// static double allocation_slot_length2ms (int allocation_slot_length){
+// 	return double((pAllocationSlotMin + allocation_slot_length * pAllocationSlotResolution)/1000.0);
+// }
 
 /*--------------------------------------------------------------------------------
  * Function:	Symbols2Sec
@@ -98,6 +112,21 @@ static double Bits2Sec (double sizeinbits, double datarateinbits){
 	
 	double res;
 	res = (sizeinbits/datarateinbits);
+	return (res);
+}
+
+/*--------------------------------------------------------------------------------
+ * Function:	TX_TIME
+ *
+ * Description:	Calculate the transmission time of a packet
+ *
+ *           SizeInBits : double, datarateinKbits : double
+ *--------------------------------------------------------------------------------*/
+
+static double TX_TIME (double sizeinbits, double datarateinKbits){
+	
+	double res;
+	res = (sizeinbits/(1000 * datarateinKbits));
 	return (res);
 }
 
@@ -191,16 +220,39 @@ static double dabs (double a) {
  *
  *           a : double, b : double 
  *--------------------------------------------------------------------------------*/
-
 static int compare_doubles (double a, double b) {
-
 	if(dabs(a-b)<=0.0000001)
 		return 0;
-	else 
-	{
+	else {
 		if(a>b)
 			return 1;
 		else 
 			return -1;
 	}
 }
+
+
+/*--------------------------------------------------------------------------------
+ * Function:	rand_int(int seed)
+ *
+ * Description:	return random integer from given seed
+ *
+ *           seed integer
+ *--------------------------------------------------------------------------------*/
+ static int rand_int (int module) {
+	// int new_seed, rand_int;
+	// PrgT_Random_Gen *my_rng;
+
+	// new_seed = (int)time(0) + (int)op_dist_uniform (256);
+	// /* create a new random number generator */
+	// my_rng = op_prg_random_gen_create (new_seed);
+	// printf("new_seed=%d\n", new_seed);
+
+	//  generate a random integer in the interval [0,module-1] 
+	// rand_int = (op_prg_random_integer_gen (my_rng) % module);
+
+	// /* destroy the random number generator */
+	// op_prg_random_gen_destroy (my_rng);
+	return (int)op_dist_uniform(module);
+ }
+#endif
