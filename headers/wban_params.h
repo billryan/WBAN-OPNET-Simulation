@@ -24,8 +24,8 @@
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
 #define pAllocationSlotMin 500 //500 μs for NB PHY
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
-#define allocationSlotLength 19 //for NB PHY, L=19 means that 10 ms per slot
-#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //10 ms default
+#define allocationSlotLength 9 //for NB PHY, L=9 means that 5 ms per slot
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //5 ms default
 
 // constants related to Intra-Frame Spacing IFS 
 #define aMaxSIFSFrameSize_Bits	(18*8)
