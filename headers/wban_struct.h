@@ -129,6 +129,7 @@ typedef struct {
 	double slot_length2sec; // one slot length in sec
 	int SD; // the superframe duration in slots
 	int BI; // the beacon interval in slots
+	double duration; // superfarm duration in second
 	int sleep_period; // the inactive portion in slots
 	int current_slot; // the current slot in the active portion of the superframe from 0 to beacon_period_length-1
 	int current_first_free_slot;
@@ -228,6 +229,12 @@ typedef struct {
 	int up; // user priority
 } subqueue_info;
 
+/* define the data stat infomation parameters */
+typedef struct {
+	double number;
+	double ppdu_kbits;
+} data_stat_info;
+
 /* statistic vectors */
 typedef struct {
 	Stathandle data_pkt_fail;
@@ -311,7 +318,9 @@ typedef struct
 {
 	int nid;
 	int slot_start;
+	int map2_slot_start;
+	int map2_slot_end;
 	int slot_end;
-	int pktnum;
+	int slotnum;
 } assignment_map;
 #endif

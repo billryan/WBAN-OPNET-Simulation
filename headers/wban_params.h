@@ -89,6 +89,9 @@
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
 
+// max nodes in a wban
+#define NODE_MAX 10
+
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
 #define UNCONNECTED_NID 1 // For unicast from/to unconnected nodes in a BAN
@@ -118,17 +121,42 @@
 #define ACK_FRAME_SIZE_BITS 40
 #define I_ACK_PPDU_SIZE_BITS (72+121)
 #define BEACON_PPDU_BITS 321
+
+#define MAC_STATE_ALL 10
+// int i_test = 0;
+
+/* USER_PRIORITY for DATA */
+#define UP0     0
+#define UP1     1
+#define UP2     2
+#define UP3     3
+#define UP4     4
+#define UP5     5
+#define UP6     6
+#define UP7     7
+/* use the UP_ALL to replace constant 8 */
+#define UP_ALL  8
+/* Generate, Sent, Receive STAT for DATA */
+#define GEN     0
+#define QUEUE_SUCC 1
+#define QUEUE_FAIL 2
+#define SENT    3
+#define RCV     4
+#define SUBQ    5
+/* use the DATA_STATE to replace constant 6 */
+#define DATA_STATE 6
+
 /** APP Layer constants		**/
-enum USER_PRIORITY {
-	UP0 = 0,
-	UP1 = 1,
-	UP2 = 2,
-	UP3 = 3,
-	UP4 = 4,
-	UP5 = 5,
-	UP6 = 6,
-	UP7 = 7
-};
+// enum USER_PRIORITY {
+// 	UP0 = 0,
+// 	UP1 = 1,
+// 	UP2 = 2,
+// 	UP3 = 3,
+// 	UP4 = 4,
+// 	UP5 = 5,
+// 	UP6 = 6,
+// 	UP7 = 7
+// };
 
 enum MAC_STATES {
     MAC_SETUP = 1000,
@@ -139,12 +167,12 @@ enum MAC_STATES {
     MAC_RAP2 = 1005,
     MAC_MAP2 = 1006,
     MAC_CAP = 1007,
-    CONN_SETUP = 1008,
-    MAC_RAP = 1017,
+    MAC_SLEEP = 1008,
+    MAC_RAP = 1009,
     MAC_FREE_TX_ACCESS = 1012,
     MAC_FREE_RX_ACCESS = 1013,
-    MAC_BEACON_WAIT = 1019,
-    MAC_SLEEP = 1020
+    MAC_BEACON_WAIT = 1018,
+    CONN_SETUP = 1019
 };
 
 enum SF_STATES {

@@ -220,19 +220,17 @@ static double dabs (double a) {
  *
  *           a : double, b : double 
  *--------------------------------------------------------------------------------*/
-
 static int compare_doubles (double a, double b) {
-
 	if(dabs(a-b)<=0.0000001)
 		return 0;
-	else 
-	{
+	else {
 		if(a>b)
 			return 1;
 		else 
 			return -1;
 	}
 }
+
 
 /*--------------------------------------------------------------------------------
  * Function:	rand_int(int seed)
