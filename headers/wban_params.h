@@ -125,17 +125,38 @@
 #define MAC_STATE_ALL 10
 // int i_test = 0;
 
+/* USER_PRIORITY for DATA */
+#define UP0     0
+#define UP1     1
+#define UP2     2
+#define UP3     3
+#define UP4     4
+#define UP5     5
+#define UP6     6
+#define UP7     7
+/* use the UP_ALL to replace constant 8 */
+#define UP_ALL  8
+/* Generate, Sent, Receive STAT for DATA */
+#define GEN     0
+#define QUEUE_SUCC 1
+#define QUEUE_FAIL 2
+#define SENT    3
+#define RCV     4
+#define SUBQ    5
+/* use the DATA_STATE to replace constant 6 */
+#define DATA_STATE 6
+
 /** APP Layer constants		**/
-enum USER_PRIORITY {
-	UP0 = 0,
-	UP1 = 1,
-	UP2 = 2,
-	UP3 = 3,
-	UP4 = 4,
-	UP5 = 5,
-	UP6 = 6,
-	UP7 = 7
-};
+// enum USER_PRIORITY {
+// 	UP0 = 0,
+// 	UP1 = 1,
+// 	UP2 = 2,
+// 	UP3 = 3,
+// 	UP4 = 4,
+// 	UP5 = 5,
+// 	UP6 = 6,
+// 	UP7 = 7
+// };
 
 enum MAC_STATES {
     MAC_SETUP = 1000,
