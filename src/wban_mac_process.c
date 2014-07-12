@@ -1153,6 +1153,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 
 	if((0 == node_attr.protocol_ver) || (1 == node_attr.protocol_ver)){
 		if(SF.current_first_free_slot <= SF.current_slot){
+			printf("%s current_slot=%d,current_first_free_slot=%d\n", node_attr.name, SF.current_slot, SF.current_first_free_slot);
 			op_sim_end("ERROR : MAP allocation ERROR","MAP allocation","","");
 			// SF.current_first_free_slot = SF.current_slot + 1;
 		}
@@ -1395,19 +1396,19 @@ static void wban_mac_interrupt_process() {
 							temp_ppdu_kbits += data_stat_all[i][RCV].ppdu_kbits;
 						}
 						throughputG = (temp_ppdu_kbits - temp_last_ppdu_kbits)/SF.duration;
-						// log = fopen(log_name, "a");
-						// fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughputG);
-						// fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
-						// fclose(log);
+						log = fopen(log_name, "a");
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughputG);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
+						fclose(log);
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
 					}
 					mac_state = MAC_SETUP;
 
-					log = fopen(log_name, "a");
-					fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
-					fclose(log);
-					op_prg_odb_bkpt ("beacon_end");
+					// log = fopen(log_name, "a");
+					// fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
+					// fclose(log);
+					// op_prg_odb_bkpt ("beacon_end");
 					break;
 				};/*end of BEACON_INTERVAL_CODE */
 
