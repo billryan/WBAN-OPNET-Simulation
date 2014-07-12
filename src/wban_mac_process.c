@@ -117,8 +117,6 @@ static void wban_mac_init() {
 		b2_attr_comp_id = op_topo_child (b2_attr_id, OPC_OBJTYPE_GENERIC, 0);
 		op_ima_obj_attr_get (b2_attr_comp_id, "CAP End", &b2_attr.cap_end);
 		op_ima_obj_attr_get (b2_attr_comp_id, "MAP2 End", &b2_attr.map2_end);
-		SF.cap_end = b2_attr.cap_end;
-		SF.map2_end = b2_attr.map2_end;
 
 		SF.current_first_free_slot = beacon_attr.rap1_start + beacon_attr.rap1_length;
 
@@ -490,7 +488,7 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 static void wban_send_beacon_frame () {
 	Packet* beacon_MSDU;
 	Packet* beacon_MPDU;
-	double beacon_frame_tx_time;
+	// double beacon_frame_tx_time;
 	extern int sequence_num_beaconG;
 
 	/* Stack tracing enrty point */
@@ -537,9 +535,11 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
 
 	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
-	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate);
+	// beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate);
 	op_prg_odb_bkpt("send_beacon");
-	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
+	// if(SF.rap1_start > 0){
+	// 	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
+	// }
 	if(init_flag){
 		log = fopen(log_name, "a");
 		fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
@@ -551,7 +551,7 @@ static void wban_send_beacon_frame () {
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
 	
-	wban_schedule_next_beacon (); // Maybe for updating the parameters of superframe
+	
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -606,15 +606,34 @@ static void wban_send_beacon2_frame () {
 	/* send the MPDU to PHY and calculate the energer consuming */
 	wban_send_mac_pk_to_phy(beacon2_MPDU);
 	// op_prg_odb_bkpt("send_b2");
-
-	SF.cap_start2sec = SF.b2_start2sec + beacon2_frame_tx_time + pSIFS;
+	SF.cap_end = b2_attr.cap_end;
+	if((SF.cap_end > 0) && (SF.cap_end < SF.b2_start)){
+		op_sim_end("ERROR : CAP_END must greater than B2_START","B2_CAP","","");
+	}else if(SF.cap_end < 0){
+		op_sim_end("ERROR : CAP_END must greater than 0","CAP","","");
+	}else if(SF.cap_end > 255){
+		op_sim_end("ERROR : CAP_END must less than 256","CAP","","");
+	}
 	// SF.map2_end = b2_attr.map2_end;
 	/* Additional processing for proposed protocol */
 	if (1 == node_attr.protocol_ver) {
+		SF.map2_end = b2_attr.map2_end;
 		if(SF.map2_end == 0){
-			op_sim_end("ERROR : MAP2_END must greater than 0","MAP2_END", "","");
+			op_sim_end("ERROR : MAP2_END must greater than 0 for Protocol version 1","MAP2_END", "","");
 		}
-		SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
+		if(255 == SF.map2_end){
+			SF.map2_end = SF.SD - 1;
+		}
+		if(255 == SF.cap_end){
+			SF.cap_end = SF.SD - 1;
+		}
+		if(SF.cap_end > SF.map2_end){
+			SF.cap_start = SF.b2_start;
+			SF.cap_start2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
+			SF.cap_end2sec = SF.BI_Boundary + (SF.cap_end+1) * SF.slot_length2sec;
+			op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
+			op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
+		}
 		free_slot = SF.b2_start;
 		j = rand_int(current_free_connected_NID - 32);
 		slot_avg = (SF.map2_end - SF.b2_start + 1)/(current_free_connected_NID - 32);
@@ -646,23 +665,32 @@ static void wban_send_beacon2_frame () {
 				assign_map[shuffle%NODE_MAX].map2_slot_end = 0;
 			}
 		}
-		if(IAM_BAN_HUB){
-			SF.map2_start = SF.b2_start;
-			SF.map2_start2sec = op_sim_time() + beacon2_frame_tx_time + pSIFS;
-			SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1)*SF.slot_length2sec;
-			op_intrpt_schedule_self(SF.map2_start2sec, START_OF_MAP2_PERIOD_CODE);
-			op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
-			op_prg_odb_bkpt("debug_map2");
-		}
+		SF.map2_start = SF.b2_start;
+		SF.map2_start2sec = op_sim_time() + beacon2_frame_tx_time + pSIFS;
+		SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1)*SF.slot_length2sec;
+		op_intrpt_schedule_self(SF.map2_start2sec, START_OF_MAP2_PERIOD_CODE);
+		op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
+		op_prg_odb_bkpt("debug_map2");
+		
 		// for(i=32; i < current_free_connected_NID; i++){
 		// 	printf("NID=%d,", i);
 		// 	printf("map2_slot_start=%d,", assign_map[i%NODE_MAX].map2_slot_start);
 		// 	printf("map2_slot_end=%d\n", assign_map[i%NODE_MAX].map2_slot_end);
 		// }
 		// op_prg_odb_bkpt("debug");
+	}else{
+		if(0 == SF.cap_end){
+			op_sim_end("ERROR : CAP_END must greater than 0 for Protocol version 0","CAP","","");
+		}
+		SF.cap_start2sec = SF.b2_start2sec + beacon2_frame_tx_time + pSIFS;
+		if(255 == SF.cap_end){
+			SF.cap_end = SF.SD - 1;
+		}
+		SF.cap_end2sec = SF.BI_Boundary + (SF.cap_end+1) * SF.slot_length2sec;
+		op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
+		op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
 	}
-	printf(" [Node %s] t=%f  -> Beacon2 Frame transmission. \n\n", node_attr.name, op_sim_time());
-	op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -845,66 +873,84 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 
 	beacon2_PPDU_size = wban_norm_phy_bits(beacon2_MPDU_rx);
 	op_pk_nfd_get_pkt (beacon2_MPDU_rx, "MAC Frame Payload", &beacon2_MSDU_rx);
-	// if I'm a Node, I get the information and synchronize myself
-	if (!IAM_BAN_HUB) {
-		op_pk_nfd_get (beacon2_MPDU_rx, "Sender ID", &rcv_sender_id);
-		op_pk_nfd_get (beacon2_MPDU_rx, "Sequence Number", &sequence_number_fd);
-		op_pk_nfd_get (beacon2_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
-		op_pk_nfd_get (beacon2_MPDU_rx, "B2", &beacon2_enabled_fd);
+	op_pk_nfd_get (beacon2_MPDU_rx, "Sender ID", &rcv_sender_id);
+	op_pk_nfd_get (beacon2_MPDU_rx, "Sequence Number", &sequence_number_fd);
+	op_pk_nfd_get (beacon2_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
+	op_pk_nfd_get (beacon2_MPDU_rx, "B2", &beacon2_enabled_fd);
 
-		if (node_attr.ban_id + 15 != rcv_sender_id) {
-			printf(" [Node %s] t=%f  -> Beacon2 Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
-			/* Stack tracing exit point */
-			FOUT;
-		} else {
-			printf (" [Node %s] t=%f  -> Beacon2 Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
-			printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
-		}
-		// op_pk_nfd_get (beacon2_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
-		// op_pk_nfd_get (beacon2_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
-		op_pk_nfd_get (beacon2_MSDU_rx, "CAP End", &b2_attr.cap_end);
-		op_pk_nfd_get (beacon2_MSDU_rx, "MAP2 End", &b2_attr.map2_end);
-		SF.cap_end = b2_attr.cap_end;
+	// if (node_attr.ban_id + 15 != rcv_sender_id) {
+	// 	printf(" [Node %s] t=%f  -> Beacon2 Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
+	// 	/* Stack tracing exit point */
+	// 	FOUT;
+	// } else {
+	// 	printf (" [Node %s] t=%f  -> Beacon2 Frame Reception - synchronization. \n", node_attr.name, op_sim_time());
+	// 	printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
+	// }
+	// op_pk_nfd_get (beacon2_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
+	// op_pk_nfd_get (beacon2_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
+	op_pk_nfd_get (beacon2_MSDU_rx, "CAP End", &b2_attr.cap_end);
+	op_pk_nfd_get (beacon2_MSDU_rx, "MAP2 End", &b2_attr.map2_end);
 
-		beacon2_frame_tx_time = TX_TIME(beacon2_PPDU_size, node_attr.data_rate);
-		// printf("SF.b2_start2sec=%f\n", SF.b2_start2sec);
-		// printf("beacon2_frame_tx_time=%f\n", beacon2_frame_tx_time);
-		// printf("SF.b2_start2sec + beacon2_frame_tx_time + pSIFS=");
-		// printf("%f\n", SF.b2_start2sec + beacon2_frame_tx_time + pSIFS);
-		SF.cap_start2sec = max_double(SF.b2_start2sec + beacon2_frame_tx_time + pSIFS, op_sim_time());
-		if(0 == SF.cap_end){
-			SF.cap_end2sec = SF.BI_Boundary + SF.SD*SF.slot_length2sec;
-		} else {
-			SF.cap_end2sec = SF.BI_Boundary + SF.cap_end * SF.slot_length2sec;
+	SF.cap_end = b2_attr.cap_end;
+	if((SF.cap_end > 0) && (SF.cap_end < SF.b2_start)){
+		op_sim_end("ERROR : CAP_END must greater than B2_START","B2_CAP","","");
+	}else if(SF.cap_end < 0){
+		op_sim_end("ERROR : CAP_END must greater than 0","CAP","","");
+	}else if(SF.cap_end > 255){
+		op_sim_end("ERROR : CAP_END must less than 256","CAP","","");
+	}
+	beacon2_frame_tx_time = TX_TIME(beacon2_PPDU_size, node_attr.data_rate);
+	// printf("SF.b2_start2sec=%f\n", SF.b2_start2sec);
+	// printf("beacon2_frame_tx_time=%f\n", beacon2_frame_tx_time);
+	// printf("SF.b2_start2sec + beacon2_frame_tx_time + pSIFS=");
+	// printf("%f\n", SF.b2_start2sec + beacon2_frame_tx_time + pSIFS);
+	/* Additional processing for proposed protocol */
+	if (1 == node_attr.protocol_ver) {
+		if(255 == SF.cap_end){
+			SF.cap_end = SF.SD - 1;
 		}
-		/* Additional processing for proposed protocol */
-		if (1 == node_attr.protocol_ver) {
+		if(SF.cap_end > b2_attr.map2_end){
+			SF.cap_start = b2_attr.map2_end+1;
 			SF.cap_start2sec = SF.BI_Boundary + (b2_attr.map2_end+1) * SF.slot_length2sec;
-			// printf("SF.cap_start2sec replaced with %f for protocol version 1.\n", SF.cap_start2sec);
-			
-			if(assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start > 0){
-				SF.map2_start = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start;
-				SF.map2_end = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_end;
-				SF.map2_start2sec = SF.BI_Boundary + SF.map2_start * SF.slot_length2sec;
-				SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
-				if (SF.map2_start == SF.b2_start){
-					SF.map2_start2sec = op_sim_time() + pSIFS;
-				}
-				// printf("NID=%d allocated with map2_start=%d, map2_end=%d\n", mac_attr.sender_id, SF.map2_start, SF.map2_end);
-				op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
-				op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
+			SF.cap_end2sec = SF.BI_Boundary + (SF.cap_end+1) * SF.slot_length2sec;
+			op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
+			op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
+		}
+		printf("%s cap_start2sec=%f,cap_end2sec=%f\n", node_attr.name, SF.cap_start2sec,SF.cap_end2sec);
+		// printf("SF.cap_start2sec replaced with %f for protocol version 1.\n", SF.cap_start2sec);
+		
+		if(assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start > 0){
+			SF.map2_start = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_start;
+			SF.map2_end = assign_map[mac_attr.sender_id%NODE_MAX].map2_slot_end;
+			SF.map2_start2sec = SF.BI_Boundary + SF.map2_start * SF.slot_length2sec;
+			SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1) * SF.slot_length2sec;
+			if (SF.map2_start == SF.b2_start){
+				SF.map2_start2sec = op_sim_time() + pSIFS;
 			}
-			op_prg_odb_bkpt("debug");
+			// printf("NID=%d allocated with map2_start=%d, map2_end=%d\n", mac_attr.sender_id, SF.map2_start, SF.map2_end);
+			op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
+			op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
 		}
 		wban_battery_sleep_start(mac_state);
 		mac_state = MAC_SLEEP;
+		op_prg_odb_bkpt("debug");
+	}else{
+		if(0 == SF.cap_end){
+			op_sim_end("ERROR : CAP_END must greater than 0 for Protocol version 0","CAP","","");
+		}
+		SF.cap_start2sec = SF.b2_start2sec + beacon2_frame_tx_time + pSIFS;
+		if(255 == SF.cap_end){
+			SF.cap_end = SF.SD - 1;
+		}
+		SF.cap_end2sec = SF.BI_Boundary + (SF.cap_end+1) * SF.slot_length2sec;
 		op_intrpt_schedule_self(SF.cap_start2sec, START_OF_CAP_PERIOD_CODE);
 		op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
-		op_prg_odb_bkpt("extract_b2");
-
-		op_pk_destroy (beacon2_MSDU_rx);
-		op_pk_destroy (beacon2_MPDU_rx);
 	}
+	op_prg_odb_bkpt("extract_b2");
+
+	op_pk_destroy (beacon2_MSDU_rx);
+	op_pk_destroy (beacon2_MPDU_rx);
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -937,61 +983,61 @@ static void wban_schedule_next_beacon() {
 	SF.current_slot = 0;
 	// SF.current_first_free_slot = beacon_attr.rap1_end + 1; // spec for hub assignment
 
-	SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
-	SF.eap1_end2sec = SF.rap1_start2sec;
-	SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
-	SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec;
-	if(SF.b2_start == 0){
-		SF.b2_start2sec = 0;
-	}
-
-	// SF.eap1_length2sec = SF.rap1_start * SF.slot_length2sec - beacon_frame_tx_time;
-	SF.rap1_length2sec = (SF.rap1_end - SF.rap1_start + 1) * SF.slot_length2sec;
-
-	// SF.current_first_free_slot = SF.rap1_end + 1; // spec for hub assignment
-
-	/* for node we should calculate the slot boundary */
-	SF.current_slot = (int)floor((op_sim_time()-SF.BI_Boundary)/SF.slot_length2sec);
-
-	// op_prg_odb_bkpt("sch_beacon");
-	/* INCREMENT_SLOT at slot boundary */
-	op_intrpt_schedule_self (SF.BI_Boundary + (SF.current_slot+1)*SF.slot_length2sec, INCREMENT_SLOT);
-	/* Use EAP1 Phase */
-	if (SF.rap1_start > 0) {
-		/* The SF.eap1_start2sec may behind current time op_sim_time() */
-		printf("Node %s eap1_start2sec=%f, current time=%f.\n", node_attr.name, SF.eap1_start2sec, op_sim_time());
-		SF.eap1_start2sec = max_double(op_sim_time(), SF.eap1_start2sec);
+	/* Allocation for EAP1 and RAP1 */
+	if(SF.rap1_start > 0){
+		SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_length2sec;
+		if(IAM_BAN_HUB){
+			SF.eap1_start2sec = op_sim_time();
+		}else{
+			SF.eap1_start2sec = op_sim_time() + pSIFS;
+		}
+		SF.eap1_end2sec = SF.rap1_start2sec;
 		op_intrpt_schedule_self (SF.eap1_start2sec, START_OF_EAP1_PERIOD_CODE);
-	}
-
-	if ((SF.rap1_start > 0) && (SF.rap1_length2sec > 0)) {
 		op_intrpt_schedule_self (SF.eap1_end2sec, END_OF_EAP1_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
-		op_intrpt_schedule_self (SF.rap1_end2sec, END_OF_RAP1_PERIOD_CODE);
-		if (OPC_TRUE == node_attr.is_BANhub){
-			SF.map1_start2sec = SF.rap1_end2sec;
-			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
-		} else {
-
+	}else{
+		if(IAM_BAN_HUB){
+			SF.rap1_start2sec = op_sim_time();
+		}else{
+			SF.rap1_start2sec = op_sim_time() + pSIFS;
 		}
 	}
 
-	if (SF.b2_start > 0) {
-		if(IAM_BAN_HUB){
+	// if((SF.rap1_start > 0) && (SF.rap1_end > 0)){
+	if(SF.rap1_end > 0){
+		SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_length2sec;
+		SF.rap1_length2sec = SF.rap1_end2sec - SF.rap1_start2sec;
+		op_intrpt_schedule_self(SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
+		op_intrpt_schedule_self(SF.rap1_end2sec, END_OF_RAP1_PERIOD_CODE);
+		if((IAM_BAN_HUB) && (SF.rap1_end < SF.SD - 1) && (SF.b2_start != SF.rap1_end+1)){
+			SF.map1_start = SF.rap1_end + 1;
+			SF.map1_start2sec = SF.rap1_end2sec;
+			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
+		}
+	}
+
+	if(SF.b2_start >= (SF.rap1_end+1)){
+		SF.b2_start2sec = SF.BI_Boundary + SF.b2_start * SF.slot_length2sec;
+		op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
+		if((IAM_BAN_HUB) && (SF.b2_start > (SF.rap1_end+1))) {
 			SF.map1_end = SF.b2_start - 1;
 			SF.map1_end2sec = SF.b2_start2sec;
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
-			op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
-		} else {
-			/* used for setup of Node */
-			op_intrpt_schedule_self (SF.b2_start2sec, SEND_B2_FRAME);
 		}
-	} else {
-		if(OPC_TRUE == node_attr.is_BANhub){
+	}else if((SF.rap1_end < SF.SD - 1) && (0 == SF.b2_start)){
+		if(IAM_BAN_HUB){
 			SF.map1_end = SF.SD - 1;
 			SF.map1_end2sec = SF.BI_Boundary + SF.BI*SF.slot_length2sec;
+			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
+	}else if(SF.b2_start < SF.rap1_end){
+		op_sim_end("ERROR : B2_START must greater than RAP1_END","RAP_B2","","");
 	}
+
+	// SF.current_first_free_slot = SF.rap1_end + 1; // spec for hub assignment
+
+	// op_prg_odb_bkpt("sch_beacon");
+	/* INCREMENT_SLOT at slot boundary */
+	op_intrpt_schedule_self (SF.BI_Boundary + SF.slot_length2sec, INCREMENT_SLOT);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_length2sec, BEACON_INTERVAL_CODE);
 	
 	// printf("Node %s Superframe parameters:\n", node_attr.name);
@@ -1012,10 +1058,7 @@ static void wban_schedule_next_beacon() {
 			FOUT;
 		}
 		queue_conn_req = op_sim_time()+(mac_attr.sender_id%8)*3*I_ACK_TX_TIME + 2*pSIFS;
-		// printf("%s queue_conn_req = %f\n", node_attr.name, queue_conn_req);
-		// op_prg_odb_bkpt("queue_req");
-		op_intrpt_schedule_self(queue_conn_req,SEND_CONN_REQ_CODE);
-		// wban_send_conn_req_frame();
+		op_intrpt_schedule_self(queue_conn_req, SEND_CONN_REQ_CODE);
 	}
 	/* Stack tracing exit point */
 	FOUT;
@@ -1352,18 +1395,18 @@ static void wban_mac_interrupt_process() {
 							temp_ppdu_kbits += data_stat_all[i][RCV].ppdu_kbits;
 						}
 						throughputG = (temp_ppdu_kbits - temp_last_ppdu_kbits)/SF.duration;
-						log = fopen(log_name, "a");
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughputG);
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
-						fclose(log);
+						// log = fopen(log_name, "a");
+						// fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughputG);
+						// fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
+						// fclose(log);
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
 					}
 					mac_state = MAC_SETUP;
 
-					// log = fopen(log_name, "a");
-					// fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
-					// fclose(log);
+					log = fopen(log_name, "a");
+					fprintf (log,"t=%f  -> ++++++++++ START OF BEACON PERIOD ++++++++++ \n\n", op_sim_time());
+					fclose(log);
 					op_prg_odb_bkpt ("beacon_end");
 					break;
 				};/*end of BEACON_INTERVAL_CODE */
@@ -1450,7 +1493,7 @@ static void wban_mac_interrupt_process() {
 					// fclose(log);
 					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE RAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
 					
-					op_prg_odb_bkpt("rap1");
+					// op_prg_odb_bkpt("rap1");
 
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
@@ -1822,6 +1865,9 @@ static void wban_mac_interrupt_process() {
 
 				case N_ACK_PACKET_SENT:
 				{
+					if((MANAGEMENT == pkt_to_be_sent.frame_type) && (BEACON == pkt_to_be_sent.frame_subtype)){
+						wban_schedule_next_beacon(); //update the superframe
+					}
 					TX_ING = OPC_FALSE;
 					// attemptingToTX = OPC_FALSE;
 					waitForACK = OPC_FALSE;
