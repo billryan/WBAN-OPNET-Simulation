@@ -163,9 +163,13 @@ static void wban_mac_init() {
 	local_DATA_rcv_nbr = 0.0;
 	local_DATA_PPDU_sent_kbits = 0.0;
 	local_DATA_PPDU_rcv_kbits = 0.0;
-	throughputG = 0.0;
+	throughput = 0.0;
 	temp_ppdu_kbits = 0.0;
 	temp_last_ppdu_kbits = 0.0;
+	throughput_rap_kbits = 0.0;
+	throughput_map_kbits = 0.0;
+	throughput_rcv_kbits = 0.0;
+	throughput_rcv_nbr = 0.0;
 	/* initialization for data_stat */
 	for(i=0; i<UP_ALL; i++){
 		for(j=0; j<DATA_STATE; j++){
@@ -331,7 +335,16 @@ static void wban_parse_incoming_frame() {
 			switch (frame_type_fd) {
 				case DATA: /* Handle data packets */
 					printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
-					
+					/* collect statistics */
+					data_stat[frame_subtype_fd][RCV].number += 1;
+					data_stat[frame_subtype_fd][RCV].ppdu_kbits += 0.001*ppdu_bits;
+					// throughput_rcv_kbits += 0.001*ppdu_bits;
+					// throughput_rcv_nbr += 1;
+					if(MAC_RAP1 == mac_state){
+						throughput_rap_kbits += 0.001*ppdu_bits;
+					}else if(SF.IN_MAP_PHASE){
+						throughput_map_kbits += 0.001*ppdu_bits;
+					}
 					// PPDU_rcv_nbr = PPDU_rcv_nbr + 1;
 					// PPDU_rcv_kbits = PPDU_rcv_kbits + 1.0*ppdu_bits/1000.0;
 					// stat_vec.ppdu_rcv_nbr = stat_vec.ppdu_rcv_nbr + 1;
@@ -760,11 +773,11 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	// 	}
 	// }
 
-	// printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
 	// log = fopen(log_name, "a");
 	// fprintf(log, "MAP_allocation,Interval_Start=%d,Interval_End=%d\n", conn_assign_attr.interval_start,conn_assign_attr.interval_end);
 	// fclose(log);
-	// op_prg_odb_bkpt("rcv_assign");
+	op_prg_odb_bkpt("rcv_assign");
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -1080,14 +1093,16 @@ static void wban_send_conn_req_frame () {
 	FIN(wban_send_conn_req_frame);
 	printf("Connection Request allocation_length=%d for Node %s\n", conn_req_attr.allocation_length, node_attr.name);
 	if (conn_req_attr.allocation_length > 0) {
-		if(conn_req_attr.allocation_length > 3){
-			/* maximum allocation length for a node is 3 */
-			conn_req_attr.allocation_length = 3;
-		}
+		// if(conn_req_attr.allocation_length > 8){
+			/* maximum allocation length for a node is 8 */
+		// 	conn_req_attr.allocation_length = 8;
+		// }
 	} else {
 		// printf("Node %s need not scheduling slots.\n", node_attr.name);
 		FOUT;
 	}
+
+	op_prg_odb_bkpt("pre_req");
 	random_num = rand_int(256);
 	/* create a connection request frame */
 	conn_req_MSDU = op_pk_create_fmt("wban_connection_request_frame_format");
@@ -1139,17 +1154,44 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_conn_assign_frame);
-
-	if(assign_map[mac_attr.recipient_id%10].slot_start != 0){
-		printf("NID %d has been assigned with slot %d to %d.\n", mac_attr.recipient_id, assign_map[mac_attr.recipient_id%10].slot_start, assign_map[mac_attr.recipient_id%10].slot_end);
-		FOUT;
-	}
 	random_num = rand_int(256);
 	/* create a connection request frame */
 	conn_assign_MSDU = op_pk_create_fmt ("wban_connection_assignment_frame_format");
 	
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "Connection Status", 0);
+
+	if(assign_map[mac_attr.recipient_id%10].slot_start != 0){
+		/* set the fields of the conn_assign frame */
+		// op_pk_nfd_set (conn_assign_MSDU, "EAP2 Start", );
+		op_pk_nfd_set (conn_assign_MSDU, "Interval Start", assign_map[mac_attr.recipient_id%10].slot_start);
+		op_pk_nfd_set (conn_assign_MSDU, "Interval End", assign_map[mac_attr.recipient_id%10].slot_end);
+
+		/* create a MAC frame (MPDU) that encapsulates the conn_assign payload (MSDU) */
+		conn_assign_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
+		op_pk_nfd_set (conn_assign_MPDU, "Ack Policy", I_ACK_POLICY);
+		op_pk_nfd_set (conn_assign_MPDU, "EAP Indicator", 1); // EAP1 enabled
+		op_pk_nfd_set (conn_assign_MPDU, "Frame Subtype", CONNECTION_ASSIGNMENT);
+		op_pk_nfd_set (conn_assign_MPDU, "Frame Type", MANAGEMENT);
+		op_pk_nfd_set (conn_assign_MPDU, "B2", 1); // beacon2 enabled
+		op_pk_nfd_set (conn_assign_MPDU, "Sequence Number", random_num);
+		op_pk_nfd_set (conn_assign_MPDU, "Inactive", beacon_attr.inactive_duration); // conn_assign and conn_assign2 frame used
+		op_pk_nfd_set (conn_assign_MPDU, "Recipient ID", mac_attr.recipient_id);
+		op_pk_nfd_set (conn_assign_MPDU, "Sender ID", mac_attr.sender_id);
+		op_pk_nfd_set (conn_assign_MPDU, "BAN ID", mac_attr.ban_id);
+		op_pk_nfd_set_pkt (conn_assign_MPDU, "MAC Frame Payload", conn_assign_MSDU); // wrap conn_assign payload (MSDU) in MAC Frame (MPDU)
+		/* put it into the queue with priority waiting for transmission */
+		op_pk_priority_set (conn_assign_MPDU, 6.0);
+		if (op_subq_pk_insert(SUBQ_MAN, conn_assign_MPDU, OPC_QPOS_TAIL) == OPC_QINS_OK) {
+			// printf (" [Node %s] t=%f  -> Enqueuing of MAC MANAGEMENT frame [SEQ = %d]\n\n", node_attr.name, op_sim_time(), random_num);
+		} else {
+			// printf (" [Node %s] t=%f  -> MAC MANAGEMENT frame cannot be enqueuing - FRAME IS DROPPED !!!! \n\n", node_attr.name, op_sim_time());
+			/* destroy the packet */
+			op_pk_destroy (conn_assign_MPDU);
+		}
+		printf("NID %d has been assigned with slot %d to %d.\n", mac_attr.recipient_id, assign_map[mac_attr.recipient_id%10].slot_start, assign_map[mac_attr.recipient_id%10].slot_end);
+		FOUT;
+	}
 
 	if((0 == node_attr.protocol_ver) || (1 == node_attr.protocol_ver)){
 		if(SF.current_first_free_slot <= SF.current_slot){
@@ -1358,6 +1400,9 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 static void wban_mac_interrupt_process() {
 	double map_start2sec;
 	double map_end2sec;
+	double tx_suc_nbr;
+	double tx_suc_ppdu_kbits;
+	double data_rx_nbr;
 	int i, j;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
@@ -1374,32 +1419,47 @@ static void wban_mac_interrupt_process() {
 			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
-					pkt_to_be_sent.enable = OPC_FALSE;
+					// pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 					TX_ING = OPC_FALSE;
 					/* This connection is terminated. */
-					if (op_subq_empty (SUBQ_MAN) == OPC_FALSE){
+					// if (op_subq_empty (SUBQ_MAN) == OPC_FALSE){
 						/* Subqueue contains messages queued for processing.	*/
 						/* Flush the subqueue of messages. */
-						op_subq_flush (SUBQ_MAN);
-					}
+					// 	op_subq_flush (SUBQ_MAN);
+					// }
 					for(i=32; i<current_free_connected_NID; i++){
 						assign_map[i%10].map2_slot_start = 0;
 					}
 					if(!IAM_BAN_HUB){
 						wban_battery_sleep_end(mac_state);
 					}else{
+						log = fopen(log_name, "a");
 						/* collect statistics */
 						temp_last_ppdu_kbits = temp_ppdu_kbits;
 						temp_ppdu_kbits = 0.0;
+						tx_suc_nbr = 0;
+						tx_suc_ppdu_kbits = 0;
+						data_rx_nbr = 0;
 						for(i=0; i<UP_ALL; i++){
-							temp_ppdu_kbits += data_stat_all[i][RCV].ppdu_kbits;
+							data_rx_nbr += data_stat[i][RCV].number;
+							temp_ppdu_kbits += data_stat[i][RCV].ppdu_kbits;
+							tx_suc_nbr += data_stat_all[i][RCV].number;
+							tx_suc_ppdu_kbits += data_stat_all[i][RCV].ppdu_kbits;
 						}
-						throughputG = (temp_ppdu_kbits - temp_last_ppdu_kbits)/SF.duration;
-						log = fopen(log_name, "a");
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughputG);
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
+						throughput = (temp_ppdu_kbits - temp_last_ppdu_kbits)/SF.duration;
+						
+						if(SF.rap1_end > 0){
+							fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RAP_kbps=%f\n", op_sim_time(), node_id, throughput_rap_kbits/SF.rap1_length2sec);
+						}
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughput);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_TX_SUC_kbps=%f\n", op_sim_time(), node_id, tx_suc_ppdu_kbits/op_sim_time());
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_nbr=%f\n", op_sim_time(), node_id, data_rx_nbr);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_TX_SUC_nbr=%f\n", op_sim_time(), node_id, tx_suc_nbr);
 						fclose(log);
+						throughput_rap_kbits = 0;
+						// throughput_map_kbits = 0;
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
 					}
@@ -1450,7 +1510,9 @@ static void wban_mac_interrupt_process() {
 					phase_end_timeG = SF.eap1_end2sec;
 					SF.IN_MAP_PHASE = OPC_FALSE;
 					SF.IN_EAP_PHASE = OPC_TRUE;
-					pkt_to_be_sent.enable = OPC_FALSE;
+					if(pkt_to_be_sent.frame_subtype != 7){
+						pkt_to_be_sent.enable = OPC_FALSE;
+					}
 					attemptingToTX = OPC_FALSE;
 				
 					// log = fopen(log_name, "a");
@@ -2072,11 +2134,9 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 				// fprintf(log, "t=%f,DATA_PPDU=%d,UPx=%d,", op_sim_time(), pk_size, up_prio);
 				// fprintf(log, "ETE_DELAY=%f\n", ete_delay);
 	    		// PPDU_rcv_nbr = PPDU_rcv_nbr + 1;
-	    		PPDU_rcv_kbits = PPDU_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
+	    		// PPDU_rcv_kbits = PPDU_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
 				// stat_vec.ppdu_rcv_nbr = stat_vec.ppdu_rcv_nbr + 1;
 				// stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
-				// local_DATA_rcv_nbr += 1;
-				// local_DATA_PPDU_rcv_kbits += 1.0*pkt_to_be_sent.ppdu_bits/1000.0;
 				data_stat[pkt_to_be_sent.frame_subtype][RCV].number += 1;
 				data_stat[pkt_to_be_sent.frame_subtype][RCV].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
 				data_stat_all[pkt_to_be_sent.frame_subtype][RCV].number += 1;
