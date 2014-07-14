@@ -170,6 +170,9 @@ static void wban_mac_init() {
 	throughput_map_kbits = 0.0;
 	throughput_rcv_kbits = 0.0;
 	throughput_rcv_nbr = 0.0;
+	throughput_rap_msdu_kbits = 0;
+	lastSF_msdu_nbr = 0;
+	data_rx_nbr = 0;
 	/* initialization for data_stat */
 	for(i=0; i<UP_ALL; i++){
 		for(j=0; j<DATA_STATE; j++){
@@ -341,6 +344,7 @@ static void wban_parse_incoming_frame() {
 					// throughput_rcv_kbits += 0.001*ppdu_bits;
 					// throughput_rcv_nbr += 1;
 					if(MAC_RAP1 == mac_state){
+						throughput_rap_msdu_kbits += 0.001*(ppdu_bits - header4mac2phy() - 72);
 						throughput_rap_kbits += 0.001*ppdu_bits;
 					}else if(SF.IN_MAP_PHASE){
 						throughput_map_kbits += 0.001*ppdu_bits;
@@ -586,7 +590,9 @@ static void wban_send_beacon2_frame () {
 	int shuffle;
 	int slot_num;
 	int slot_avg;
+	int slot_req;
 	int slot_req_total;
+	int slot_map2_total;
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_beacon2_frame);
@@ -651,20 +657,22 @@ static void wban_send_beacon2_frame () {
 		j = rand_int(current_free_connected_NID - 32);
 		slot_avg = (SF.map2_end - SF.b2_start + 1)/(current_free_connected_NID - 32);
 		slot_req_total = 0;
+		slot_map2_total = SF.map2_end - SF.b2_start + 1;
 		for(i=32; i < current_free_connected_NID; i++){
 			slot_req_total = slot_req_total + assign_map[i%NODE_MAX].slotnum;
 		}
 		for(i=32; i < current_free_connected_NID; i++){
 			shuffle = 32 + (i+j)%(current_free_connected_NID - 32);
-			if((assign_map[shuffle%NODE_MAX].slotnum > slot_avg) && (slot_req_total > (SF.map2_end - SF.b2_start + 1))){
-				assign_map[shuffle%NODE_MAX].slotnum = slot_avg;
-				slot_req_total = slot_req_total - (assign_map[shuffle%NODE_MAX].slotnum - slot_avg);
+			if((assign_map[shuffle%NODE_MAX].slotnum > slot_avg) && (slot_req_total > slot_map2_total)){
+				slot_req = max_int(slot_avg, (assign_map[shuffle%NODE_MAX].slotnum-(slot_req_total-slot_map2_total)));
+				slot_req_total = slot_req_total - (assign_map[shuffle%NODE_MAX].slotnum - slot_req);
+				assign_map[shuffle%NODE_MAX].slotnum = slot_req;
 			}
 			if(assign_map[shuffle%NODE_MAX].slotnum > 0){
 				slot_num = assign_map[shuffle%NODE_MAX].slotnum;
-				if(slot_num > 4){
-					slot_num = 4;
-				}
+				// if(slot_num > 4){
+				// 	slot_num = 4;
+				// }
 				if(free_slot + slot_num < SF.map2_end + 2){
 					assign_map[shuffle%NODE_MAX].map2_slot_start = free_slot;
 					assign_map[shuffle%NODE_MAX].map2_slot_end = assign_map[shuffle%NODE_MAX].map2_slot_start+slot_num-1;
@@ -777,7 +785,7 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	// log = fopen(log_name, "a");
 	// fprintf(log, "MAP_allocation,Interval_Start=%d,Interval_End=%d\n", conn_assign_attr.interval_start,conn_assign_attr.interval_end);
 	// fclose(log);
-	op_prg_odb_bkpt("rcv_assign");
+	op_prg_odb_bkpt("debug");
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -940,7 +948,7 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 			if (SF.map2_start == SF.b2_start){
 				SF.map2_start2sec = op_sim_time() + pSIFS;
 			}
-			// printf("NID=%d allocated with map2_start=%d, map2_end=%d\n", mac_attr.sender_id, SF.map2_start, SF.map2_end);
+			printf("NID=%d allocated with map2_start=%d, map2_end=%d\n", mac_attr.sender_id, SF.map2_start, SF.map2_end);
 			op_intrpt_schedule_self(max_double(SF.map2_start2sec, op_sim_time()), START_OF_MAP2_PERIOD_CODE);
 			op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
 		}
@@ -1402,7 +1410,8 @@ static void wban_mac_interrupt_process() {
 	double map_end2sec;
 	double tx_suc_nbr;
 	double tx_suc_ppdu_kbits;
-	double data_rx_nbr;
+	double th_msdu_sf_kbps;
+	double th_msdu_kbps;
 	int i, j;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
@@ -1437,6 +1446,7 @@ static void wban_mac_interrupt_process() {
 						log = fopen(log_name, "a");
 						/* collect statistics */
 						temp_last_ppdu_kbits = temp_ppdu_kbits;
+						lastSF_msdu_nbr = data_rx_nbr;
 						temp_ppdu_kbits = 0.0;
 						tx_suc_nbr = 0;
 						tx_suc_ppdu_kbits = 0;
@@ -1447,21 +1457,28 @@ static void wban_mac_interrupt_process() {
 							tx_suc_nbr += data_stat_all[i][RCV].number;
 							tx_suc_ppdu_kbits += data_stat_all[i][RCV].ppdu_kbits;
 						}
+						th_msdu_kbps = (temp_ppdu_kbits - 0.001*data_rx_nbr*(header4mac2phy()+72))/op_sim_time();
 						throughput = (temp_ppdu_kbits - temp_last_ppdu_kbits)/SF.duration;
-						
+						th_msdu_sf_kbps = throughput - (0.001*(data_rx_nbr-lastSF_msdu_nbr)*(header4mac2phy()+72))/SF.duration;
+
 						if(SF.rap1_end > 0){
-							fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RAP_kbps=%f\n", op_sim_time(), node_id, throughput_rap_kbits/SF.rap1_length2sec);
+							fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RAP_MSDU_kbps=%f\n", op_sim_time(), node_id, throughput_rap_msdu_kbits/SF.rap1_length2sec);
+							fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RAP_PPDU_kbps=%f\n", op_sim_time(), node_id, throughput_rap_kbits/SF.rap1_length2sec);
 						}
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_kbps=%f\n", op_sim_time(), node_id, throughput);
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
-						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_TX_SUC_kbps=%f\n", op_sim_time(), node_id, tx_suc_ppdu_kbits/op_sim_time());
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_MSDU_kbps=%f\n", op_sim_time(), node_id, th_msdu_sf_kbps);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_SF_PPDU_kbps=%f\n", op_sim_time(), node_id, throughput);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_MSDU_kbps=%f\n", op_sim_time(), node_id, th_msdu_kbps);
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_PPDU_kbps=%f\n", op_sim_time(), node_id, temp_ppdu_kbits/op_sim_time());
+						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_TX_SUC_PPDU_kbps=%f\n", op_sim_time(), node_id, tx_suc_ppdu_kbits/op_sim_time());
 						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_RCV_nbr=%f\n", op_sim_time(), node_id, data_rx_nbr);
 						fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT_TX_SUC_nbr=%f\n", op_sim_time(), node_id, tx_suc_nbr);
 						fclose(log);
 						throughput_rap_kbits = 0;
+						throughput_rap_msdu_kbits = 0;
 						// throughput_map_kbits = 0;
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
+						op_prg_odb_bkpt("debug");
 					}
 					mac_state = MAC_SETUP;
 
@@ -1976,7 +1993,7 @@ static void wban_mac_interrupt_process() {
 			// }
 			fclose(log);
 			
-			op_prg_odb_bkpt("debug_end");
+			// op_prg_odb_bkpt("debug_end");
 			
 			// wban_battery_end();
 
@@ -2278,12 +2295,12 @@ static void wban_attempt_TX() {
 		if((1 == node_attr.protocol_ver) && (MAC_MAP1 == mac_state)){
 			subq_info_get(SUBQ_DATA);
 			slotnum = (int)((subq_info.bitsize + subq_info.pksize *2* header4mac2phy())/(node_attr.data_rate*1000.0*SF.slot_length2sec));
-			if(slotnum > 4){
-				slotnum = 4;
-			}
+			// if(slotnum > 4){
+			// 	slotnum = 4;
+			// }
 			op_pk_nfd_set (frame_MPDU_to_be_sent, "slotnum", slotnum);
 			printf("NID=%d Required slotnum=%d\n", mac_attr.sender_id, slotnum);
-			// op_prg_odb_bkpt("debug");
+			op_prg_odb_bkpt("debug");
 		}
 		pkt_to_be_sent.enable = OPC_TRUE;
 	} else {
