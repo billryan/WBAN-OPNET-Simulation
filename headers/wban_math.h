@@ -147,6 +147,21 @@ static int min_int (int a, int b){
 	return (mini);
 }
 
+/*--------------------------------------------------------------------------------
+ * Function:	max_int
+ *
+ * Description:	return the maximum of two interger
+ *
+ *				a : integer, b : integer           
+ *--------------------------------------------------------------------------------*/
+
+static int max_int (int a, int b){
+	int mini;
+	mini = a;
+	if (b>a)
+		mini = b;
+	return (mini);
+}
 
 /*--------------------------------------------------------------------------------
  * Function:	max_double
