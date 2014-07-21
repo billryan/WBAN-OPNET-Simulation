@@ -1204,7 +1204,7 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	if((0 == node_attr.protocol_ver) || (1 == node_attr.protocol_ver)){
 		if(SF.current_first_free_slot <= SF.current_slot){
 			printf("%s current_slot=%d,current_first_free_slot=%d\n", node_attr.name, SF.current_slot, SF.current_first_free_slot);
-			op_sim_end("ERROR : MAP allocation ERROR","MAP allocation","","");
+			// op_sim_end("ERROR : MAP allocation ERROR","MAP allocation","","");
 			// SF.current_first_free_slot = SF.current_slot + 1;
 		}
 		if(0 < SF.b2_start){
@@ -1253,6 +1253,8 @@ static void wban_send_conn_assign_frame ( int allocation_length) {
 	assign_map[mac_attr.recipient_id%10].slot_start = conn_assign_attr.interval_start;
 	assign_map[mac_attr.recipient_id%10].slot_end = conn_assign_attr.interval_end;
 
+	printf("NID=%d allocated with slot_start=%d, slot_end=%d\n", mac_attr.recipient_id, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+	op_prg_odb_bkpt("map_alloc");
 	/* set the fields of the conn_assign frame */
 	op_pk_nfd_set (conn_assign_MSDU, "EAP2 Start", conn_assign_attr.eap2_start);
 	op_pk_nfd_set (conn_assign_MSDU, "Interval Start", conn_assign_attr.interval_start);
