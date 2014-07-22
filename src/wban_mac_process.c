@@ -559,7 +559,10 @@ static void wban_send_beacon_frame () {
 		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		fclose(log);
 		init_flag = OPC_FALSE;
+		printf("t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+		op_prg_odb_bkpt("init");
 	}
+
 
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
@@ -589,6 +592,8 @@ static void wban_send_beacon2_frame () {
 	int slot_req;
 	int slot_req_total;
 	int slot_map2_total;
+	int node_num;
+	int shuffle_up[NODE_MAX];
 
 	/* Stack tracing enrty point */
 	FIN(wban_send_beacon2_frame);
@@ -620,7 +625,6 @@ static void wban_send_beacon2_frame () {
 	beacon2_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon2_MPDU), node_attr.data_rate);
 	/* send the MPDU to PHY and calculate the energer consuming */
 	wban_send_mac_pk_to_phy(beacon2_MPDU);
-	// op_prg_odb_bkpt("send_b2");
 	SF.cap_end = b2_attr.cap_end;
 	if((SF.cap_end > 0) && (SF.cap_end < SF.b2_start)){
 		op_sim_end("ERROR : CAP_END must greater than B2_START","B2_CAP","","");
@@ -650,15 +654,48 @@ static void wban_send_beacon2_frame () {
 			op_intrpt_schedule_self(SF.cap_end2sec, END_OF_CAP_PERIOD_CODE);
 		}
 		free_slot = SF.b2_start;
-		j = rand_int(current_free_connected_NID - 32);
 		slot_avg = (SF.map2_end - SF.b2_start + 1)/(current_free_connected_NID - 32);
 		slot_req_total = 0;
 		slot_map2_total = SF.map2_end - SF.b2_start + 1;
+		for(i=0; i<NODE_MAX; i++){
+			/* initialization for shuffle_up[i] */
+			shuffle_up[i] = 0;
+		}
+		node_num = current_free_connected_NID-32;
 		for(i=32; i < current_free_connected_NID; i++){
 			slot_req_total = slot_req_total + assign_map[i%NODE_MAX].slotnum;
+			shuffle_up[i%node_num] = i;
 		}
+		// printf("\nShuffle Stage1-init: \n");
+		// for(i=0; i<NODE_MAX; i++){
+		// 	printf("i=%d, shuffle_up[i]=%d\n", i, shuffle_up[i]);
+		// }
+		for(i=node_num-1; i>0; i--){
+			j = rand_int(i);
+			shuffle = shuffle_up[j];
+			shuffle_up[j] = shuffle_up[i];
+			shuffle_up[i] = shuffle;
+		}
+		// printf("\nShuffle Stage2-random: \n");
+		// for(i=0; i<NODE_MAX; i++){
+		// 	printf("i=%d, shuffle_up[i]=%d\n", i, shuffle_up[i]);
+		// }
+		for(i=0; i<node_num; i++){
+			for(j=0; j<node_num-i-1; j++){
+				if(assign_map[shuffle_up[j]%NODE_MAX].up < assign_map[shuffle_up[j+1]%NODE_MAX].up){
+					shuffle = shuffle_up[j];
+					shuffle_up[j] = shuffle_up[j+1];
+					shuffle_up[j+1] = shuffle;
+				}
+			}
+		}
+		// printf("\nShuffle Stage3-shuffle_up: \n");
+		// for(i=0; i<NODE_MAX; i++){
+		// 	printf("i=%d, shuffle_up[i]=%d\n", i, shuffle_up[i]);
+		// }
 		for(i=32; i < current_free_connected_NID; i++){
-			shuffle = 32 + (i+j)%(current_free_connected_NID - 32);
+			// shuffle = 32 + (i+j)%(current_free_connected_NID - 32);
+			shuffle = shuffle_up[i-32];
 			if((assign_map[shuffle%NODE_MAX].slotnum > slot_avg) && (slot_req_total > slot_map2_total)){
 				slot_req = max_int(slot_avg, (assign_map[shuffle%NODE_MAX].slotnum-(slot_req_total-slot_map2_total)));
 				slot_req_total = slot_req_total - (assign_map[shuffle%NODE_MAX].slotnum - slot_req);
@@ -687,14 +724,14 @@ static void wban_send_beacon2_frame () {
 		SF.map2_end2sec = SF.BI_Boundary + (SF.map2_end+1)*SF.slot_length2sec;
 		op_intrpt_schedule_self(SF.map2_start2sec, START_OF_MAP2_PERIOD_CODE);
 		op_intrpt_schedule_self(SF.map2_end2sec, END_OF_MAP2_PERIOD_CODE);
-		op_prg_odb_bkpt("debug_map2");
 		
 		// for(i=32; i < current_free_connected_NID; i++){
 		// 	printf("NID=%d,", i);
+		// 	printf("slot_num=%d,", assign_map[i%NODE_MAX].slotnum);
 		// 	printf("map2_slot_start=%d,", assign_map[i%NODE_MAX].map2_slot_start);
 		// 	printf("map2_slot_end=%d\n", assign_map[i%NODE_MAX].map2_slot_end);
 		// }
-		// op_prg_odb_bkpt("debug");
+		// op_prg_odb_bkpt("send_b2");
 	}else{
 		if(0 == SF.cap_end){
 			op_sim_end("ERROR : CAP_END must greater than 0 for Protocol version 0","CAP","","");
@@ -858,6 +895,8 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
 			fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 			fclose(log);
+			printf("t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+			op_prg_odb_bkpt("init");
 			// op_prg_odb_bkpt("get_nid");
 			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
 		}
@@ -1666,7 +1705,7 @@ static void wban_mac_interrupt_process() {
 						wban_battery_sleep_end(mac_state);
 					}
 					mac_state = MAC_SETUP;
-					op_prg_odb_bkpt("send_b2");
+					// op_prg_odb_bkpt("send_b2");
 					if (IAM_BAN_HUB){
 						wban_send_beacon2_frame();
 					} else {
@@ -2069,13 +2108,14 @@ static void wban_extract_data_frame(Packet* frame_MPDU) {
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	if(1 == node_attr.protocol_ver){
 		if(MAC_MAP1 == mac_state) {
-			if(assign_map[mac_attr.recipient_id%10].slot_start > 0){
-				if(assign_map[mac_attr.recipient_id%10].slot_end == SF.current_slot){
-					assign_map[mac_attr.recipient_id%10].slotnum = slotnum;
+			if(assign_map[mac_attr.recipient_id%NODE_MAX].slot_start > 0){
+				if(assign_map[mac_attr.recipient_id%NODE_MAX].slot_end == SF.current_slot){
+					assign_map[mac_attr.recipient_id%NODE_MAX].slotnum = slotnum;
+					assign_map[mac_attr.recipient_id%NODE_MAX].up = up_prio;
 				}
 			}
 			printf("NID=%d,slotnum=%d\n", mac_attr.recipient_id, slotnum);
-			// op_prg_odb_bkpt("debug");
+			op_prg_odb_bkpt("req_map2");
 		}
 	}
 	op_prg_odb_bkpt("rcv_data");
@@ -2290,7 +2330,7 @@ static void wban_attempt_TX() {
 			// 	slotnum = 4;
 			// }
 			op_pk_nfd_set (frame_MPDU_to_be_sent, "slotnum", slotnum);
-			printf("NID=%d Required slotnum=%d\n", mac_attr.sender_id, slotnum);
+			printf("NID=%d requires slotnum=%d\n", mac_attr.sender_id, slotnum);
 			op_prg_odb_bkpt("debug");
 		}
 		pkt_to_be_sent.enable = OPC_TRUE;
