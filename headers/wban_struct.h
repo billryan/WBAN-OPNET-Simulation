@@ -8,23 +8,18 @@ typedef struct {
 	Objid   my_battery; // Battery module ID
 
 	char 	name [20];
-	double	x; // X coordinate of the node
-	double	y; // Y coordinate of the node
-	double altitude; // The altitude of the node
-	
+	// double	x; // X coordinate of the node
+	// double	y; // Y coordinate of the node
+	// double altitude; // The altitude of the node
 	double data_rate; // WBAN Data Rate
-
 	int	sender_address; // sender address of the node, 48 bits, for beacon frame
-
 	int ban_id;	// ban ID
 	int hub_id; //Hub ID
 	int unconnectedNID; // temporary unconnected NID
-
 	Boolean is_BANhub; // state if the node is a Hub or not
 	char Device_Mode[20]; // Can be a Node or a Hub
 	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	int map_schedule; //Schedule strategy for MAP
-	
 	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
 	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
 } wban_node_attributes;
@@ -32,7 +27,6 @@ typedef struct {
 /* define the beacon frame parameters */
 typedef struct {
 	int	sender_address; // 48 bits
-
 	int beacon_period_length;
 	int allocation_slot_length;
 	int rap1_start;
@@ -46,8 +40,8 @@ typedef struct {
 
 /* define the beacon2 frame parameters */
 typedef struct {
-	int beacon_period_length;
-	int allocation_slot_length;
+	// int beacon_period_length;
+	// int allocation_slot_length;
 	int cap_end;
 	int map2_end;
 } beacon2_attributes;
@@ -58,7 +52,6 @@ typedef struct {
 	int	sender_address; // 48 bits
 	int requested_wakeup_phase;
 	int requested_wakeup_period;
-
 	int allocation_id;
 	int minimum_length;
 	int allocation_length;
@@ -68,21 +61,11 @@ typedef struct {
 typedef struct {
 	int eap2_start;
 	int	sender_address; // 48 bits
-
 	int allocation_id;
 	int interval_start;
 	int interval_end;
 	int allocation_length;
 } connection_assignment_attributes;
-
-/* define the redord storing in the wpan_node_attributes->GTS_list_PC */
-typedef struct {
-	int start_slot;	// the starting superframe slot of the appropriate GTS
-	int length; // length of the GTS [# superframe slots]
-	int direction; // direction of the transmission (device->PANCoord (transmit)=0, PANCoord->device(receive)=1)	
-	int assoc_dev_address;	// MAC address of associated device
-	int beacon_persistence_time;	// how long this GTS descriptor will appear in the beacon [# of superframes]
-} wpan_gts_list_PC_record;
 
 /* define the MAP1 parameters of the node */
 typedef struct {
@@ -95,7 +78,6 @@ typedef struct {
 	Boolean TX_state; // true if in TX state
 	int retries_nbr;	// actual number of retries (< aMaxFrameRetries)
 } wban_map_attributes;
-
 
 /* define the backoff parameters */
 typedef struct {
@@ -114,7 +96,6 @@ typedef struct {
 } wban_csma_attributes;
 
 
-
 /*
           |***********************************|.................................|
 
@@ -127,6 +108,7 @@ typedef struct {
 typedef struct {
 	int slot_duration; // the slot duration in slots
 	double slot_length2sec; // one slot length in sec
+	double slot_sec;
 	int SD; // the superframe duration in slots
 	int BI; // the beacon interval in slots
 	double duration; // superfarm duration in second
@@ -184,8 +166,6 @@ typedef struct {
 	Boolean ENABLE_TX_NEW; // Enable new transmission
 	Boolean IN_CONN_SETUP; // whether in connection setup
 	Boolean SLEEP;	// Inactive portion
-	Boolean RESUME_BACKOFF_TIMER; // if TRUE the backoff is resumed in the new CAP
-	Boolean CCA_DEFERRED; // if TRUE the CCA must start at the begining of the CAP of the next superframe
 } wban_superframe_strucuture;
 
 /* define the MAC parameters */

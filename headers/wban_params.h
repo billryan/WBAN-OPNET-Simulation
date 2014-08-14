@@ -24,8 +24,8 @@
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
 #define pAllocationSlotMin 500 //500 μs for NB PHY
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
-#define allocationSlotLength 10 //for NB PHY, L=9 means that 5 ms per slot
-#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //5.5 ms default
+#define allocationSlotLength 3 //for NB PHY, L=3 means that 2 ms per slot
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
 
 // constants related to Intra-Frame Spacing IFS 
 #define aMaxSIFSFrameSize_Bits	(18*8)
@@ -100,10 +100,6 @@
 //int unconnectedNID; // start assigning unconnectedNID from ID 1
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
-
-
-
-#define Symbol2Bits 4
 
 // Frame Control Field - Dest./Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
 #define MAC_HEADER_SIZE 104	
