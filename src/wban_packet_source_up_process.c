@@ -39,7 +39,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 7 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up7-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up7_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up7_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up7_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up7_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up7_stop_time);	
@@ -47,7 +47,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 6 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up6-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up6_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up6_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up6_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up6_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up6_stop_time);	
@@ -55,7 +55,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 5 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up5-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up5_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up5_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up5_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up5_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up5_stop_time);	
@@ -63,7 +63,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 4 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up4-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up4_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up4_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up4_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up4_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up4_stop_time);	
@@ -71,7 +71,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 3 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up3-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up3_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up3_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up3_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up3_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up3_stop_time);	
@@ -79,7 +79,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 2 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up2-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up2_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up2_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up2_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up2_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up2_stop_time);	
@@ -87,7 +87,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 1 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up1-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up1_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up1_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up1_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up1_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up1_stop_time);	
@@ -95,7 +95,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 0 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up0-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up0_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up0_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up0_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up0_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up0_stop_time);	
@@ -112,35 +112,35 @@ static void wban_source_init() {
 		up0_start_time = SC_INFINITE_TIME;
 	}
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up7_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up7_msdu_interarrival_dist_str);
 	up7_msdu_size_dist_ptr       = oms_dist_load_from_string (up7_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up6_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up6_msdu_interarrival_dist_str);
 	up6_msdu_size_dist_ptr       = oms_dist_load_from_string (up6_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up5_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up5_msdu_interarrival_dist_str);
 	up5_msdu_size_dist_ptr       = oms_dist_load_from_string (up5_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up4_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up4_msdu_interarrival_dist_str);
 	up4_msdu_size_dist_ptr       = oms_dist_load_from_string (up4_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up3_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up3_msdu_interarrival_dist_str);
 	up3_msdu_size_dist_ptr       = oms_dist_load_from_string (up3_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up2_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up2_msdu_interarrival_dist_str);
 	up2_msdu_size_dist_ptr       = oms_dist_load_from_string (up2_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up1_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up1_msdu_interarrival_dist_str);
 	up1_msdu_size_dist_ptr       = oms_dist_load_from_string (up1_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up0_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up0_msdu_interarrival_dist_str);
 	up0_msdu_size_dist_ptr       = oms_dist_load_from_string (up0_msdu_size_dist_str);
 
