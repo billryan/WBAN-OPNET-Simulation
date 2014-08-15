@@ -41,7 +41,7 @@ static void wban_mac_init() {
 	mac_attr.ban_id = node_attr.ban_id;
 	/* get the Sender Address of the node */
 	op_ima_obj_attr_get (node_attr.objid, "Sender Address", &node_attr.sender_address);
-	/* Sender Address is not specified - Auto Assigned(-2) from node objid */
+	/* Sender Address is not specified - Auto Assigned(-2) frome node objid */
 	if (node_attr.sender_address == AUTO_ASSIGNED_NID) {
 		node_attr.sender_address = node_attr.objid;
 	}
@@ -55,6 +55,7 @@ static void wban_mac_init() {
 	/* get the MAC settings */
 	op_ima_obj_attr_get (mac_attr.objid, "MAC Attributes", &mac_attr_id);
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
+	// op_ima_obj_attr_get (mac_attr_comp_id, "Batterie Life Extension", &mac_attr.Battery_Life_Extension);
 	op_ima_obj_attr_get (mac_attr_comp_id, "Max Packet Tries", &max_packet_tries);
 	op_ima_obj_attr_get (mac_attr_comp_id, "MGMT Buffer Size", &mac_attr.MGMT_buffer_size);
 	op_ima_obj_attr_get (mac_attr_comp_id, "DATA Buffer Size", &mac_attr.DATA_buffer_size);
@@ -93,7 +94,7 @@ static void wban_mac_init() {
 		beacon_attr_comp_id = op_topo_child (beacon_attr_id, OPC_OBJTYPE_GENERIC, 0);
 
 		op_ima_obj_attr_get (beacon_attr_comp_id, "Beacon Period Length", &beacon_attr.beacon_period_length);
-		op_ima_obj_attr_get (beacon_attr_comp_id, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
+		// op_ima_obj_attr_get (beacon_attr_comp_id, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP1 Start", &beacon_attr.rap1_start);
 		op_ima_obj_attr_get (beacon_attr_comp_id, "RAP1 Length", &beacon_attr.rap1_length);
 		// op_ima_obj_attr_get (beacon_attr_comp_id, "RAP1 End", &beacon_attr.rap1_end);
@@ -124,7 +125,7 @@ static void wban_mac_init() {
 		// register the beacon frame statistics
 		beacon_frame_hndl = op_stat_reg ("MANAGEMENT.Number of Generated Beacon Frame", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 		wban_send_beacon_frame ();
-	} else { /* if the node is not Hub */
+	} else { /* if the node is not a Hub */
 		mac_attr.sender_id = UNCONNECTED_NID;
 		mac_attr.recipient_id = UNCONNECTED;
 		//node_attr.unconnectedNID = 1 + (unconnectedNID - 1) % 16;
@@ -132,9 +133,10 @@ static void wban_mac_init() {
 		node_attr.unconnectedNID = node_attr.objid;
 		conn_assign_attr.interval_start = 255;
 		conn_assign_attr.interval_end = 0;
-
-		// fprintf (log," [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
-		printf (" [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
+		
+		
+			// fprintf (log," [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
+			printf (" [Node %s] initialized with unconnectedNID %d \n\n", node_attr.name, node_attr.unconnectedNID);
 		
 		/* get the Connection Request for the Node */
 		op_ima_obj_attr_get (node_attr.objid, "Connection Request", &conn_req_attr_id);
@@ -180,10 +182,6 @@ static void wban_mac_init() {
 			data_stat_all[i][j].ppdu_kbits = 0.0;
 		}
 	}
-	for(i=0; i<NODE_MAX; i++){
-		ack_seq_nid[i] = -1;
-	}
-	
 	/* register the statistics */
 	// stat_vec.data_pkt_fail = op_stat_reg("DATA.Data Packet failed", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
 	// stat_vec.data_pkt_suc1 = op_stat_reg("DATA.Data Packet Succed 1", OPC_STAT_INDEX_NONE, OPC_STAT_LOCAL);
@@ -201,6 +199,7 @@ static void wban_mac_init() {
 	// stat_vecG.up7_sent = op_stat_reg("DATA.UP7 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	// stat_vecG.up5_sent = op_stat_reg("DATA.UP5 Sent", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
 	// stat_vecG.data_pkt_rec = op_stat_reg("DATA.Data Packet Received", OPC_STAT_INDEX_NONE, OPC_STAT_GLOBAL);
+
 
 	// stat_vec.ppdu_sent_kbits = 0;
 	// stat_vec.ppdu_sent_nbr = 0;
@@ -232,6 +231,7 @@ static void wban_log_file_init() {
 	FIN(wban_log_file_init);
 
 	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", directory_path_name);
+
 	/* verification if the directory_path_name is a valid directory */
 	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
 		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
@@ -242,6 +242,15 @@ static void wban_log_file_init() {
     // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
     strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
     sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, node_attr.protocol_ver);
+
+    /* Check for existence */
+    // if((_access( log_name, 0 )) != -1){
+    //     printf("File %s exists\n", log_name);
+    // 	log = fopen(log_name, "a");
+    // } else {
+    // 	printf("File %s unexists.\n", log_name);
+    // 	log = fopen(log_name, "w");
+    // }
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -262,7 +271,7 @@ static void wban_parse_incoming_frame() {
 	int recipient_id;
 	int sender_id;
 	int ack_policy_fd;
-	// int eap_indicator_fd;
+	int eap_indicator_fd;
 	int frame_type_fd;
 	int frame_subtype_fd;
 	int beacon2_enabled_fd;
@@ -286,16 +295,18 @@ static void wban_parse_incoming_frame() {
 			ppdu_bits = op_pk_total_size_get(rcv_frame);
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
+			/*update the battery*/
+			// packet_size = op_pk_total_size_get(frame_MPDU);
+			// printf("Received packet size=%d.\n", packet_size);
 			ete_delay = op_sim_time() - op_pk_creation_time_get(frame_MPDU);
 			if (MAC_SLEEP == mac_state){
 				FOUT;
 			}
+			
 			op_pk_nfd_get (frame_MPDU, "BAN ID", &ban_id);
 			op_pk_nfd_get (frame_MPDU, "Recipient ID", &recipient_id);
 			op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
-
 			// filter the incoming BAN packet - not implemented entirely
-			/*update the battery module*/
     		if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
     			if((waitForACK) && (sender_id != mac_attr.sender_id)){
 					wban_battery_update_rx(ppdu_bits, mac_state);
@@ -307,11 +318,12 @@ static void wban_parse_incoming_frame() {
 
     		/* repalce the mac_attr.receipient_id with Sender ID */
     		mac_attr.recipient_id = sender_id;
+
 			/*acquire "Frame Type" field*/
 			op_pk_nfd_get (frame_MPDU, "Frame Type", &frame_type_fd);
 			op_pk_nfd_get (frame_MPDU, "Frame Subtype", &frame_subtype_fd);
 			op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy_fd);
-			// op_pk_nfd_get (frame_MPDU, "EAP Indicator", &eap_indicator_fd);
+			op_pk_nfd_get (frame_MPDU, "EAP Indicator", &eap_indicator_fd);
 			op_pk_nfd_get (frame_MPDU, "B2", &beacon2_enabled_fd);
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
@@ -322,18 +334,14 @@ static void wban_parse_incoming_frame() {
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
-				if(ack_seq_nid[sender_id%NODE_MAX] != ack_seq_num){
-					ack_seq_nid[sender_id%NODE_MAX] = ack_seq_num;
-				}else{
-					printf("Duplicate packet received.\n");
-					op_pk_destroy (rcv_frame);
-					op_pk_destroy (frame_MPDU);
-					FOUT;
-				}
 			}
 			switch (frame_type_fd) {
 				case DATA: /* Handle data packets */
 					printf (" [Node %s] t=%f  !!!!!!!!! Data Frame Reception From @%d !!!!!!!!! \n\n", node_attr.name, op_sim_time(), sender_id);
+					if(data_rcv_init_flag){
+						t_data_rcv_start = op_sim_time();
+						data_rcv_init_flag = OPC_FALSE;
+					}
 					/* collect statistics */
 					latency_avg[frame_subtype_fd] = (latency_avg[frame_subtype_fd] * data_stat_local[frame_subtype_fd][RCV].number + ete_delay)/(data_stat_local[frame_subtype_fd][RCV].number + 1);
 					data_stat_local[frame_subtype_fd][RCV].number += 1;
@@ -348,6 +356,14 @@ static void wban_parse_incoming_frame() {
 					}else if(SF.IN_MAP_PHASE){
 						throughput_map_kbits += 0.001*ppdu_bits;
 					}
+					// stat_vec.ppdu_rcv_nbr = stat_vec.ppdu_rcv_nbr + 1;
+					// stat_vec.ppdu_rcv_kbits = stat_vec.ppdu_rcv_kbits + 1.0*ppdu_bits/1000.0;
+					// if((mac_state == MAC_RAP1) && (node_attr.is_BANhub)){
+					// 	stat_vec.ppdu_rcv_kbits_rap = stat_vec.ppdu_rcv_kbits_rap + 1.0*ppdu_bits/1000.0;
+					// 	stat_vec.ppdu_rcv_nbr_rap = stat_vec.ppdu_rcv_nbr_rap + 1;
+					// // }
+					// op_stat_write(stat_vec.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
+					// op_stat_write(stat_vecG.data_pkt_rec, op_pk_total_size_get(frame_MPDU));
 
 					wban_extract_data_frame (frame_MPDU);
 					/* send to higher layer for statistics */
@@ -460,14 +476,17 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 	if (mac_attr.sender_id == sender_id) {
 		printf (" [Node %s] t=%f  -> Loop: DISCARD FRAME \n\n",node_attr.name, op_sim_time());
 		op_pk_destroy (frame_MPDU);
+
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
+
 	if (node_attr.ban_id != ban_id) {
 		printf (" [Node %s] The packet from BAN ID %d is not the same with my BAN ID %d.\n", node_attr.name, ban_id, node_attr.ban_id);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
+
 	if ((mac_attr.sender_id == recipient_id) || (BROADCAST_NID == recipient_id)) {
 		/* Stack tracing exit point */
 		FRET(OPC_TRUE);
@@ -509,18 +528,16 @@ static void wban_send_beacon_frame () {
 	
 	/* create a beacon frame */
 	beacon_MSDU = op_pk_create_fmt ("wban_beacon_MSDU_format");
-	
 	/* set the fields of the beacon frame */
 	op_pk_nfd_set (beacon_MSDU, "Sender Address", beacon_attr.sender_address);
 	op_pk_nfd_set (beacon_MSDU, "Beacon Period Length", beacon_attr.beacon_period_length);
-	op_pk_nfd_set (beacon_MSDU, "Allocation Slot Length", beacon_attr.allocation_slot_length);
+	// op_pk_nfd_set (beacon_MSDU, "Allocation Slot Length", beacon_attr.allocation_slot_length);
 	op_pk_nfd_set (beacon_MSDU, "RAP1 End", beacon_attr.rap1_end);
 	// op_pk_nfd_set (beacon_MSDU, "RAP2 Start", beacon_attr.rap2_start);
 	// op_pk_nfd_set (beacon_MSDU, "RAP2 End", beacon_attr.rap2_end);
 	op_pk_nfd_set (beacon_MSDU, "RAP1 Start", beacon_attr.rap1_start);
 	op_pk_nfd_set (beacon_MSDU, "B2 Start", beacon_attr.b2_start);
 	// op_pk_nfd_set (beacon_MSDU, "Inactive Duration", beacon_attr.inactive_duration);
-	
 	/* create a MAC frame (MPDU) that encapsulates the beacon payload (MSDU) */
 	beacon_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
@@ -534,7 +551,6 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set (beacon_MPDU, "Recipient ID", BROADCAST_NID);
 	op_pk_nfd_set (beacon_MPDU, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (beacon_MPDU, "BAN ID", mac_attr.ban_id);
-	
 	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
 
 	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
@@ -599,12 +615,12 @@ static void wban_send_beacon2_frame () {
 	beacon2_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
 	op_pk_nfd_set (beacon2_MPDU, "Ack Policy", N_ACK_POLICY);
-	// op_pk_nfd_set (beacon2_MPDU, "EAP Indicator", 1); // EAP1 enabled
+	op_pk_nfd_set (beacon2_MPDU, "EAP Indicator", 1); // EAP1 enabled
 	op_pk_nfd_set (beacon2_MPDU, "Frame Subtype", BEACON2);
 	op_pk_nfd_set (beacon2_MPDU, "Frame Type", CONTROL);
 	op_pk_nfd_set (beacon2_MPDU, "B2", 1); // beacon2 enabled
 	op_pk_nfd_set (beacon2_MPDU, "Sequence Number", rand_int(256));
-	// op_pk_nfd_set (beacon2_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
+	op_pk_nfd_set (beacon2_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
 	op_pk_nfd_set (beacon2_MPDU, "Recipient ID", BROADCAST_NID);
 	op_pk_nfd_set (beacon2_MPDU, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (beacon2_MPDU, "BAN ID", mac_attr.ban_id);
@@ -761,7 +777,6 @@ static void wban_extract_conn_req_frame(Packet* frame_MPDU) {
 	conn_assign_attr.allocation_length = allocation_length;
 	printf("NID=%d Allocation Length=%d.\n", mac_attr.recipient_id, allocation_length);
 	op_prg_odb_bkpt("rcv_req");
-
 	wban_send_conn_assign_frame(allocation_length);
 	/* Stack tracing exit point */
 	FOUT;	
@@ -784,6 +799,7 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 
 	op_pk_nfd_get (frame_MPDU, "Sequence Number", &seq_num);
 	op_pk_nfd_get (frame_MPDU, "Sender ID", &mac_attr.recipient_id);
+
 	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	// op_pk_nfd_get (frame_MSDU, "EAP2 Start", &conn_assign_attr.eap2_start);
 	op_pk_nfd_get (frame_MSDU, "Interval Start", &conn_assign_attr.interval_start);
@@ -801,6 +817,10 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	// }
 
 	printf("Node %s assigned with Interval Start %d slot, Interval End %d slot.\n", node_attr.name, conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+	// log = fopen(log_name, "a");
+	// fprintf(log, "MAP_allocation,Interval_Start=%d,Interval_End=%d\n", conn_assign_attr.interval_start,conn_assign_attr.interval_end);
+	// fclose(log);
+	op_prg_odb_bkpt("debug");
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -826,7 +846,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU_rx), node_attr.data_rate);
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
 	// if I'm a End Device, I get the information and synchronize myself
-	if (!IAM_BAN_HUB) {
+	if (!node_attr.is_BANhub) {
 		op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
 		op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
 		op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
@@ -841,7 +861,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 		}
 		op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.sender_address);
 		op_pk_nfd_get (beacon_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
-		op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
+		// op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
 		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 End", &beacon_attr.rap1_end);
 		// op_pk_nfd_get (beacon_MSDU_rx, "RAP2 Start", &beacon_attr.rap2_start);
 		// op_pk_nfd_get (beacon_MSDU_rx, "RAP2 End", &beacon_attr.rap2_end);
@@ -869,13 +889,18 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 			 * and are only able to transmit in RAP periods.
 			 */
 			/* initialize the NID from 32 */
-			mac_attr.sender_id = current_free_connected_NID++;  //current_free_connected_NID is global variable
+			mac_attr.sender_id = current_free_connected_NID++;
+			// current_free_connected_NID++;
+			// printf("Node %s get the NID=%d\n", node_attr.name, mac_attr.sender_id);
+			// op_prg_odb_bkpt("debug");
 			log = fopen(log_name, "a");
 			fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
 			fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 			fclose(log);
 			printf("t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
 			op_prg_odb_bkpt("init");
+			// op_prg_odb_bkpt("get_nid");
+			// mac_attr.sender_id = node_attr.objid; // we simply use objid as sender_id
 		}
 		wban_schedule_next_beacon();
 	}
@@ -896,8 +921,9 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 	int beacon2_PPDU_size;
 	int rcv_sender_id;
 	int sequence_number_fd;
-	// int eap_indicator_fd;
+	int eap_indicator_fd;
 	int beacon2_enabled_fd;
+	// int i;
 	double beacon2_frame_tx_time;
 	
 	/* Stack tracing enrty point */
@@ -907,8 +933,9 @@ static void wban_extract_beacon2_frame(Packet* beacon2_MPDU_rx) {
 	op_pk_nfd_get_pkt (beacon2_MPDU_rx, "MAC Frame Payload", &beacon2_MSDU_rx);
 	op_pk_nfd_get (beacon2_MPDU_rx, "Sender ID", &rcv_sender_id);
 	op_pk_nfd_get (beacon2_MPDU_rx, "Sequence Number", &sequence_number_fd);
-	// op_pk_nfd_get (beacon2_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
+	op_pk_nfd_get (beacon2_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
 	op_pk_nfd_get (beacon2_MPDU_rx, "B2", &beacon2_enabled_fd);
+
 	// op_pk_nfd_get (beacon2_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
 	// op_pk_nfd_get (beacon2_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
 	op_pk_nfd_get (beacon2_MSDU_rx, "CAP End", &b2_attr.cap_end);
@@ -990,9 +1017,7 @@ static void wban_schedule_next_beacon() {
 	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
 	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
 	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
-	SF.slot_sec =  (pAllocationSlotMin + beacon_attr.allocation_slot_length*pAllocationSlotResolution) * 0.001;
-	printf("allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
-	op_prg_odb_bkpt("slot_sec");
+
 	SF.slot_length2sec = 0.001*allocationSlotLength2ms; // transfer allocation slot length from ms to sec.
 	SF.duration = SF.BI*SF.slot_length2sec;
 	SF.rap1_start = beacon_attr.rap1_start;
