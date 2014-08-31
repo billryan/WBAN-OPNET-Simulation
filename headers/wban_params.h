@@ -1,6 +1,9 @@
 #ifndef BAN_PARAMS_H
 #define BAN_PARAMS_H
 
+/* Misc */
+#define ESSENTIAL   0
+#define VERBOSE     1
 /** PHY Layer constatns		**/
 #define aMaxPHYPacketSize_Octet 	127								// size of PSDU
 #define aMaxPHYPacketSize_Bits 		(8*aMaxPHYPacketSize_Octet)		// 1016 bits
@@ -24,7 +27,7 @@
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
 #define pAllocationSlotMin 500 //500 μs for NB PHY
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
-#define allocationSlotLength 3 //for NB PHY, L=3 means that 2 ms per slot
+#define allocationSlotLength 0 //for NB PHY, L=3 means that 2 ms per slot
 #define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
 
 // constants related to Intra-Frame Spacing IFS 
