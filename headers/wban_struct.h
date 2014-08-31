@@ -128,6 +128,7 @@ typedef struct {
 	int map2_start;
 	int map2_end;
 	int b2_start;
+	int b2_end;
 	int cap_start;
 	int cap_end;
 	int inactive_duration;
