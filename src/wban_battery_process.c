@@ -151,7 +151,7 @@ static void wban_battery_update() {
 				energy_consume.rx -= rx_energy;
 				energy_consume.idle += idle_energy;
 				/* update the consumed energy with the one of in idle state */
-				consumed_energy= tx_energy +idle_energy;
+				consumed_energy= tx_energy + idle_energy - rx_energy;
 				/* update the current energy level */
 				battery.current_energy = battery.current_energy - consumed_energy;
 				
@@ -296,8 +296,8 @@ static void wban_battery_update() {
 		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY,", op_sim_time(), node_name, node_id);
 		fprintf(log, "TX=%f,RX=%f,", energy_consume.tx, energy_consume.rx);
 		fprintf(log, "CCA=%f,IDLE=%f,", energy_consume.cca, energy_consume.idle);
-		fprintf(log, "SLEEP=%f\n", energy_consume.sleep);
-		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY,TOTAL=%f\n", op_sim_time(), node_name, node_id, battery.initial_energy - battery.current_energy);
+		fprintf(log, "SLEEP=%f,", energy_consume.sleep);
+		fprintf(log, "TOTAL=%f\n", battery.initial_energy - battery.current_energy);
 		fclose(log);
 	}
 	/* Stack tracing exit point */
