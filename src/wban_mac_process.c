@@ -516,7 +516,7 @@ static void wban_send_beacon_frame () {
 
 	if(init_flag){
 		log = fopen(log_name, "a");
-		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,INIT,NID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, mac_attr.sender_id);
+		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,INIT,NID=%d,", op_sim_time(), node_attr.name, node_id, mac_attr.sender_id);
 		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		fclose(log);
 		init_flag = OPC_FALSE;
@@ -788,8 +788,7 @@ static void wban_extract_conn_assign_frame(Packet* frame_MPDU) {
 	if(init_flag){
 		log = fopen(log_name, "a");
 		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,INIT,NID=%d,", op_sim_time(), node_attr.name, node_id, mac_attr.sender_id);
-		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d,", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
-		fprintf(log, "MAP1_START=%d,MAP1_END=%d\n", conn_assign_attr.interval_start, conn_assign_attr.interval_end);
+		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		fclose(log);
 		printf("t=%f,NODE_NAME=%s,NID=%d,INIT\n", op_sim_time(), node_attr.name, mac_attr.sender_id);
 		printf("\t  Assigned with Interval Start %d slot, Interval End %d slot.\n", conn_assign_attr.interval_start, conn_assign_attr.interval_end);
@@ -1995,6 +1994,7 @@ static void wban_mac_interrupt_process() {
 			data_pkt_num = 0;
 			data_pkt_latency_total = 0;
 			data_pkt_latency_avg = 0;
+			/* IF Hub process first then it will not get the real subq data info */
 			subq_data_info_get();
 			log = fopen(log_name, "a");
 			for(i=0; i<UP_ALL; i++){
@@ -2014,12 +2014,11 @@ static void wban_mac_interrupt_process() {
 				}
 			}
 			if(IAM_BAN_HUB){
+				/* UP=8 means the UP in total */
 				data_pkt_latency_avg = data_pkt_latency_total / data_pkt_num;
-				fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,DATA_LATENCY_AVG,", op_sim_time(), node_attr.name, node_id);
-				fprintf(log, "LATENCY_AVG_ALL=%f\n", data_pkt_latency_avg);
+				fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,DATA_LATENCY,", op_sim_time(), node_attr.name, node_id);
+				fprintf(log, "UP=8,LATENCY_AVG=%f\n", data_pkt_latency_avg);
 			}
-			fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY_TX=%f\n", op_sim_time(), node_attr.name, node_id, 17.4*0.001*3*t_tx_interval);
-			fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY_RX=%f\n", op_sim_time(), node_attr.name, node_id, 24.8*0.001*3*t_rx_interval);
 			fclose(log);
 			// op_prg_odb_bkpt("debug_end");
 			// wban_battery_end();
