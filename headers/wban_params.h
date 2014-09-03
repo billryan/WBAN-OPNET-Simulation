@@ -30,11 +30,6 @@
 #define allocationSlotLength 0 //for NB PHY, L=3 means that 2 ms per slot
 #define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
 
-// constants related to Intra-Frame Spacing IFS 
-#define aMaxSIFSFrameSize_Bits	(18*8)
-#define aMinLIFSPeriod	40
-#define aMinSIFSPeriod	12
-
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
 #define SYMBOL_RATE 600000.0 // 600 Ksps
@@ -77,8 +72,6 @@
 #define COORDINATOR_REALIGMNET 8
 #define GTS_REQ 9
 
-// WPAN bit rate [bps]
-#define WPAN_DATA_RATE 250000.0
 // WBAN bit rate [bps]
 #define WBAN_DATA_RATE 971400.0
 #define WBAN_DATA_RATE_KBITS (WBAN_DATA_RATE/1000.0)
