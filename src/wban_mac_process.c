@@ -208,18 +208,19 @@ static void wban_mac_init() {
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
-	char directory_path_name[200];
+	char dir_path[200];
 	char buffer[30];
+	int i;
 	time_t rawtime;
 	struct tm *p;
 
 	/* Stack tracing enrty point */
 	FIN(wban_log_file_init);
 
-	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", directory_path_name);
+	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", dir_path);
 	op_ima_obj_attr_get (node_attr.objid, "Log Level", &log_level);
-	/* verification if the directory_path_name is a valid directory */
-	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
+	/* verification if the dir_path is a valid directory */
+	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
 		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
 	}
 
@@ -227,7 +228,16 @@ static void wban_log_file_init() {
 	p=localtime(&rawtime);
 	// strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
 	strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
-	sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, node_attr.protocol_ver);
+	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
+		if (dir_path[i] == '\0'){
+			break;
+		}
+	}
+	if(dir_path[i-1] == '\\'){
+		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+	}else{
+		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+	}
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -495,7 +505,6 @@ static void wban_send_beacon_frame () {
 	// if(SF.rap1_start > 0){
 	// 	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
 	// }
-
 	if(init_flag){
 		log = fopen(log_name, "a");
 		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,INIT,NID=%d,", op_sim_time(), node_attr.name, node_id, mac_attr.sender_id);
@@ -503,10 +512,10 @@ static void wban_send_beacon_frame () {
 		fclose(log);
 		init_flag = OPC_FALSE;
 		SF.slot_sec = (pAllocationSlotMin + beacon_attr.allocation_slot_length*pAllocationSlotResolution) * 0.000001;
-		printf("\nt=%f,NODE_NAME=%s,NID=%d,INIT,MAC_STATE=%d\n", op_sim_time(), node_attr.name, mac_attr.sender_id, mac_state);
-		printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
-		printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
-		op_prg_odb_bkpt("init");
+		// printf("\nt=%f,NODE_NAME=%s,NID=%d,INIT,MAC_STATE=%d\n", op_sim_time(), node_attr.name, mac_attr.sender_id, mac_state);
+		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
+		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
+		// op_prg_odb_bkpt("init");
 	}
 	SF.current_slot = (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
 
