@@ -135,10 +135,11 @@
 #define SENT    3
 #define RCV     4
 #define SUBQ    5
+#define FAIL    6
 /* use the DATA_STATE to replace constant 6 */
-#define DATA_STATE 6
+#define DATA_STATE 7
 
-/** APP Layer constants		**/
+/** APP Layer constants	**/
 // enum USER_PRIORITY {
 // 	UP0 = 0,
 // 	UP1 = 1,
