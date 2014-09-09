@@ -15,8 +15,9 @@ static void wban_battery_init() {
 	Objid current_draw_comp_id; 
 	Objid current_draw_id;
 	int protocol_ver;
-	char directory_path_name[200];
+	char dir_path[200];
 	char buffer[30];
+	int i;
 	time_t rawtime;
 	struct tm *p;
 
@@ -31,14 +32,14 @@ static void wban_battery_init() {
 	/* get the value to check if this node is PAN Coordinator or not */
 	op_ima_obj_attr_get (battery.parent_id, "Device Mode", &battery.Device_Mode);
 	op_ima_obj_attr_get (battery.parent_id, "name", node_name);
-	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", directory_path_name);
+	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", dir_path);
 
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (battery.parent_id, "Protocol Version", &protocol_ver);
-	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", directory_path_name);
+	op_ima_obj_attr_get (battery.parent_id, "Log File Directory", dir_path);
 
-	/* verification if the directory_path_name is a valid directory */
-	if (prg_path_name_is_dir (directory_path_name) == PrgC_Path_Name_Is_Not_Dir) {
+	/* verification if the dir_path is a valid directory */
+	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
 		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
 	}
 
@@ -46,8 +47,18 @@ static void wban_battery_init() {
 	p=localtime(&rawtime);
     // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
     strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
-    sprintf(log_name, "%s%s-ver%d.trace", directory_path_name, buffer, protocol_ver);
+    sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, protocol_ver);
 
+	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
+		if (dir_path[i] == '\0'){
+			break;
+		}
+	}
+	if(dir_path[i-1] == '\\'){
+		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, protocol_ver);
+	}else{
+		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, protocol_ver);
+	}
     /* Check for existence */
     // if((_access( log_name, 0 )) != -1){
     //     printf("File %s exists\n", log_name);
