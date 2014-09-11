@@ -219,10 +219,6 @@ static void wban_log_file_init() {
 
 	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", dir_path);
 	op_ima_obj_attr_get (node_attr.objid, "Log Level", &log_level);
-	/* verification if the dir_path is a valid directory */
-	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
-		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
-	}
 
 	time(&rawtime);
 	p=localtime(&rawtime);
@@ -233,10 +229,17 @@ static void wban_log_file_init() {
 			break;
 		}
 	}
+	if(prg_file_path_create(dir_path, PRGC_FILE_PATH_CREATE_OPT_DIRECTORY) == PrgC_Compcode_Failure){
+		op_sim_end("ERROR : Log File is not valid.","INVALID_FILE", "","");
+	}
 	if(dir_path[i-1] == '\\'){
 		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
 	}else{
 		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+	}
+	/* verification if the dir_path is a valid directory */
+	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
+		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
 	}
 	
 	/* Stack tracing exit point */
@@ -1815,11 +1818,7 @@ static void wban_mac_interrupt_process() {
 								csma.CW = CWmax[pkt_to_be_sent.user_priority];
 							}
 							// printf("\t  csma.CW=%d doubled after pkt_tx_fail=%d\n", csma.CW, pkt_tx_fail);
-
 						}
-					}
-					if(pkt_tx_fail > 1){
-						// op_prg_odb_bkpt("debug_cw");
 					}
 					// check if we reached the max number and if so delete the packet
 					if (pkt_tx_fail >= max_packet_tries) {
@@ -1839,6 +1838,12 @@ static void wban_mac_interrupt_process() {
 						// printf("\t  Packet transmission exceeds max packet tries at time\n");
 						// remove MAC frame (MPDU) frame_MPDU_to_be_sent
 						// op_pk_destroy(frame_MPDU_to_be_sent);
+						if(pkt_to_be_sent.frame_type == DATA){
+							data_stat_local[pkt_to_be_sent.frame_subtype][FAIL].number += 1;
+							data_stat_local[pkt_to_be_sent.frame_subtype][FAIL].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
+							data_stat_all[pkt_to_be_sent.frame_subtype][FAIL].number += 1;
+							data_stat_all[pkt_to_be_sent.frame_subtype][FAIL].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
+						}
 						pkt_to_be_sent.enable = OPC_FALSE;
 						waitForACK = OPC_FALSE;
 						TX_ING = OPC_FALSE;
@@ -1950,7 +1955,7 @@ static void wban_mac_interrupt_process() {
 			data_pkt_latency_avg = 0;
 			data_pkt_ppdu_kbits = 0;
 			thput_msdu_kbps = 0;
-			/* IF Hub process first then it will not get the real subq data info */
+			/* If Hub process first then it will not get the real subq data info */
 			subq_data_info_get();
 			log = fopen(log_name, "a");
 			for(i=0; i<UP_ALL; i++){
@@ -2225,6 +2230,12 @@ static void wban_attempt_TX() {
 		pkt_tx_total = 0;
 		pkt_tx_out_phase = 0;
 		pkt_tx_fail = 0;
+		if(pkt_to_be_sent.frame_type == DATA){
+			data_stat_local[pkt_to_be_sent.frame_subtype][FAIL].number += 1;
+			data_stat_local[pkt_to_be_sent.frame_subtype][FAIL].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
+			data_stat_all[pkt_to_be_sent.frame_subtype][FAIL].number += 1;
+			data_stat_all[pkt_to_be_sent.frame_subtype][FAIL].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
+		}
 	}
 
 	// Try to draw a new packet from the data or Management buffers.
