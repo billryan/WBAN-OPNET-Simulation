@@ -1,6 +1,9 @@
 #ifndef BAN_PARAMS_H
 #define BAN_PARAMS_H
 
+/* Misc */
+#define ESSENTIAL   0
+#define VERBOSE     1
 /** PHY Layer constatns		**/
 #define aMaxPHYPacketSize_Octet 	127								// size of PSDU
 #define aMaxPHYPacketSize_Bits 		(8*aMaxPHYPacketSize_Octet)		// 1016 bits
@@ -24,13 +27,8 @@
 //the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
 #define pAllocationSlotMin 500 //500 μs for NB PHY
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
-#define allocationSlotLength 9 //for NB PHY, L=9 means that 5 ms per slot
-#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //5 ms default
-
-// constants related to Intra-Frame Spacing IFS 
-#define aMaxSIFSFrameSize_Bits	(18*8)
-#define aMinLIFSPeriod	40
-#define aMinSIFSPeriod	12
+#define allocationSlotLength 0 //for NB PHY, L=3 means that 2 ms per slot
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
 
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
@@ -63,19 +61,6 @@
 #define ACK_FRAME_TYPE 2
 #define COMMAND_FRAME_TYPE 3
 
-/** Command frame identifiers **/
-#define ASSOCIATION_REQ 1
-#define ASSOCIATION_RES 2
-#define DISASSOCIATION_NOT 3
-#define DATA_REQ 4
-#define PAN_ID_CONFLICT_NOT 5
-#define ORPHAN_NOT 6
-#define BEACON_REQ 7
-#define COORDINATOR_REALIGMNET 8
-#define GTS_REQ 9
-
-// WPAN bit rate [bps]
-#define WPAN_DATA_RATE 250000.0
 // WBAN bit rate [bps]
 #define WBAN_DATA_RATE 971400.0
 #define WBAN_DATA_RATE_KBITS (WBAN_DATA_RATE/1000.0)
@@ -100,22 +85,6 @@
 //int unconnectedNID; // start assigning unconnectedNID from ID 1
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
-
-
-
-#define Symbol2Bits 4
-
-// Frame Control Field - Dest./Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
-#define MAC_HEADER_SIZE 104	
-
-// Frame Control Field - Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
-#define BEACON_HEADER_SIZE 72
-
-// Physical layer header [bits]
-#define PHY_HEADER_SIZE 121
-
-// Beacon frame (MAC payload MSDU) size with length of beacon payload set to 0 [bits]
-#define BEACON_MSDU_SIZE 32
 
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40
@@ -143,10 +112,11 @@
 #define SENT    3
 #define RCV     4
 #define SUBQ    5
+#define FAIL    6
 /* use the DATA_STATE to replace constant 6 */
-#define DATA_STATE 6
+#define DATA_STATE 7
 
-/** APP Layer constants		**/
+/** APP Layer constants	**/
 // enum USER_PRIORITY {
 // 	UP0 = 0,
 // 	UP1 = 1,

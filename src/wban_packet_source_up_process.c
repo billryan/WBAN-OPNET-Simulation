@@ -36,10 +36,11 @@ static void wban_source_init() {
 	/* get the name of the node */
 	op_ima_obj_attr_get (parent_id, "name", node_name);
 
+	printf("%s User Priority Traffic initialization.\n", node_name);
 	op_ima_obj_attr_get (own_id, "User Priority 7 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up7-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up7_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up7_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up7_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up7_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up7_stop_time);	
@@ -47,7 +48,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 6 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up6-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up6_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up6_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up6_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up6_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up6_stop_time);	
@@ -55,7 +56,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 5 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up5-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up5_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up5_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up5_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up5_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up5_stop_time);	
@@ -63,7 +64,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 4 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up4-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up4_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up4_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up4_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up4_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up4_stop_time);	
@@ -71,7 +72,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 3 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up3-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up3_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up3_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up3_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up3_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up3_stop_time);	
@@ -79,7 +80,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 2 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up2-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up2_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up2_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up2_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up2_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up2_stop_time);	
@@ -87,7 +88,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 1 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up1-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up1_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up1_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up1_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up1_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up1_stop_time);	
@@ -95,7 +96,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (own_id, "User Priority 0 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up0-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
-	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interarrival Time", up0_msdu_interarrival_dist_str);
+	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Interval Time", up0_msdu_interarrival_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "MSDU Size",              up0_msdu_size_dist_str);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Start Time",             &up0_start_time);
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up0_stop_time);	
@@ -112,35 +113,35 @@ static void wban_source_init() {
 		up0_start_time = SC_INFINITE_TIME;
 	}
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up7_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up7_msdu_interarrival_dist_str);
 	up7_msdu_size_dist_ptr       = oms_dist_load_from_string (up7_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up6_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up6_msdu_interarrival_dist_str);
 	up6_msdu_size_dist_ptr       = oms_dist_load_from_string (up6_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up5_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up5_msdu_interarrival_dist_str);
 	up5_msdu_size_dist_ptr       = oms_dist_load_from_string (up5_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up4_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up4_msdu_interarrival_dist_str);
 	up4_msdu_size_dist_ptr       = oms_dist_load_from_string (up4_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up3_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up3_msdu_interarrival_dist_str);
 	up3_msdu_size_dist_ptr       = oms_dist_load_from_string (up3_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up2_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up2_msdu_interarrival_dist_str);
 	up2_msdu_size_dist_ptr       = oms_dist_load_from_string (up2_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up1_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up1_msdu_interarrival_dist_str);
 	up1_msdu_size_dist_ptr       = oms_dist_load_from_string (up1_msdu_size_dist_str);
 
-	/* Load the PDFs that will be used in computing the MSDU Interarrival Times and MSDU Sizes. */
+	/* Load the PDFs that will be used in computing the MSDU Interval Times and MSDU Sizes. */
 	up0_msdu_interarrival_dist_ptr = oms_dist_load_from_string (up0_msdu_interarrival_dist_str);
 	up0_msdu_size_dist_ptr       = oms_dist_load_from_string (up0_msdu_size_dist_str);
 
@@ -289,9 +290,7 @@ static void wban_source_init() {
 static void wban_print_parameters() {
 
 	/* Stack tracing enrty point */	
-	FIN(wban_print_parameters);
-
-	
+	FIN(wban_print_parameters);	
 		printf (" User Priority 7 Traffic parameters:\n");
 		printf ("\t MSDU Interarival PDF : %s\n", up7_msdu_interarrival_dist_str);
 		printf ("\t MSDU Size PDF        : %s\n", up7_msdu_size_dist_str);
@@ -306,6 +305,22 @@ static void wban_print_parameters() {
 		}
 		else {
 			printf ("\t Stop time            : %f\n", up7_stop_time);
+		}
+
+		printf (" User Priority 6 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up6_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up6_msdu_size_dist_str);
+		if (up6_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up6_start_time);
+		}
+		if (up6_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up6_stop_time);
 		}
 
 		printf (" User Priority 5 Traffic parameters:\n");
@@ -324,6 +339,86 @@ static void wban_print_parameters() {
 			printf ("\t Stop time            : %f\n", up5_stop_time);
 		}
 
+		printf (" User Priority 4 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up4_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up4_msdu_size_dist_str);
+		if (up4_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up4_start_time);
+		}
+		if (up4_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up4_stop_time);
+		}
+
+		printf (" User Priority 3 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up3_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up3_msdu_size_dist_str);
+		if (up3_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up3_start_time);
+		}
+		if (up3_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up3_stop_time);
+		}
+
+		printf (" User Priority 2 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up2_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up2_msdu_size_dist_str);
+		if (up2_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up2_start_time);
+		}
+		if (up2_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up2_stop_time);
+		}
+
+		printf (" User Priority 1 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up1_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up1_msdu_size_dist_str);
+		if (up1_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up1_start_time);
+		}
+		if (up1_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up1_stop_time);
+		}
+
+		printf (" User Priority 0 Traffic parameters:\n");
+		printf ("\t MSDU Interarival PDF : %s\n", up0_msdu_interarrival_dist_str);
+		printf ("\t MSDU Size PDF        : %s\n", up0_msdu_size_dist_str);
+		if (up0_start_time == -1) {
+			printf ("\t Start time           : Infinity \n");
+		}
+		else {
+			printf ("\t Start time           : %f\n", up0_start_time);
+		}
+		if (up0_stop_time == -1) {
+			printf ("\t Stop time            : Infinity \n");
+		}
+		else {
+			printf ("\t Stop time            : %f\n", up0_stop_time);
+		}
+
 		if (destination_id == HUB_ID) {
 			printf (" Destination ID : HUB_ID \n");
 		}
@@ -334,8 +429,6 @@ static void wban_print_parameters() {
 			printf (" Destination ID : %d (%#X)\n", destination_id, destination_id);
 		}
 		printf ("|-----------------------------------------------------------------------------|\n\n");
-	
-	
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -405,11 +498,11 @@ static void wban_up7_traffic_generate() {
 	
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up7_stop_time) || (up7_stop_time == SC_INFINITE_TIME)) {
 		up7_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP7);
-		printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -450,7 +543,7 @@ static void wban_up6_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32668;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 6);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -470,7 +563,7 @@ static void wban_up6_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up6_stop_time) || (up6_stop_time == SC_INFINITE_TIME)) {
 		up6_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP6);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP6 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -545,14 +638,12 @@ static void wban_up5_traffic_generate() {
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
 	
 
-		printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+		// printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	
 	if ((abs_next_intarr_time <= up5_stop_time) || (up5_stop_time == SC_INFINITE_TIME)) {
 		up5_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP5);
-		
-		
-			printf ("\t Next UP5 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+			// printf ("\t Next UP5 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 		
 	}
 		
@@ -595,7 +686,7 @@ static void wban_up4_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32448;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 4);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -615,7 +706,7 @@ static void wban_up4_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up4_stop_time) || (up4_stop_time == SC_INFINITE_TIME)) {
 		up4_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP4);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP4 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -656,7 +747,7 @@ static void wban_up3_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32338;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 3);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -676,7 +767,7 @@ static void wban_up3_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up3_stop_time) || (up3_stop_time == SC_INFINITE_TIME)) {
 		up3_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP3);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP3 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -717,7 +808,7 @@ static void wban_up2_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32228;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 2);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -737,7 +828,7 @@ static void wban_up2_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up2_stop_time) || (up2_stop_time == SC_INFINITE_TIME)) {
 		up2_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP2);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP2 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -778,7 +869,7 @@ static void wban_up1_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32118;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 1);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -798,7 +889,7 @@ static void wban_up1_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up1_stop_time) || (up1_stop_time == SC_INFINITE_TIME)) {
 		up1_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP1);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP1 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -839,7 +930,7 @@ static void wban_up0_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32008;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 0);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -859,7 +950,7 @@ static void wban_up0_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up0_stop_time) || (up0_stop_time == SC_INFINITE_TIME)) {
 		up0_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP0);
-		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP0 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
