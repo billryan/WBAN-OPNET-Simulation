@@ -46,7 +46,8 @@ static void wban_battery_init() {
 	time(&rawtime);
 	p=localtime(&rawtime);
     // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
-    strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+	// strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+	strftime(buffer, 30, "%Y-%m-%d", p);
     sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, protocol_ver);
 
 	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
@@ -153,7 +154,7 @@ static void wban_battery_update() {
 				rx_energy = (battery.current_rx_mA * MILLI) * tx_time * battery.power_supply;
 				/* compute the time spent by the node in idle state */
 				idle_duration = op_sim_time()-tx_time-activity.last_idle_time;
-				printf("t=%f,NODE_NAME=%s,PACKET_TX_CODE,tx_time=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,tx_time,activity.last_idle_time);
+				// printf("t=%f,NODE_NAME=%s,PACKET_TX_CODE,tx_time=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,tx_time,activity.last_idle_time);
 				if(idle_duration < 0){
 					idle_duration = 0;
 				}
@@ -190,7 +191,7 @@ static void wban_battery_update() {
 				}else{
 					idle_duration = op_sim_time()-rx_time-activity.last_idle_time;
 				}
-				printf("t=%f,NODE_NAME=%s,PACKET_RX_CODE,rx_time=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,rx_time,activity.last_idle_time);
+				// printf("t=%f,NODE_NAME=%s,PACKET_RX_CODE,rx_time=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,rx_time,activity.last_idle_time);
 				if(idle_duration < 0){
 					idle_duration = 0;
 				}
@@ -223,7 +224,7 @@ static void wban_battery_update() {
 				op_ici_attr_get(iciptr, "MAC STATE", &mac_state);
 				op_ici_destroy(iciptr);
 				idle_duration = op_sim_time()-activity.last_idle_time;
-				printf("t=%f,NODE_NAME=%s,CCA_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
+				// printf("t=%f,NODE_NAME=%s,CCA_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
 				if(idle_duration < 0){
 					idle_duration = 0;
 				}
@@ -258,7 +259,7 @@ static void wban_battery_update() {
 				op_ici_destroy(iciptr);
 				/* compute the time spent by the node in idle state */
 				idle_duration = op_sim_time()-activity.last_idle_time;
-				printf("t=%f,NODE_NAME=%s,START_OF_SLEEP_PERIOD_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
+				// printf("t=%f,NODE_NAME=%s,START_OF_SLEEP_PERIOD_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
 				if(idle_duration < 0){
 					idle_duration = 0;
 				}

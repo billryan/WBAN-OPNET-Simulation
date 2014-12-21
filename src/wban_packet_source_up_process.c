@@ -498,11 +498,11 @@ static void wban_up7_traffic_generate() {
 	
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up7_stop_time) || (up7_stop_time == SC_INFINITE_TIME)) {
 		up7_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP7);
-		printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP7 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -543,7 +543,7 @@ static void wban_up6_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32668;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 6);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -563,7 +563,7 @@ static void wban_up6_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up6_stop_time) || (up6_stop_time == SC_INFINITE_TIME)) {
 		up6_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP6);
-		printf ("\t Next UP6 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP6 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -638,12 +638,12 @@ static void wban_up5_traffic_generate() {
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
 	
 
-		printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+		// printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	
 	if ((abs_next_intarr_time <= up5_stop_time) || (up5_stop_time == SC_INFINITE_TIME)) {
 		up5_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP5);
-			printf ("\t Next UP5 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+			// printf ("\t Next UP5 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 		
 	}
 		
@@ -686,7 +686,7 @@ static void wban_up4_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32448;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 4);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -706,7 +706,7 @@ static void wban_up4_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up4_stop_time) || (up4_stop_time == SC_INFINITE_TIME)) {
 		up4_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP4);
-		printf ("\t Next UP4 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP4 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -747,7 +747,7 @@ static void wban_up3_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32338;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 3);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -767,7 +767,7 @@ static void wban_up3_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up3_stop_time) || (up3_stop_time == SC_INFINITE_TIME)) {
 		up3_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP3);
-		printf ("\t Next UP3 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP3 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -808,7 +808,7 @@ static void wban_up2_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32228;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 2);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -828,7 +828,7 @@ static void wban_up2_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up2_stop_time) || (up2_stop_time == SC_INFINITE_TIME)) {
 		up2_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP2);
-		printf ("\t Next UP2 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP2 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -869,7 +869,7 @@ static void wban_up1_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32118;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 1);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -889,7 +889,7 @@ static void wban_up1_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up1_stop_time) || (up1_stop_time == SC_INFINITE_TIME)) {
 		up1_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP1);
-		printf ("\t Next UP1 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP1 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */
@@ -930,7 +930,7 @@ static void wban_up0_traffic_generate() {
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
 	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32008;
+	dataSN = (dataSN + 1) % 32768;
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 0);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -950,7 +950,7 @@ static void wban_up0_traffic_generate() {
 	
 	if ((abs_next_intarr_time <= up0_stop_time) || (up0_stop_time == SC_INFINITE_TIME)) {
 		up0_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP0);
-		printf ("\t Next UP0 MSDU will be generated at %f\n\n", abs_next_intarr_time);
+		// printf ("\t Next UP0 MSDU will be generated at %f\n\n", abs_next_intarr_time);
 	}
 
 	/* Stack tracing exit point */

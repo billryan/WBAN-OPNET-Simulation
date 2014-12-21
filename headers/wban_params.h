@@ -61,17 +61,6 @@
 #define ACK_FRAME_TYPE 2
 #define COMMAND_FRAME_TYPE 3
 
-/** Command frame identifiers **/
-#define ASSOCIATION_REQ 1
-#define ASSOCIATION_RES 2
-#define DISASSOCIATION_NOT 3
-#define DATA_REQ 4
-#define PAN_ID_CONFLICT_NOT 5
-#define ORPHAN_NOT 6
-#define BEACON_REQ 7
-#define COORDINATOR_REALIGMNET 8
-#define GTS_REQ 9
-
 // WBAN bit rate [bps]
 #define WBAN_DATA_RATE 971400.0
 #define WBAN_DATA_RATE_KBITS (WBAN_DATA_RATE/1000.0)
@@ -96,18 +85,6 @@
 //int unconnectedNID; // start assigning unconnectedNID from ID 1
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
-
-// Frame Control Field - Dest./Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
-#define MAC_HEADER_SIZE 104	
-
-// Frame Control Field - Src. addressing mode = 10b (Address field contains a 16  bit short address) - [bits] MHR+MFR
-#define BEACON_HEADER_SIZE 72
-
-// Physical layer header [bits]
-#define PHY_HEADER_SIZE 121
-
-// Beacon frame (MAC payload MSDU) size with length of beacon payload set to 0 [bits]
-#define BEACON_MSDU_SIZE 32
 
 // ACK frame (MPDU) size [bits]
 #define ACK_FRAME_SIZE_BITS 40

@@ -59,6 +59,8 @@ static void wban_mac_init() {
 	op_ima_obj_attr_get (mac_attr_comp_id, "MGMT Buffer Size", &mac_attr.MGMT_buffer_size);
 	op_ima_obj_attr_get (mac_attr_comp_id, "DATA Buffer Size", &mac_attr.DATA_buffer_size);
 	mac_attr.wait_for_ack = OPC_FALSE;
+	op_ima_obj_attr_set (SUBQ_MAN, "pk capacity", mac_attr.MGMT_buffer_size);
+	op_ima_obj_attr_set (SUBQ_DATA, "pk capacity", mac_attr.DATA_buffer_size);
 
 	/*get the battery attribute ID*/
 	node_attr.my_battery = op_id_from_name (node_attr.objid, OPC_OBJTYPE_PROC, "Battery");
@@ -223,7 +225,8 @@ static void wban_log_file_init() {
 	time(&rawtime);
 	p=localtime(&rawtime);
 	// strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
-	strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+	// strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+	strftime(buffer, 30, "%Y-%m-%d", p);
 	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
 		if (dir_path[i] == '\0'){
 			break;
@@ -313,8 +316,6 @@ static void wban_parse_incoming_frame() {
 			// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			// fclose(log);
-			// printf("\nt=%f,NODE_NAME=%s,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d\n", op_sim_time(), node_attr.name, mac_state, recipient_id, sender_id);
-			// printf("\t  FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
@@ -2159,7 +2160,7 @@ static void wban_attempt_TX() {
 	/* Stack tracing enrty point */
 	FIN(wban_attempt_TX);
 
-	printf("\nt=%f,NODE_NAME=%s,mac_state=%d\n", op_sim_time(), node_attr.name, mac_state);
+	// printf("\nt=%f,NODE_NAME=%s,mac_state=%d\n", op_sim_time(), node_attr.name, mac_state);
 	if(waitForACK || attemptingToTX || TX_ING){
 		if(waitForACK) printf("\t  waitForACK=True,");
 		if(attemptingToTX) printf("\t  attemptingToTX=True,");
