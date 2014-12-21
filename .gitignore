@@ -1,3 +1,4 @@
 *.obj
-*.c
+*pr.c
 *.cpp
+*.swp
