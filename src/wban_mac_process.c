@@ -258,6 +258,7 @@ static void wban_log_file_init() {
  *--------------------------------------------------------------------------------*/
 static void wban_parse_incoming_frame() {
 	Packet* frame_MPDU;
+	Packet* frame_MSDU;
 	Packet* rcv_frame;
 	int Stream_ID;
 	int ban_id;
@@ -272,6 +273,7 @@ static void wban_parse_incoming_frame() {
 	int inactive_fd;
 	int ppdu_bits;
 	double ete_delay;
+	double app_latency;
 
 	/* Stack tracing enrty point */
 	FIN(wban_parse_incoming_frame);
@@ -316,6 +318,8 @@ static void wban_parse_incoming_frame() {
 			// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			// fclose(log);
+			// printf("t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
+			// printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
@@ -333,6 +337,14 @@ static void wban_parse_incoming_frame() {
 				case DATA: /* Handle data packets */
 					// printf ("\t  Data Packet reception from sender_id=%d\n", sender_id);
 					/* collect statistics */
+					op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
+					app_latency = op_sim_time() - op_pk_creation_time_get(frame_MSDU);
+					// printf ("\t  frame_MSDU_create_time=%f, app_latency=%f\n", op_pk_creation_time_get(frame_MSDU), app_latency);
+					// log = fopen(log_name, "a");
+					// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
+					// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,APP_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, app_latency);
+					// fclose(log);
+					// op_prg_odb_bkpt("debug_app");
 					latency_avg[frame_subtype_fd] = (latency_avg[frame_subtype_fd] * data_stat_local[frame_subtype_fd][RCV].number + ete_delay)/(data_stat_local[frame_subtype_fd][RCV].number + 1);
 					data_stat_local[frame_subtype_fd][RCV].number += 1;
 					data_stat_local[frame_subtype_fd][RCV].ppdu_kbits += 0.001*ppdu_bits;
@@ -1350,10 +1362,8 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
 	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
 	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
-
 	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
 	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
-
 	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
 	op_pk_nfd_set (data_frame_mpdu, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (data_frame_mpdu, "BAN ID", mac_attr.ban_id);
@@ -1374,6 +1384,8 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
 		data_stat_all[user_priority][QUEUE_SUCC].ppdu_kbits += 0.001*wban_norm_phy_bits(data_frame_mpdu);
 		// printf("\nt=%f,NODE_NAME=%s,MAC_STATE=%d,APP_LAYER_ENQUEUE_SUCC,SENDER_ID=%d,RECIPIENT_ID=%d,", op_sim_time(), node_attr.name, mac_state, mac_attr.sender_id, dest_id);
 		// printf("\t  FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d\n", DATA, user_priority, wban_norm_phy_bits(data_frame_mpdu));
+		// printf(" [Node %s] t = %f, data_frame_msdu_create_time = %f, data_frame_mpdu_create_time = %f\n", \
+		// 	node_attr.name, op_sim_time(), op_pk_creation_time_get(data_frame_msdu), op_pk_creation_time_get(data_frame_mpdu));
 		// op_prg_odb_bkpt("debug_app");
 	} else {
 		data_stat_local[user_priority][QUEUE_FAIL].number += 1;

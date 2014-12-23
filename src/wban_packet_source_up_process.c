@@ -296,14 +296,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up7_msdu_size_dist_str);
 		if (up7_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up7_start_time);
 		}
 		if (up7_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up7_stop_time);
 		}
 
@@ -312,14 +310,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up6_msdu_size_dist_str);
 		if (up6_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up6_start_time);
 		}
 		if (up6_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up6_stop_time);
 		}
 
@@ -328,14 +324,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up5_msdu_size_dist_str);
 		if (up5_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up5_start_time);
 		}
 		if (up5_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up5_stop_time);
 		}
 
@@ -344,14 +338,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up4_msdu_size_dist_str);
 		if (up4_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up4_start_time);
 		}
 		if (up4_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up4_stop_time);
 		}
 
@@ -360,14 +352,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up3_msdu_size_dist_str);
 		if (up3_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up3_start_time);
 		}
 		if (up3_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up3_stop_time);
 		}
 
@@ -376,14 +366,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up2_msdu_size_dist_str);
 		if (up2_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up2_start_time);
 		}
 		if (up2_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up2_stop_time);
 		}
 
@@ -392,14 +380,12 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up1_msdu_size_dist_str);
 		if (up1_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up1_start_time);
 		}
 		if (up1_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up1_stop_time);
 		}
 
@@ -408,24 +394,20 @@ static void wban_print_parameters() {
 		printf ("\t MSDU Size PDF        : %s\n", up0_msdu_size_dist_str);
 		if (up0_start_time == -1) {
 			printf ("\t Start time           : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Start time           : %f\n", up0_start_time);
 		}
 		if (up0_stop_time == -1) {
 			printf ("\t Stop time            : Infinity \n");
-		}
-		else {
+		} else {
 			printf ("\t Stop time            : %f\n", up0_stop_time);
 		}
 
 		if (destination_id == HUB_ID) {
 			printf (" Destination ID : HUB_ID \n");
-		}
-		else if (destination_id == 0xFF) {
+		} else if (destination_id == 0xFF) {
 			printf (" Destination ID : Broadcast - %d (%#X) \n", destination_id, destination_id);
-		}
-		else {
+		} else {
 			printf (" Destination ID : %d (%#X)\n", destination_id, destination_id);
 		}
 		printf ("|-----------------------------------------------------------------------------|\n\n");
@@ -454,7 +436,7 @@ static void wban_up7_traffic_generate() {
 	
 	/* Generate a MSDU size outcome.		*/
 	msdu_size = (int) ceil (oms_dist_outcome (up7_msdu_size_dist_ptr));
-		
+
 	/* 0 <= MAC frame body <= pMaxFrameBodyLength_Bits */
 	if (msdu_size > pMaxFrameBodyLength_Bits)
 		msdu_size = pMaxFrameBodyLength_Bits;	/* The size of generated MSDU is bigger than the maximum - the size is set to the maximum. */
@@ -496,9 +478,12 @@ static void wban_up7_traffic_generate() {
 	// app_sent_msdu_bits = app_sent_msdu_bits + (msdu_size/1000.0);	
 	// app_sent_msdu_nbr = app_sent_msdu_nbr + 1;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up7_stop_time) || (up7_stop_time == SC_INFINITE_TIME)) {
 		up7_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP7);
@@ -557,9 +542,12 @@ static void wban_up6_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up6_stop_time) || (up6_stop_time == SC_INFINITE_TIME)) {
 		up6_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP6);
@@ -634,11 +622,13 @@ static void wban_up5_traffic_generate() {
 	// app_sent_msdu_bits = app_sent_msdu_bits + (msdu_size/1000.0);	
 	// app_sent_msdu_nbr = app_sent_msdu_nbr + 1;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
+	
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	
-
-		// printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP5 MSDU (size = %d bits) \
+			// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	
 	if ((abs_next_intarr_time <= up5_stop_time) || (up5_stop_time == SC_INFINITE_TIME)) {
@@ -700,9 +690,12 @@ static void wban_up4_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up4_stop_time) || (up4_stop_time == SC_INFINITE_TIME)) {
 		up4_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP4);
@@ -761,9 +754,12 @@ static void wban_up3_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up3_stop_time) || (up3_stop_time == SC_INFINITE_TIME)) {
 		up3_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP3);
@@ -822,9 +818,12 @@ static void wban_up2_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up2_stop_time) || (up2_stop_time == SC_INFINITE_TIME)) {
 		up2_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP2);
@@ -883,9 +882,12 @@ static void wban_up1_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up1_stop_time) || (up1_stop_time == SC_INFINITE_TIME)) {
 		up1_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP1);
@@ -944,9 +946,12 @@ static void wban_up0_traffic_generate() {
 
 	abs_next_intarr_time = op_sim_time () + next_intarr_time;
 	
+	// printf(" [Node %s] t = %f, msdu_create_time = %f, app_pkt_create_time = %f\n", \
+	// 	node_name, op_sim_time(), op_pk_creation_time_get(msdu_ptr), op_pk_creation_time_get(app_traffic_ptr));
 	/* send the App traffic via the stream to the lower layer.	*/
 	op_pk_send (app_traffic_ptr, STRM_FROM_UP_TO_MAC);
-	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
+	// printf (" [Node %s] t= %f -> UP7 MSDU (size = %d bits) \
+		// was generated and sent to MAC layer.\n", node_name, op_sim_time(), msdu_size);
 	
 	if ((abs_next_intarr_time <= up0_stop_time) || (up0_stop_time == SC_INFINITE_TIME)) {
 		up0_next_msdu_evh = op_intrpt_schedule_self (abs_next_intarr_time, SC_GENERATE_UP0);
