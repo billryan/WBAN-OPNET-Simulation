@@ -2,3 +2,8 @@
 *pr.c
 *.cpp
 *.swp
+
+# temp files
+*~
+*/*~
+*/*/*~
