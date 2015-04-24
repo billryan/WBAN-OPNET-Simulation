@@ -16,7 +16,8 @@ def load_stat(file_in):
         file_in,dtype={'names':
             ('version','rate','latency','energy','throughput','pkt_loss_rate','pkt_queue_rate'),
             'formats':('i','f','f','f','f','f','f')},comments='#',unpack=True)
-    latency_ms = latency * 1000.0
+    #latency_ms = latency * 1000.0
+    latency_ms = latency
     pkt_loss_ratio = 100 * pkt_loss
     pkt_queue_ratio = 100 * pkt_queue
     std_indices = np.where(version == 0)
@@ -27,7 +28,7 @@ def load_stat(file_in):
     plt.plot(rate[std_indices], latency_ms[std_indices], 'o-', linewidth=2, label="IEEE 802.15.6")
     plt.plot(rate[proposal_indices], latency_ms[proposal_indices], 'o-', linewidth=2, label="Proposal")
     plt.xlabel("Arrival Rate(kbps)")
-    plt.ylabel("Latency(ms)")
+    plt.ylabel("Latency(s)")
     plt.title('Latency')
     plt.grid()
     plt.legend(loc='upper left')

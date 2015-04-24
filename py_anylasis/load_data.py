@@ -191,20 +191,24 @@ def load_pkt_stat(in_file):
             data_state = re.split('[=,]', line[0:-2])[9]
             number = float(re.split('[=,]', line[0:-2])[11])
             ppdu_kbits = float(re.split('[=,]', line[0:-2])[13])
-            if stat_info_dic[node_id].has_key('DATA') == False:
+            if not stat_info_dic[node_id].has_key('DATA'):
                 stat_info_dic[node_id]['DATA'] = {}
                 stat_info_dic[node_id]['DATA'][up] = {}
                 stat_info_dic[node_id]['DATA'][up][data_state] = {}
                 stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
                 stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
-            elif stat_info_dic[node_id]['DATA'].has_key(up):
-                if stat_info_dic[node_id]['DATA'][up].has_key(data_state) == False:
-                    stat_info_dic[node_id]['DATA'][up][data_state] = {}
-                    stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
-                    stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
-                else:
-                    stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
-                    stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
+            elif not stat_info_dic[node_id]['DATA'].has_key(up):
+                stat_info_dic[node_id]['DATA'][up] = {}
+                stat_info_dic[node_id]['DATA'][up][data_state] = {}
+                stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
+                stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
+            elif not stat_info_dic[node_id]['DATA'][up].has_key(data_state):
+                stat_info_dic[node_id]['DATA'][up][data_state] = {}
+                stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
+                stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
+            else:
+                stat_info_dic[node_id]['DATA'][up][data_state]['NUMBER'] = number
+                stat_info_dic[node_id]['DATA'][up][data_state]['PPDU_KBITS'] = ppdu_kbits
 
     return stat_info_dic
 
@@ -247,16 +251,16 @@ def load_pkt_loss_avg(file_list):
         for (k,v) in stat_info_dic.items():
             if 16 < stat_info_dic[k]['NID'] < 32:
                 for i in xrange(8):
-                    for j in xrange(7):
-                        if stat_info_dic[k]['DATA'].has_key(str(i)):
-                            pkt_gen_num += stat_info_dic[k]['DATA'][str(i)]['0']['NUMBER']
-                            pkt_rcv_num += stat_info_dic[k]['DATA'][str(i)]['4']['NUMBER']
-                            pkt_fail_num += stat_info_dic[k]['DATA'][str(i)]['6']['NUMBER']
+                    #for j in xrange(7):
+                    if stat_info_dic[k]['DATA'].has_key(str(i)):
+                        pkt_gen_num += stat_info_dic[k]['DATA'][str(i)]['0']['NUMBER']
+                        pkt_rcv_num += stat_info_dic[k]['DATA'][str(i)]['4']['NUMBER']
+                        pkt_fail_num += stat_info_dic[k]['DATA'][str(i)]['6']['NUMBER']
             elif stat_info_dic[k]['NID'] > 31:
                 for i in xrange(8):
-                    for j in xrange(7):
-                        if stat_info_dic[k]['DATA'].has_key(str(i)):
-                            pkt_subq_num += stat_info_dic[k]['DATA'][str(i)]['5']['NUMBER']
+                    #for j in xrange(7):
+                    if stat_info_dic[k]['DATA'].has_key(str(i)):
+                        pkt_subq_num += stat_info_dic[k]['DATA'][str(i)]['5']['NUMBER']
         #pkt_loss_num = pkt_gen_num - pkt_rcv_num - pkt_subq_num
         #pkt_loss_num = pkt_gen_num - pkt_rcv_num - pkt_subq_num
         pkt_loss_num = pkt_gen_num - pkt_rcv_num
