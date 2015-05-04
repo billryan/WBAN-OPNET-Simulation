@@ -3,3 +3,4 @@
 *.cpp
 *.swp
 /py_analysis
+*~
