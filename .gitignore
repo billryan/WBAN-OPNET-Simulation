@@ -2,3 +2,14 @@
 *pr.c
 *.cpp
 *.swp
+/py_analysis
+*~
+# temp files
+*~
+*/*~
+*/*/*~
+
+# OS X
+.DS_Store
+*/.DS_Store
+*/*/.DS_Store
