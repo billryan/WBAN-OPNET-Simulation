@@ -361,3 +361,8 @@ static void wban_send_beacon_frame () {
 	wban_send_mac_pk_to_phy(beacon_MPDU);
 }
 ```
+
+### `wban_send_beacon2_frame`
+
+发送 beacon2 控制帧用，如果要在超帧中设置 CAP 时需要发送此帧，同时也可以按需更改 beacon2 帧内容。如之前实现了两种 MAC 协议，其中就充分利用了 beacon2 的信息，所以就可以在此函数中根据不同协议做进一步区分。如果要在 beacon2 部分中做复杂的时隙再分配可以仔细看看这个函数的实现。正常情况下不需要利用到这个函数。
+
