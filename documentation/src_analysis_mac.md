@@ -339,3 +339,25 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 	}
 }
 ```
+
+### wban_send_beacon_frame
+
+发送 Beacon 帧函数，由 Hub 节点进行发送，读取在 Hub 节点处设置的 Beacon 帧属性，将这些帧属性信息封装至包中。封装顺序为 MSDU ==> MPDU ==> PPDU. 在发送 Beacon 帧之前获得当前超帧的起始时间`SF.BI_Boundary`，便于后面设置定时器和超帧起止时间信息。如果是第一次发送 beacon 帧，还需要根据`init_flag`设置其他变量信息。
+
+```c
+static void wban_send_beacon_frame () {
+	beacon_MSDU = op_pk_create_fmt ("wban_beacon_MSDU_format");
+	/* set the fields of the beacon frame */
+	/* create a MAC frame (MPDU) that encapsulates the beacon payload (MSDU) */
+	beacon_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
+	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
+
+	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
+	if(init_flag){
+	}
+	SF.current_slot = (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
+
+	/* send the MPDU to PHY and calculate the energy consuming */
+	wban_send_mac_pk_to_phy(beacon_MPDU);
+}
+```
