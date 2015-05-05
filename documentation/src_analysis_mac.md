@@ -281,3 +281,45 @@ switch (frame_type_fd) {
 case STRM_FROM_TRAFFIC_UP_TO_MAC: /* INCOMMING PACKETS(MSDU) FROM THE TRAFFIC SOURCE */
 	wban_encapsulate_and_enqueue_data_frame (rcv_frame, I_ACK_POLICY, node_attr.traffic_dest_id);
 ```
+
+### `wban_log_file_init`
+
+用于初始化记录各项统计数据的文件，目前该仿真平台并未采用 OPNET 官方的统计量记录方式，个人认为设置探针等方式对于开发阶段的调试过于麻烦(需要先手动选定仿真场景和数据，再将数据导出至 EXCEL, 最后再统计)，嗯，我不喜欢拿鼠标戳来戳去的低效做法，借鉴了 Castalia 中的方法，直接采用一个文本记录所有数据，后期使用 Python 进行数据提取和分析。但这种方式的缺点是用到了文件 IO，且 OPNET 中不同的节点在仿真过程中即为不同的进程，对同一文件读写需要加锁，故频繁记录大量数据时会导致仿真速度急剧下降。我的做法是映射一部分内存作为文件读写，一定程度上可以改善，但是由于频繁加锁解锁的存在，仿真速度还是不够理想。另一种思路就是不同进程读写不同文件，这样就不必频繁加锁解锁了，这样后期处理下就好了，Python 大法好！
+
+函数`wban_log_file_init`主要利用了当前时间和在节点处设置的目录进行自动命名，便于后期使用 Python 自动化分析，同时防止多次仿真时文件被覆盖。
+```c
+/*--------------------------------------------------------------------------------
+ * Function:	 wban_log_file_init
+ *
+ * Description:	log file init
+ *
+ * No parameters
+ *--------------------------------------------------------------------------------*/
+static void wban_log_file_init() {
+	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", dir_path);
+	op_ima_obj_attr_get (node_attr.objid, "Log Level", &log_level);
+
+	time(&rawtime);
+	p=localtime(&rawtime);
+	// strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
+	// strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
+	strftime(buffer, 30, "%Y-%m-%d", p);
+	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
+		if (dir_path[i] == '\0'){
+			break;
+		}
+	}
+	if(prg_file_path_create(dir_path, PRGC_FILE_PATH_CREATE_OPT_DIRECTORY) == PrgC_Compcode_Failure){
+		op_sim_end("ERROR : Log File is not valid.","INVALID_FILE", "","");
+	}
+	if(dir_path[i-1] == '\\'){
+		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+	}else{
+		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+	}
+	/* verification if the dir_path is a valid directory */
+	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
+		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
+	}
+}
+```
