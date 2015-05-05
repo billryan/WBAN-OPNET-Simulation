@@ -288,13 +288,6 @@ case STRM_FROM_TRAFFIC_UP_TO_MAC: /* INCOMMING PACKETS(MSDU) FROM THE TRAFFIC SO
 
 函数`wban_log_file_init`主要利用了当前时间和在节点处设置的目录进行自动命名，便于后期使用 Python 自动化分析，同时防止多次仿真时文件被覆盖。
 ```c
-/*--------------------------------------------------------------------------------
- * Function:	 wban_log_file_init
- *
- * Description:	log file init
- *
- * No parameters
- *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
 	op_ima_obj_attr_get (node_attr.objid, "Log File Directory", dir_path);
 	op_ima_obj_attr_get (node_attr.objid, "Log Level", &log_level);
@@ -320,6 +313,29 @@ static void wban_log_file_init() {
 	/* verification if the dir_path is a valid directory */
 	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
 		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
+	}
+}
+```
+
+### `is_packet_for_me`
+
+包检测的入口函数，判断从物理层接收到的包是否是自己需要接收的。主要从目前所处的状态(比如是否睡眠)和是否为本网内节点发送的包进行过滤。这个函数对于多网环境和组簇的场景比较重要。主要根据入口参数如 ban_id, recipient_id, sender_id判断是否需要接收包。
+
+1. 首先判断 sender_id 是否就是自身，如果为自身则直接丢弃，OPNET 中节点不仅可以接收来自其他节点的包，还可以接收来自自身的包，一般来说自身的包需要直接丢弃。
+2. 接着判断 ban_id 是否和自身 ban_id 相同，不同则代表收到的包来自其他网络，一般来说直接丢弃，但若有特殊用途则做进一步处理。
+3. 判断 recipient_id 为单播还是广播。
+
+```c
+static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id, int sender_id) {
+	/*Check if the frame is loop*/
+	if (mac_attr.sender_id == sender_id) {
+		op_pk_destroy (frame_MPDU);
+	}
+	if (node_attr.ban_id != ban_id) {
+	}
+	if ((mac_attr.sender_id == recipient_id) || (BROADCAST_NID == recipient_id)) {
+	} else {
+		op_pk_destroy (frame_MPDU);
 	}
 }
 ```
