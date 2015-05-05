@@ -366,3 +366,11 @@ static void wban_send_beacon_frame () {
 
 发送 beacon2 控制帧用，如果要在超帧中设置 CAP 时需要发送此帧，同时也可以按需更改 beacon2 帧内容。如之前实现了两种 MAC 协议，其中就充分利用了 beacon2 的信息，所以就可以在此函数中根据不同协议做进一步区分。如果要在 beacon2 部分中做复杂的时隙再分配可以仔细看看这个函数的实现。正常情况下不需要利用到这个函数。
 
+### `wban_extract_conn_req_frame`
+
+主要用于 Hub 解析接收到的 Connection Request 帧，Hub 判断是否给相应 Node 分配时隙和告知其他资源。Node 在 Scheduling 阶段需要请求的时隙数为 `allocation_length`, Hub 正是通过此帧获知这一信息。不过感觉这有点不科学，如果 Node 需要的时隙数是变化的如何破？重新发送 Connection Request 帧的开销太大了。具体实现时可以根据自己的需求灵活更改。
+
+
+### `wban_extract_conn_assign_frame`
+
+用于 Node 接收 Hub 发送过来的 Conenction Assignment 帧，Hub 在此帧中告知 Node 在超帧 Superframe 中的起止时隙处。如 Interval Start 和 Interval End。目前该仿真平台对于 Connection Request 和 Connection Assignment 均只做一次，故改变了 init_flag 变量。
