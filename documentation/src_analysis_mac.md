@@ -340,7 +340,7 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 }
 ```
 
-### wban_send_beacon_frame
+### `wban_send_beacon_frame`
 
 发送 Beacon 帧函数，由 Hub 节点进行发送，读取在 Hub 节点处设置的 Beacon 帧属性，将这些帧属性信息封装至包中。封装顺序为 MSDU ==> MPDU ==> PPDU. 在发送 Beacon 帧之前获得当前超帧的起始时间`SF.BI_Boundary`，便于后面设置定时器和超帧起止时间信息。如果是第一次发送 beacon 帧，还需要根据`init_flag`设置其他变量信息。
 
@@ -374,3 +374,91 @@ static void wban_send_beacon_frame () {
 ### `wban_extract_conn_assign_frame`
 
 用于 Node 接收 Hub 发送过来的 Conenction Assignment 帧，Hub 在此帧中告知 Node 在超帧 Superframe 中的起止时隙处。如 Interval Start 和 Interval End。目前该仿真平台对于 Connection Request 和 Connection Assignment 均只做一次，故改变了 init_flag 变量。
+
+### `wban_extract_beacon_frame`
+
+用于 Node 接收 Hub 发送过来的 beacon 帧，获知超帧中各阶段的起止信息和同步信息。如果当前 Node 并未加入到当前 WBAN 网络，则将`UNCONNECTED_NID`更改为合适的 NID。如果需要组簇等实现其他算法，这里可能需要做一些改动。最后调用`wban_schedule_next_beacon`等待接收下一个超帧。
+
+### `wban_extract_beacon2_frame`
+
+用于 Node 接收 Hub 发送的 beacon2 控制帧，如果需要使用 CAP 和 MAP2 阶段才需要关注此函数。
+
+### `wban_schedule_next_beacon`
+
+用于 Node 和 Hub 根据 beacon 帧中相应信息设置当前超帧各阶段的起止时间和安排下一超帧的起始时间。
+
+### `wban_send_conn_req_frame`
+
+用于 Node 根据自身节点属性(如在 Scheduling 阶段需要多长时隙)向 Hub 发送 Connection Request 帧。目前的做法是仅与 Hub 成功交互一次。
+
+### `wban_send_conn_assign_frame`
+
+Hub 接收到 Connection Request 帧后即准备安排发送此帧，用于确认 Node 在 Scheduling 阶段的起止时隙和其他信息。
+
+### `wban_send_i_ack_frame`
+
+用于 Hub 和 Node 向需要返回 I-ACK 的包回复 I-ACK 包，注意需要判断是否越界——`ack_sent < phase_end_timeG`.
+
+### `wban_encapsulate_and_enqueue_data_frame`
+
+用于封装来自应用层发送过来的包，封装之前先确认当前 MAC 模块的状态：
+
+```
+if ((MAC_SLEEP != mac_state) && (MAC_SETUP != mac_state))
+```
+
+### `wban_extract_data_frame`
+
+用于解析收到的数据帧，如果需要在数据帧中捎带信息则需要更改此函数。
+
+### `wban_extract_i_ack_frame`
+
+用于解析接收到的 I-ACK 帧，这个函数有点微妙，首先需要判断当前是不是在等待其他节点回复 I-ACK 。
+
+1. `pkt_to_be_sent.enable`: 当前是否即将发送包？是的话就不需要当前的 I-ACK 包。
+2. `pkt_tx_total`: 忘了...
+3. `waitForACK`: 是否在等待接收 I-ACK。
+
+三者有一为真即可接收此 I-ACK 包，这种处理方式的正确性还有待考证。
+
+```c
+if((!pkt_to_be_sent.enable) || (0 == pkt_tx_total) || (!waitForACK))
+```
+
+如果当前状态为正在等待接收 I-ACK, 则需要关闭最近的一次等待 I-ACK 结束的定时器，具体则是`WAITING_ACK_END_CODE`中断。关闭定时器的大致形式如下：
+
+```
+op_intrpt_disable (OPC_INTRPT_SELF, WAITING_ACK_END_CODE, OPC_TRUE);
+```
+
+如果当前接收到的为数据帧，则统计相应变量信息。最后设置相应全局变量信息用于加锁释放锁等操作。
+
+```
+waitForACK = OPC_FALSE;
+TX_ING = OPC_FALSE;
+// attemptingToTX = OPC_FALSE;
+pkt_to_be_sent.enable = OPC_FALSE;
+pkt_tx_total = 0;
+pkt_tx_out_phase = 0;
+pkt_tx_fail = 0;
+```
+
+以下就一些状态信息做一些说明：
+
+- `waitForACK`: 是否在等待接收 I-ACK
+- `TX_ING`: 是否正处于发送包的过程当中
+- `pkt_to_be_sent.enable`: 此时是否可以发送包？
+- `pkt_tx_total`: 忘了，待补充
+- `pkt_tx_out_phase`: 同上
+- `pkt_tx_fail`: 同上
+
+最后在 pSIFS 时间间隔后设置可发送下一个包。
+
+```
+op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
+```
+
+
+### `wban_mac_interrupt_process`
+
+MAC 层核心模块！
