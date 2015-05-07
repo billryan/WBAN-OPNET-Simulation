@@ -458,6 +458,43 @@ pkt_tx_fail = 0;
 op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 ```
 
+### `wban_attempt_TX`
+
+在所有可能的阶段尝试传输，粗略来讲分为两种传输模式——重传原来的包和从 MAC 层缓存队列中取出新包进行传输。
+能进行传输的前提是以下三个条件均为假。
+
+1. waitForACK: 代表当前节点正在等待接收 I-ACK，不可进行传输包的操作。
+2. attemptingToTX: 已经有包即将传输，故不安排新的包。
+3. TX_ING: 有包正在传输过程中，不可安排其他包传输。
+
+```
+if(waitForACK || attemptingToTX || TX_ING)
+```
+
+如果达到传输要求，则进一步判断当前 MAC 层所处状态，如是处于 MAP(只能使用 Scheduling) 还是 CAP(使用CSMA/CA)阶段。
+
+```
+SF.IN_CAP_PHASE = OPC_TRUE;
+SF.IN_MAP_PHASE = OPC_FALSE;
+```
+
+保险起见，检查当前节点是否还处于传输阶段 - `op_stat_local_read(TX_BUSY_STAT)`.
+
+pkt_to_be_sent.enable: 判断当前节点是否被允许发送包。
+pkt_tx_total < max_packet_tries: 当前包传输的次数是否超过最大重传次数。
+
+```
+if((pkt_to_be_sent.enable) && (pkt_tx_total < max_packet_tries))
+```
+
+if(!can_fit_TX(&pkt_to_be_sent)): 包被取出来但是如果传输此包则会超出当前允许的时隙边界
+
+如果当前节点处于 CAP 阶段，则调用 `wban_attempt_TX_CSMA` 使用 CSMA/CA 进行传输。
+如果当前节点处于 MAP 阶段(注意在具体的代码实现中 MAP 仅是指当前节点在整个超帧中所分配的部分起止时隙段，并不是整个 MAP)，使用`wban_send_mac_pk_to_phy(frame_MPDU_to_be_sent);`将 MAC 层的包送至 PHY 进行封装。
+
+随后检查 MAC 层子队列(管理帧和数据帧)是否非空，优先发送管理帧。
+
+若`pkt_to_be_sent.enable`为真，代表当前包可发送，若处于 CAP 阶段，则设置 CSMA 相应的参数并调用 `wban_attempt_TX_CSMA();`. 若处于 MAP 则直接传至 PHY。
 
 ### `wban_mac_interrupt_process`
 
