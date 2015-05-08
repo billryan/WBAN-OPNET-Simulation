@@ -514,6 +514,46 @@ if(!can_fit_TX(&pkt_to_be_sent)): 包被取出来但是如果传输此包则会�
 
 接收包属性指针参数，获取 ACK 的策略，判断当前剩余时间是否满足传输此包和 I-ACK 的需求。若为 N-ACK 策略，则不需要等待接收 ACK，若设置为 I-ACK 策略，则还需要计算接收 I-ACK 的时间。
 
+### `wban_send_mac_pk_to_phy`
+
+发送 MAC 层的包到物理层，此时已确定可以发送此包，需要设置如下两个变量：
+
+```
+attemptingToTX = OPC_FALSE;
+TX_ING = OPC_TRUE;
+```
+
+对于 I-ACK 策略的包，需要设置等待接收 ACK 结束时的中断。
+
+```
+op_intrpt_schedule_self(ack_expire_time, WAITING_ACK_END_CODE);
+```
+
+### `wban_norm_phy_bits`
+
+归一化 MAC 帧到物理层包，考虑了物理层头信息。
+
+### `phy_to_radio`
+
+发包的最后一个环节，将封装好的物理层帧送至无线广播模块。
+
 ### `wban_mac_interrupt_process`
 
 MAC 层核心模块！
+
+## MAC helper
+
+1. `queue_status` - 获取 MAC 队列中子队列状态和队列容量等信息。
+2. `subq_info_get` - 获取子队列中的信息。
+3. `subq_data_info_get` - 获取数据子队列中的信息。
+4. `header4mac2phy` - MAC 层到 PHY 需要增加的头部比特数。
+
+## Battery Model
+
+更新能量计算模块的能量信息，使用 ICI 远程中断信息进行交互。同时向能量模块传递 MAC 状态信息。
+
+1. `wban_battery_update_tx` - 计算接收包时所耗费的能量。
+2. `wban_battery_update_rx` - 计算接收包时所耗费的能量。
+3. `wban_battery_cca` - 计算 CSMA 中 CCA 阶段耗费的能量。
+4. `wban_battery_sleep_start` - 睡眠起始时刻。
+5. `wban_battery_sleep_end` - 睡眠结束时刻。
