@@ -502,6 +502,14 @@ if(!can_fit_TX(&pkt_to_be_sent)): 包被取出来但是如果传输此包则会�
 
 设置全局状态变量`attemptingToTX = OPC_TRUE;`，表明已经有包处于待传输状态，不再从 MAC 层子队列中获取新的包进行传输。最终产生`CCA_START_CODE`中断。
 
+### `wban_backoff_period_boundary_get`
+
+求出退避时相应的时隙边界，使用 slot based CSMA 时需要此函数，默认应该是采用这种方式。
+
+### `wban_backoff_delay_set`
+
+设置对不同用户优先级包退避时的时延，退避到期的时间，当前阶段剩余的时间。
+
 ### `wban_mac_interrupt_process`
 
 MAC 层核心模块！
