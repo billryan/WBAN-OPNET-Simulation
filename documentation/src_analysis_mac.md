@@ -496,6 +496,12 @@ if(!can_fit_TX(&pkt_to_be_sent)): 包被取出来但是如果传输此包则会�
 
 若`pkt_to_be_sent.enable`为真，代表当前包可发送，若处于 CAP 阶段，则设置 CSMA 相应的参数并调用 `wban_attempt_TX_CSMA();`. 若处于 MAP 则直接传至 PHY。
 
+### `wban_attempt_TX_CSMA`
+
+使用 CSMA 接入信道前的参数设置，如根据不同用户优先级初始化不同的退避窗口长度。
+
+设置全局状态变量`attemptingToTX = OPC_TRUE;`，表明已经有包处于待传输状态，不再从 MAC 层子队列中获取新的包进行传输。最终产生`CCA_START_CODE`中断。
+
 ### `wban_mac_interrupt_process`
 
 MAC 层核心模块！
