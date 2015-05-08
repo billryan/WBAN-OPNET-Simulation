@@ -537,9 +537,36 @@ op_intrpt_schedule_self(ack_expire_time, WAITING_ACK_END_CODE);
 
 发包的最后一个环节，将封装好的物理层帧送至无线广播模块。
 
-### `wban_mac_interrupt_process`
+## MAC 层核心逻辑 - `wban_mac_interrupt_process`
 
-MAC 层核心模块！
+MAC 层核心模块！用于处理各种中断及跳转。
+
+对于流中断`OPC_INTRPT_STRM`，则调用`wban_parse_incoming_frame`进行解析。对于自中断`OPC_INTRPT_SELF`则分为以下多种类型的中断。
+
+1. `BEACON_INTERVAL_CODE` - beacon 帧间隔中断码，用于实现超帧及发送/接收beacon。
+2. `INCREMENT_SLOT` - 根据设定的 slot 长度周期性地自增 slot, 使用最简易的定时器实现。
+3. `START_OF_EAP1_PERIOD_CODE` - EAP1 阶段的起始中断码，用于处理紧急业务。
+4. `START_OF_RAP1_PERIOD_CODE` - RAP1 阶段的起始中断码，用于 CSMA 接入方式，适用于不同用户优先级业务。
+5. `START_OF_MAP1_PERIOD_CODE` - MAP1 阶段的起始中断码，用于 Scheudling 接入方式。
+6. `SEND_B2_FRAME` - 发送 beacon2 控制帧中断码，开始发送 beacon2 中断码。
+7. `START_OF_MAP2_PERIOD_CODE` - MAP2 阶段的起始中断码，几乎和 MAP1 作用相同，一般不需要使用。
+8. `START_OF_CAP_PERIOD_CODE` - CAP 阶段的起始中断码，用于 CSMA 接入方式，一般不需要此阶段。
+9. `START_OF_SLEEP_PERIOD` - SLEEP 阶段的起始中断码，睡眠开始的标志。
+10. `TRY_PACKET_TRANSMISSION_CODE` - 尝试传输包，调用`wban_attempt_TX`.
+11. `CCA_START_CODE` - CCA 开始中断码，用于 CSMA 过程。
+12. `CCA_EXPIRATION_CODE` CCA 结束中断码，节点根据 CCA 得到信道忙闲情况。
+13. `START_TRANSMISSION_CODE` - 开始传输包，将要发送的 MAC 层包送至 PHY。
+14. `WAITING_ACK_END_CODE` - 等待 ACK 结束的中断码，判断是否超过最大重传次数等安排重传。
+15. `N_ACK_PACKET_SENT` - 将发送的包 ACK 策略设置为 N-ACK 时，此中断代表可以继续发送新的包。
+
+### 统计中断 - `OPC_INTRPT_STAT`
+
+除了 MAC 层本身的自中断，还有 PHY 反馈给 MAC 的统计中断如发送模块忙，接收包冲突等。
+
+### 仿真结束中断 - `OPC_INTRPT_ENDSIM`
+
+仿真结束时需要统计各变量信息。
+
 
 ## MAC helper
 
