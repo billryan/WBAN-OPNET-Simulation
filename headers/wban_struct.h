@@ -306,4 +306,15 @@ typedef struct
 	int slotnum;
 	int up;
 } assignment_map;
+
+typedef struct
+{
+	int bid;
+	int cid;
+	int nid;
+	int slot_start;
+	int slot_end;
+	int slotnum;
+	int up;
+} map1_schedule_map;
 #endif
