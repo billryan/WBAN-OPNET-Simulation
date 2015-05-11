@@ -57,16 +57,6 @@ typedef struct {
 	int allocation_length;
 } connection_request_attributes;
 
-/* define the connection assignment parameters */
-typedef struct {
-	int eap2_start;
-	int	sender_address; // 48 bits
-	int allocation_id;
-	int interval_start;
-	int interval_end;
-	int allocation_length;
-} connection_assignment_attributes;
-
 /* define the MAP1 parameters of the node */
 typedef struct {
 	double start_time;	// start of the using of the MAP1
@@ -114,7 +104,7 @@ typedef struct {
 	double duration; // superfarm duration in second
 	int sleep_period; // the inactive portion in slots
 	int current_slot; // the current slot in the active portion of the superframe from 0 to beacon_period_length-1
-	int current_first_free_slot;
+	int free_slot;
 
 	int beacon_period_length; // beacon period length in slots -all
 	int rap1_start;
@@ -306,4 +296,15 @@ typedef struct
 	int slotnum;
 	int up;
 } assignment_map;
+
+typedef struct
+{
+	int bid;
+	int cid;
+	int nid;
+	int slot_start;
+	int slot_end;
+	int slotnum;
+	int up;
+} map1_schedule_map;
 #endif
