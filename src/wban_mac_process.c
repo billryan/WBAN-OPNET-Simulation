@@ -123,6 +123,7 @@ static void wban_mac_init() {
 		op_ima_obj_attr_get (conn_req_attr_comp_id, "Allocation Length", &conn_req_attr.allocation_length);
 		map1_sche_map[node_id].slotnum = conn_req_attr.allocation_length;
 		map1_sche_map[node_id].bid = mac_attr.ban_id;
+		printf("node_id = %d, bid = %d.\n", node_id, mac_attr.ban_id);
 		/* start assigning connected NID from ID 32 */
 		mac_attr.sender_id = 32 + ((current_free_connected_NID - 32) % 214);
 		mac_attr.recipient_id = UNCONNECTED;
@@ -313,7 +314,7 @@ static void wban_parse_incoming_frame() {
 					data_stat_local[frame_subtype_fd][RCV].ppdu_kbits += 0.001*ppdu_bits;
 					wban_extract_data_frame (frame_MPDU);
 					/* send to higher layer for statistics */
-					op_pk_send (frame_MPDU, STRM_FROM_MAC_TO_SINK);
+					// op_pk_send (frame_MPDU, STRM_FROM_MAC_TO_SINK);
 					break;
 				case MANAGEMENT: /* Handle management packets */
 					// op_stat_write(stat_vec.data_pkt_rec, 0.0);
@@ -444,25 +445,36 @@ void map1_scheduling() {
 
 	switch (node_attr.protocol_ver) {
 		case BASE0:
+			printf("map1_scheduling...\n");
 			// disable map1
 			if (SF.rap1_start == 0) {
+				printf("rap1_start == 0\n");
 				FOUT;
 			}
 			for (i = 0; i < NODE_ALL_MAX; ++i) {
+				printf("i = %d.\n", i);
 				// ignore self
 				if (i == node_id) {
+					printf("i == node_id.\n");
 					continue;
 				}
 				// same BAN ID
 				if (map1_sche_map[i].bid != map1_sche_map[node_id].bid) {
+					printf("i.bid = %d, node_id.bid = %d.\n", \
+						    map1_sche_map[i].bid, map1_sche_map[node_id].bid);
 					continue;
 				}
 				// ignore node which do not use MAP1
 				if (map1_sche_map[i].slotnum <= 0) {
+					printf("i.slotnum <= 0.\n");
 					continue;
 				}
 				// allocation
+				printf("free_slot = %d, slotnum = %d, rap1_start = %d.\n", \
+					   SF.free_slot, map1_sche_map[i].slotnum, SF.rap1_start);
 				if (SF.free_slot + map1_sche_map[i].slotnum <= SF.rap1_start) {
+					printf("node_id = %d, slotnum = %d.\n", \
+						    map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 					map1_sche_map[i].slot_start = SF.free_slot;
 					map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
 				} else {
@@ -547,6 +559,8 @@ static void wban_send_beacon_frame () {
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
 	
+	// do map1 scheduling
+	map1_scheduling();
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -690,17 +704,14 @@ static void wban_schedule_next_beacon() {
 	} else if (SF.rap1_end < 255 && SF.rap1_end > SF.rap1_start) {
 		SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_sec;
 	}
-	if(SF.rap1_end > 0 && SF.rap1_end != 255){
-		SF.rap1_end2sec = SF.BI_Boundary + (SF.rap1_end+1)*SF.slot_sec;
-		SF.rap1_length2sec = SF.rap1_end2sec - SF.rap1_start2sec;
-	}
+	SF.rap1_length2sec = SF.rap1_end2sec - SF.rap1_start2sec;
 
 	op_intrpt_schedule_self(SF.rap1_start2sec, START_OF_RAP1_PERIOD_CODE);
 	op_intrpt_schedule_self(SF.rap1_end2sec, END_OF_RAP1_PERIOD_CODE);
 	/* INCREMENT_SLOT at slot boundary */
 	// op_prg_odb_bkpt("debug_hub");
-	// printf("\nt=%f,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_attr.name, mac_attr.sender_id);
-	// printf("\t  current_slot=%d\n", SF.current_slot);
+	printf("\nt=%f,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_attr.name, mac_attr.sender_id);
+	printf("\t  current_slot=%d\n", SF.current_slot);
 	op_intrpt_schedule_self (SF.BI_Boundary + (SF.current_slot+1)*SF.slot_sec, INCREMENT_SLOT);
 	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_sec, BEACON_INTERVAL_CODE);
 	
