@@ -78,6 +78,9 @@
 #define NODE_MAX 10
 // max nodes in all wban
 #define NODE_ALL_MAX 50
+// protocol version
+#define BASE0 0
+#define PAPER1 1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
