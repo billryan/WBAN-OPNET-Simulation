@@ -59,8 +59,6 @@ static void wban_mac_init() {
 	op_ima_obj_attr_get (mac_attr_comp_id, "MGMT Buffer Size", &mac_attr.MGMT_buffer_size);
 	op_ima_obj_attr_get (mac_attr_comp_id, "DATA Buffer Size", &mac_attr.DATA_buffer_size);
 	mac_attr.wait_for_ack = OPC_FALSE;
-	op_ima_obj_attr_set (SUBQ_MAN, "pk capacity", mac_attr.MGMT_buffer_size);
-	op_ima_obj_attr_set (SUBQ_DATA, "pk capacity", mac_attr.DATA_buffer_size);
 
 	/*get the battery attribute ID*/
 	node_attr.my_battery = op_id_from_name (node_attr.objid, OPC_OBJTYPE_PROC, "Battery");
@@ -1431,14 +1429,7 @@ static void wban_attempt_TX() {
 			wban_attempt_TX_CSMA();
 		}
 		if(SF.IN_MAP_PHASE){
-			// printf("\t  Retransmit with Scheduling\n");
-			if((1 == node_attr.protocol_ver) && (MAC_MAP1 == mac_state)){
-				subq_info_get(SUBQ_DATA);
-				slotnum = (int)(((subq_info.pksize*3*pSIFS)/SF.slot_sec) + (subq_info.bitsize + subq_info.pksize *2* header4mac2phy())/(node_attr.data_rate*1000.0*SF.slot_sec));
-				op_pk_nfd_set (frame_MPDU_to_be_sent, "slotnum", slotnum);
-				// printf("\t  Requires slotnum=%d for MAP2\n", slotnum);
-				// op_prg_odb_bkpt("req_map2");
-			}
+			printf("\t  Retransmit with Scheduling\n");
 			pkt_tx_total++;
 			wban_send_mac_pk_to_phy(frame_MPDU_to_be_sent);
 		}
@@ -2042,15 +2033,22 @@ static void queue_status() {
 	{
 		/* Obtain object ID of the ith subqueue */
 		subq_objid = op_topo_child (queue_objid, OPC_OBJMTYPE_ALL, i);
+
+		// set pk capacity of SUBQ_MAN and SUBQ_DATA
+		if (SUBQ_MAN == i) {
+			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.MGMT_buffer_size);
+		} else if (SUBQ_DATA == i) {
+			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.DATA_buffer_size);
+		}
 		
 		/* Get current subqueue attribute settings */
 		op_ima_obj_attr_get (subq_objid, "bit capacity", &bit_capacity);
 		op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
-		
+
 		if (op_subq_empty(i)) {
-			// printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), node_attr.name, i, pk_capacity, bit_capacity);
+			printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), node_attr.name, i, pk_capacity, bit_capacity);
 		} else {
-			// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
+			printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 		}
 	}
 	/* Stack tracing exit point */
@@ -2093,7 +2091,7 @@ static void subq_info_get (int subq_index) {
 		subq_info.bitsize = op_subq_stat (subq_index, OPC_QSTAT_BITSIZE);
 		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
 		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
-		// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
+		printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		pk_test_up = op_subq_pk_access(subq_index, OPC_QPOS_PRIO);
 		subq_info.up = op_pk_priority_get(pk_test_up);
 		// printf("\t  subq_info.up=UP%d\n", subq_info.up);
