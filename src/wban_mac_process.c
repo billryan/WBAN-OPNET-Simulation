@@ -448,25 +448,22 @@ void map1_scheduling() {
 			printf("map1_scheduling...\n");
 			// disable map1
 			if (SF.rap1_start == 0) {
-				printf("rap1_start == 0\n");
 				FOUT;
 			}
+			// update free_slot
+			SF.free_slot = SF.first_free_slot;
 			for (i = 0; i < NODE_ALL_MAX; ++i) {
 				printf("i = %d.\n", i);
 				// ignore self
 				if (i == node_id) {
-					printf("i == node_id.\n");
 					continue;
 				}
 				// same BAN ID
 				if (map1_sche_map[i].bid != map1_sche_map[node_id].bid) {
-					printf("i.bid = %d, node_id.bid = %d.\n", \
-						    map1_sche_map[i].bid, map1_sche_map[node_id].bid);
 					continue;
 				}
 				// ignore node which do not use MAP1
 				if (map1_sche_map[i].slotnum <= 0) {
-					printf("i.slotnum <= 0.\n");
 					continue;
 				}
 				// allocation
@@ -477,10 +474,13 @@ void map1_scheduling() {
 						    map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 					map1_sche_map[i].slot_start = SF.free_slot;
 					map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
+					SF.free_slot = map1_sche_map[i].slot_end + 1;
 				} else {
 					map1_sche_map[i].slot_start = 0;
 					map1_sche_map[i].slot_end = 0;
 				}
+
+				op_prg_odb_bkpt("map1_schedule");
 			}
 			break;
 		case PAPER1:
@@ -552,7 +552,7 @@ static void wban_send_beacon_frame () {
 		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
 		op_prg_odb_bkpt("init");
-		SF.free_slot = 1 + (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
+		SF.first_free_slot = 1 + (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
 	}
 	SF.current_slot = (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
 
@@ -673,6 +673,9 @@ static void wban_schedule_next_beacon() {
 	SF.rap1_end = beacon_attr.rap1_end;
 	// SF.current_slot = 0;
 
+	if (SF.rap1_start > SF.SD) {
+		FOUT;
+	}
 	/* Allocation for MAP1 and RAP1 */
 	if(SF.rap1_start > 0){
 		SF.rap1_start2sec = SF.BI_Boundary + SF.rap1_start * SF.slot_sec;
@@ -685,6 +688,9 @@ static void wban_schedule_next_beacon() {
 			SF.map1_end2sec = SF.BI_Boundary + \
 								map1_sche_map[node_id].slot_end * SF.slot_sec;
 			if (map1_sche_map[node_id].slot_start > 0) {
+				printf("node_id = %d, slot_start = %d, slot_end = %d.\n", \
+					    node_id, map1_sche_map[node_id].slot_start, \
+					    map1_sche_map[node_id].slot_end);
 				op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
 				op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 			}
@@ -1039,9 +1045,9 @@ static void wban_mac_interrupt_process() {
 					// log = fopen(log_name, "a");
 					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
 					// fclose(log);
-					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					// printf("\t  Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
-					// op_prg_odb_bkpt("map1_start");
+					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					printf("\t  Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
+					op_prg_odb_bkpt("map1_start");
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_MAP1_PERIOD_CODE */
@@ -1054,11 +1060,12 @@ static void wban_mac_interrupt_process() {
 					mac_state = MAC_SLEEP;
 					// pkt_to_be_sent.enable = OPC_TRUE;
 					SF.ENABLE_TX_NEW = OPC_FALSE;
-				
+
 					// log = fopen(log_name, "a");
 					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
 					// fclose(log);
-					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					op_prg_odb_bkpt("map1_end");
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 

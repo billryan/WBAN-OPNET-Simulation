@@ -105,6 +105,7 @@ typedef struct {
 	int sleep_period; // the inactive portion in slots
 	int current_slot; // the current slot in the active portion of the superframe from 0 to beacon_period_length-1
 	int free_slot;
+	int first_free_slot;
 
 	int beacon_period_length; // beacon period length in slots -all
 	int rap1_start;
