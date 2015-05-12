@@ -666,6 +666,8 @@ static void wban_schedule_next_beacon() {
 		SF.rap1_start2sec = SF.BI_Boundary + \
 							SF.rap1_start * SF.slot_sec;
 		if(IAM_BAN_HUB){
+			SF.map1_start = SF.first_free_slot;
+			SF.map1_end = SF.rap1_start - 1;
 			SF.map1_start2sec = SF.BI_Boundary + \
 								SF.first_free_slot * SF.slot_sec;
 			SF.map1_end2sec = SF.BI_Boundary + \
@@ -674,10 +676,12 @@ static void wban_schedule_next_beacon() {
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		} else if (map1_sche_map[node_id].slot_start > 0) {
 			// allocation for Node
+			SF.map1_start = map1_sche_map[node_id].slot_start;
+			SF.map1_end = map1_sche_map[node_id].slot_end;
 			SF.map1_start2sec = SF.BI_Boundary + \
 								map1_sche_map[node_id].slot_start * SF.slot_sec;
 			SF.map1_end2sec = SF.BI_Boundary + \
-								map1_sche_map[node_id].slot_end * SF.slot_sec;
+								(1 + map1_sche_map[node_id].slot_end) * SF.slot_sec;
 			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
@@ -685,6 +689,8 @@ static void wban_schedule_next_beacon() {
 	} else if (SF.rap1_start == 255) {
 		// MAP1 only
 		if(IAM_BAN_HUB){
+			SF.map1_start = SF.first_free_slot;
+			SF.map1_end = SF.BI - 1;
 			SF.map1_start2sec = SF.BI_Boundary + \
 								SF.first_free_slot * SF.slot_sec;
 			SF.map1_end2sec = SF.BI_Boundary + \
@@ -693,10 +699,12 @@ static void wban_schedule_next_beacon() {
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		} else if (map1_sche_map[node_id].slot_start > 0) {
 			// allocation for Node
+			SF.map1_start = map1_sche_map[node_id].slot_start;
+			SF.map1_end = map1_sche_map[node_id].slot_end;
 			SF.map1_start2sec = SF.BI_Boundary + \
 								map1_sche_map[node_id].slot_start * SF.slot_sec;
 			SF.map1_end2sec = SF.BI_Boundary + \
-								map1_sche_map[node_id].slot_end * SF.slot_sec;
+								(1 + map1_sche_map[node_id].slot_end) * SF.slot_sec;
 			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
