@@ -156,8 +156,9 @@ static void wban_mac_init() {
  *--------------------------------------------------------------------------------*/
 static void wban_log_file_init() {
 	char dir_path[200];
-	char buffer[30];
-	int i;
+	char date_time[30];
+	char net_name[100];
+	int i = 0;
 	time_t rawtime;
 	struct tm *p;
 
@@ -169,27 +170,26 @@ static void wban_log_file_init() {
 
 	time(&rawtime);
 	p=localtime(&rawtime);
-	// strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
-	// strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
-	strftime(buffer, 30, "%Y-%m-%d", p);
-	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
-		if (dir_path[i] == '\0'){
-			break;
-		}
-	}
+	// strftime(date_time, 30, "%Y-%m-%d_%H-%M-%S", p);
+	// strftime(date_time, 30, "%Y-%m-%d_%H-%M", p);
+	strftime(date_time, 30, "%Y_%m_%d_%H_%M", p);
+	while (dir_path[i++] != '\0')
+		;
 	if(prg_file_path_create(dir_path, PRGC_FILE_PATH_CREATE_OPT_DIRECTORY) == PrgC_Compcode_Failure){
 		op_sim_end("ERROR : Log File is not valid.","INVALID_FILE", "","");
 	}
+	// obtain the project-scenario-number
+	op_sim_info_get (OPC_STRING, OPC_SIM_INFO_OUTPUT_FILE_NAME, net_name);
 	if(dir_path[i-1] == '\\'){
-		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+		sprintf(log_name, "%s%s-%s.trace", dir_path, net_name, date_time);
 	}else{
-		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, node_attr.protocol_ver);
+		sprintf(log_name, "%s\\%s-%s.trace", dir_path, net_name, date_time);
 	}
 	/* verification if the dir_path is a valid directory */
 	if (prg_path_name_is_dir (dir_path) == PrgC_Path_Name_Is_Not_Dir) {
 		op_sim_end("ERROR : Log File Directory is not valid directory name.","INVALID_DIR", "","");
 	}
-	
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -263,9 +263,9 @@ static void wban_parse_incoming_frame() {
 			// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			// fclose(log);
-			printf("t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
-			printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
-			op_prg_odb_bkpt("debug_app");
+			// printf("t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
+			// printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			// op_prg_odb_bkpt("debug_app");
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
