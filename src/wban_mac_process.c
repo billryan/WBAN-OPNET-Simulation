@@ -448,6 +448,7 @@ void map1_scheduling() {
 		FOUT;
 	}
 
+	printf("NODE_NAME=%s, node_id=%d.\n", node_attr.name, node_id);
 	// calculate the connected node
 	connected_node = 0, slot_req_total = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -497,10 +498,10 @@ void map1_scheduling() {
 					i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 			op_prg_odb_bkpt("debug");
 		}
-
-		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end) {
-			// printf("node_id = %d, slotnum = %d.\n", \
-				    // map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
+		printf("ban_id = %d, node_id = %d, slotnum = %d.\n", \
+			    map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
 			SF.free_slot = map1_sche_map[i].slot_end + 1;
@@ -526,6 +527,7 @@ static void wban_send_beacon_frame () {
 	Packet* beacon_MSDU;
 	Packet* beacon_MPDU;
 	// double beacon_frame_tx_time;
+	int ppdu_bits = 0;
 	extern int sequence_num_beaconG;
 	/* Stack tracing enrty point */
 	FIN(wban_send_beacon_frame);
@@ -535,8 +537,8 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set (beacon_MSDU, "Sender Address", beacon_attr.sender_address);
 	op_pk_nfd_set (beacon_MSDU, "Beacon Period Length", beacon_attr.beacon_period_length);
 	op_pk_nfd_set (beacon_MSDU, "Allocation Slot Length", beacon_attr.allocation_slot_length);
-	op_pk_nfd_set (beacon_MSDU, "RAP1 End", beacon_attr.rap1_end);
 	op_pk_nfd_set (beacon_MSDU, "RAP1 Start", beacon_attr.rap1_start);
+	op_pk_nfd_set (beacon_MSDU, "RAP1 End", beacon_attr.rap1_end);
 	// op_pk_nfd_set (beacon_MSDU, "Inactive Duration", beacon_attr.inactive_duration);
 	
 	/* create a MAC frame (MPDU) that encapsulates the beacon payload (MSDU) */
@@ -546,21 +548,24 @@ static void wban_send_beacon_frame () {
 	op_pk_nfd_set (beacon_MPDU, "EAP Indicator", 1); // EAP1 enabled
 	op_pk_nfd_set (beacon_MPDU, "Frame Subtype", BEACON);
 	op_pk_nfd_set (beacon_MPDU, "Frame Type", MANAGEMENT);
-	op_pk_nfd_set (beacon_MPDU, "B2", 1); // beacon2 enabled
+	// op_pk_nfd_set (beacon_MPDU, "B2", 1); // beacon2 enabled
 	op_pk_nfd_set (beacon_MPDU, "Sequence Number", ((sequence_num_beaconG++) % 256));
-	op_pk_nfd_set (beacon_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
+	// op_pk_nfd_set (beacon_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
 	op_pk_nfd_set (beacon_MPDU, "Recipient ID", BROADCAST_NID);
 	op_pk_nfd_set (beacon_MPDU, "Sender ID", mac_attr.sender_id);
 	op_pk_nfd_set (beacon_MPDU, "BAN ID", mac_attr.ban_id);
-	
 	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
 
+	// update the superframe parameters
+	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
+	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
+	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
+	SF.duration = SF.BI*SF.slot_sec;
+	SF.rap1_start = beacon_attr.rap1_start;
+	SF.rap1_end = beacon_attr.rap1_end;
+
 	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
-	// beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate);
-	// op_prg_odb_bkpt("send_beacon");
-	// if(SF.rap1_start > 0){
-	// 	SF.eap1_start2sec = SF.BI_Boundary + beacon_frame_tx_time + pSIFS;
-	// }
+	ppdu_bits = op_pk_total_size_get(beacon_MPDU) + MAC2PHY_BITS;
 	if(init_flag){
 		log = fopen(log_name, "a");
 		fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,INIT,NID=%d,", op_sim_time(), node_attr.name, node_id, mac_attr.sender_id);
@@ -572,13 +577,13 @@ static void wban_send_beacon_frame () {
 		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
 		op_prg_odb_bkpt("init");
-		SF.first_free_slot = 1 + (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
+		SF.first_free_slot = 1 + (int)(TX_TIME(ppdu_bits, node_attr.data_rate)/SF.slot_sec);
 	}
-	SF.current_slot = (int)(TX_TIME(wban_norm_phy_bits(beacon_MPDU), node_attr.data_rate)/SF.slot_sec);
+	SF.current_slot = (int)(TX_TIME(ppdu_bits, node_attr.data_rate)/SF.slot_sec);
 
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
-	
+	wban_schedule_next_beacon();
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -603,60 +608,63 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	FIN(wban_extract_beacon_frame);
 	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU_rx), node_attr.data_rate);
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
-	// if I'm a End Device, I get the information and synchronize myself
-	if (!IAM_BAN_HUB) {
-		op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
-		op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
-		op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
-		op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
+	op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
+	op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
+	op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
+	op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
 
-		if (node_attr.ban_id + 15 != rcv_sender_id) {
-			// printf(" [Node %s] t=%f  -> Beacon Frame Reception - but not from Hub. \n", node_attr.name, op_sim_time());
-			/* Stack tracing exit point */
-			FOUT;
-		} else {
-			// printf ("   -> Sequence Number              : %d \n", sequence_number_fd);
-		}
-		op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.sender_address);
-		op_pk_nfd_get (beacon_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
-		op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 End", &beacon_attr.rap1_end);
-		op_pk_nfd_get (beacon_MSDU_rx, "RAP1 Start", &beacon_attr.rap1_start);
-		op_pk_nfd_get (beacon_MSDU_rx, "Inactive Duration", &beacon_attr.inactive_duration);
-
-		// update with actual Hub id
-		if (HUB_ID == node_attr.traffic_dest_id) {
-			node_attr.traffic_dest_id = rcv_sender_id;
-		}
-		/*update rap length*/
-		beacon_attr.rap1_length = beacon_attr.rap1_end - beacon_attr.rap1_start + 1;
-		SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
-		// op_prg_odb_bkpt("rcv_beacon");
-		op_pk_destroy (beacon_MSDU_rx);
-		op_pk_destroy (beacon_MPDU_rx);
-
-		mac_attr.recipient_id = rcv_sender_id;
-		if (UNCONNECTED_NID == mac_attr.sender_id) {
-			/* We will try to connect to this BAN  if our scheduled access length
-			 * is NOT set to unconnected (-1). If it is set to 0, it means we are
-			 * establishing a sleeping pattern and waking up only to hear beacons
-			 * and are only able to transmit in RAP periods.
-			 */
-			/* initialize the NID from 32 */
-			mac_attr.sender_id = current_free_connected_NID++;  //current_free_connected_NID is global variable
-			// log = fopen(log_name, "a");
-			// fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
-			// fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
-			// fclose(log);
-			// printf("t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
-			// op_prg_odb_bkpt("init");
-
-		}
-		SF.slot_sec = (pAllocationSlotMin + \
-					beacon_attr.allocation_slot_length*pAllocationSlotResolution) * 0.000001;
-		SF.first_free_slot = 1 + (int)(beacon_frame_tx_time/SF.slot_sec);
-		wban_schedule_next_beacon();
+	if (node_attr.ban_id + 15 != rcv_sender_id) {
+		FOUT;
 	}
+	op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.sender_address);
+	op_pk_nfd_get (beacon_MSDU_rx, "Beacon Period Length", &beacon_attr.beacon_period_length);
+	op_pk_nfd_get (beacon_MSDU_rx, "Allocation Slot Length", &beacon_attr.allocation_slot_length);
+	op_pk_nfd_get (beacon_MSDU_rx, "RAP1 End", &beacon_attr.rap1_end);
+	op_pk_nfd_get (beacon_MSDU_rx, "RAP1 Start", &beacon_attr.rap1_start);
+	op_pk_nfd_get (beacon_MSDU_rx, "Inactive Duration", &beacon_attr.inactive_duration);
+
+	// update with actual Hub id
+	if (HUB_ID == node_attr.traffic_dest_id) {
+		node_attr.traffic_dest_id = rcv_sender_id;
+	}
+	/*update rap length*/
+	beacon_attr.rap1_length = beacon_attr.rap1_end - beacon_attr.rap1_start + 1;
+	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU_rx);
+	// op_prg_odb_bkpt("rcv_beacon");
+	op_pk_destroy (beacon_MSDU_rx);
+	op_pk_destroy (beacon_MPDU_rx);
+
+	mac_attr.recipient_id = rcv_sender_id;
+	if (UNCONNECTED_NID == mac_attr.sender_id) {
+		/* We will try to connect to this BAN  if our scheduled access length
+		 * is NOT set to unconnected (-1). If it is set to 0, it means we are
+		 * establishing a sleeping pattern and waking up only to hear beacons
+		 * and are only able to transmit in RAP periods.
+		 */
+		/* initialize the NID from 32 */
+		mac_attr.sender_id = current_free_connected_NID++;  //current_free_connected_NID is global variable
+		// log = fopen(log_name, "a");
+		// fprintf(log, "t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+		// fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
+		// fclose(log);
+		// printf("t=%f,NODE_ID=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_id, node_attr.name, mac_attr.sender_id);
+		// op_prg_odb_bkpt("init");
+
+	}
+	// update the superframe parameters
+	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
+	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
+	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
+	SF.duration = SF.BI*SF.slot_sec;
+	SF.rap1_start = beacon_attr.rap1_start;
+	SF.rap1_end = beacon_attr.rap1_end;
+
+	SF.slot_sec = (pAllocationSlotMin + \
+				beacon_attr.allocation_slot_length*pAllocationSlotResolution) * 0.000001;
+	SF.first_free_slot = 1 + (int)(beacon_frame_tx_time/SF.slot_sec);
+	SF.current_slot = (int)((op_sim_time() - SF.BI_Boundary) / SF.slot_sec);
+	wban_schedule_next_beacon();
+
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -672,15 +680,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 static void wban_schedule_next_beacon() {
 	/* Stack tracing enrty point */
 	FIN(wban_schedule_next_beacon);
-
-	// update the superframe parameters
-	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
-	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
-	SF.sleep_period = SF.SD * beacon_attr.inactive_duration;
-	SF.duration = SF.BI*SF.slot_sec;
-	SF.rap1_start = beacon_attr.rap1_start;
-	SF.rap1_end = beacon_attr.rap1_end;
-
 	// exception
 	if (SF.rap1_start != 255 && SF.rap1_start >= SF.SD) {
 		op_sim_end("ERROR : RAP start > SF.SD","","","");
@@ -764,13 +763,9 @@ static void wban_schedule_next_beacon() {
 	if (IAM_BAN_HUB && SF.map1_start > 0) {
 		SF.map1_len = SF.map1_end - SF.map1_start + 1;
 		// do map1 scheduling
-		op_intrpt_schedule_self (op_sim_time(), MAP1_SCHEDULE);
+		op_intrpt_schedule_self (op_sim_time() + pSIFS, MAP1_SCHEDULE);
 	}
 
-	/* INCREMENT_SLOT at slot boundary, after beacon */
-	printf("\nt=%f,NODE_NAME=%s,NID=%d\n", op_sim_time(), node_attr.name, mac_attr.sender_id);
-	op_intrpt_schedule_self (SF.BI_Boundary + SF.first_free_slot * SF.slot_sec, INCREMENT_SLOT);
-	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_sec, BEACON_INTERVAL_CODE);
 	
 	printf("\t  Superframe parameters:\n");
 	printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
@@ -786,6 +781,9 @@ static void wban_schedule_next_beacon() {
 	printf ("Schedule Next Beacon at %f\n", SF.BI_Boundary+SF.BI*SF.slot_sec);
 	op_prg_odb_bkpt("sch_beacon");
 
+	/* INCREMENT_SLOT at slot boundary, after beacon */
+	op_intrpt_schedule_self (SF.BI_Boundary + (SF.current_slot + 1) * SF.slot_sec, INCREMENT_SLOT);
+	op_intrpt_schedule_self (SF.BI_Boundary + SF.BI*SF.slot_sec, BEACON_INTERVAL_CODE);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -1275,7 +1273,7 @@ static void wban_mac_interrupt_process() {
 
 				case N_ACK_PACKET_SENT:
 					if((MANAGEMENT == pkt_to_be_sent.frame_type) && (BEACON == pkt_to_be_sent.frame_subtype)){
-						wban_schedule_next_beacon(); //update the superframe
+						// wban_schedule_next_beacon(); //update the superframe
 					}
 					TX_ING = OPC_FALSE;
 					// attemptingToTX = OPC_FALSE;
