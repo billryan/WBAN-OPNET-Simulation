@@ -104,7 +104,7 @@ static void wban_mac_init() {
 		op_ima_obj_attr_get (conn_req_attr_comp_id, "Allocation Length", &conn_req_attr.allocation_length);
 		map1_sche_map[node_id].slotnum = conn_req_attr.allocation_length;
 		map1_sche_map[node_id].bid = mac_attr.ban_id;
-		printf("node_id = %d, bid = %d.\n", node_id, mac_attr.ban_id);
+		// printf("node_id = %d, bid = %d.\n", node_id, mac_attr.ban_id);
 		/* start assigning connected NID from ID 32 */
 		mac_attr.sender_id = 32 + ((current_free_connected_NID - 32) % 214);
 		mac_attr.recipient_id = UNCONNECTED;
@@ -263,8 +263,9 @@ static void wban_parse_incoming_frame() {
 			// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			// fclose(log);
-			// printf("t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
-			// printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			printf("t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
+			printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			op_prg_odb_bkpt("debug_app");
 			if(I_ACK_POLICY == ack_policy_fd){
 				ack_seq_num = sequence_number_fd;
 				op_intrpt_schedule_self(op_sim_time()+pSIFS, SEND_I_ACK);
@@ -423,7 +424,7 @@ void set_map1_map() {
 
 	subq_info_get(SUBQ_DATA);
 	slot_bits = node_attr.data_rate*1000.0*SF.slot_sec;
-	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* header4mac2phy();
+	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* MAC2PHY_BITS;
 	slotnum = (int)(data_ack_bits / slot_bits);
 	// reset map1_sche_map
 	map1_sche_map[node_id].slotnum = slotnum;
@@ -437,18 +438,36 @@ void set_map1_map() {
  */
 void map1_scheduling() {
 	int i = 0;
-
+	int slot_avg = 0, slot_req_total = 0, slot_req = 0;
+	int connected_node = 0;
 	FIN(map1_scheduling);
 
-	printf("map1_scheduling...\n");
+	// printf("map1_scheduling...\n");
 	// disable map1
 	if (SF.rap1_start == 0) {
 		FOUT;
 	}
+
+	// calculate the connected node
+	connected_node = 0, slot_req_total = 0;
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		// ignore self
+		if (i == node_id) {
+			continue;
+		}
+		// same BAN ID
+		if (map1_sche_map[i].bid == map1_sche_map[node_id].bid) {
+			++connected_node;
+			if (map1_sche_map[i].slotnum > 0) {
+				slot_req_total += map1_sche_map[i].slotnum;
+			}
+		}
+	}
+	slot_avg = slot_req_total / connected_node;
+
 	// update free_slot
 	SF.free_slot = SF.first_free_slot;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
-		printf("i = %d.\n", i);
 		// ignore self
 		if (i == node_id) {
 			continue;
@@ -462,11 +481,26 @@ void map1_scheduling() {
 			continue;
 		}
 		// allocation
-		printf("free_slot = %d, slotnum = %d, rap1_start = %d.\n", \
-			   SF.free_slot, map1_sche_map[i].slotnum, SF.rap1_start);
-		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.rap1_start) {
-			printf("node_id = %d, slotnum = %d.\n", \
-				    map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		// printf("free_slot = %d, slotnum = %d, rap1_start = %d.\n", \
+			   // SF.free_slot, map1_sche_map[i].slotnum, SF.rap1_start);
+		// cut off 
+		if ((map1_sche_map[i].slotnum > slot_avg) && \
+			(slot_req_total > SF.map1_len)) {
+			printf("i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+					i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+			slot_req = max_int(slot_avg, map1_sche_map[i].slotnum - \
+									(slot_req_total - SF.map1_len));
+			slot_req_total -= map1_sche_map[i].slotnum - slot_req;
+			slot_avg = slot_req_total / connected_node;
+			map1_sche_map[i].slotnum = slot_req;
+			printf("after_i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+					i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+			op_prg_odb_bkpt("debug");
+		}
+
+		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end) {
+			// printf("node_id = %d, slotnum = %d.\n", \
+				    // map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
 			SF.free_slot = map1_sche_map[i].slot_end + 1;
@@ -545,8 +579,6 @@ static void wban_send_beacon_frame () {
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
 	
-	// do map1 scheduling
-	op_intrpt_schedule_self (SF.BI_Boundary + pSIFS, MAP1_SCHEDULE);
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -727,6 +759,12 @@ static void wban_schedule_next_beacon() {
 		}
 		SF.rap1_length2sec = SF.rap1_end2sec - SF.rap1_start2sec;
 		op_intrpt_schedule_self(SF.rap1_end2sec, END_OF_RAP1_PERIOD_CODE);
+	}
+
+	if (IAM_BAN_HUB && SF.map1_start > 0) {
+		SF.map1_len = SF.map1_end - SF.map1_start + 1;
+		// do map1 scheduling
+		op_intrpt_schedule_self (op_sim_time(), MAP1_SCHEDULE);
 	}
 
 	/* INCREMENT_SLOT at slot boundary, after beacon */
@@ -1071,9 +1109,9 @@ static void wban_mac_interrupt_process() {
 					// log = fopen(log_name, "a");
 					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ START OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
 					// fclose(log);
-					printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					printf("\t  Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
-					op_prg_odb_bkpt("map1_start");
+					// printf (" [Node %s] t=%f  -> ++++++++++  START OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// printf("\t  Node %s Start MAP1 at %f, End MAP1 at %f.\n", node_attr.name, phase_start_timeG, phase_end_timeG);
+					// op_prg_odb_bkpt("map1_start");
 					op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);				
 					break;
 				};/* end of START_OF_MAP1_PERIOD_CODE */
@@ -1090,8 +1128,8 @@ static void wban_mac_interrupt_process() {
 					// log = fopen(log_name, "a");
 					// fprintf (log,"t=%f,NODE_ID=%d  -> ++++++++++ END OF THE MAP1 ++++++++++ \n\n", op_sim_time(), node_id);
 					// fclose(log);
-					printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
-					op_prg_odb_bkpt("map1_end");
+					// printf (" [Node %s] t=%f  -> ++++++++++  END OF THE MAP1 ++++++++++ \n\n", node_attr.name, op_sim_time());
+					// op_prg_odb_bkpt("map1_end");
 					break;
 				};/* end of END_OF_MAP1_PERIOD_CODE */
 
@@ -1151,9 +1189,9 @@ static void wban_mac_interrupt_process() {
 							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, CCA_START_CODE);
 						} else {
 							if(csma.backoff_counter < 0){
-								if(waitForACK) printf("waitForACK=True,");
-								if(attemptingToTX) printf("attemptingToTX=True,");
-								if(TX_ING) printf("TX_ING=True\n");
+								// if(waitForACK) printf("waitForACK=True,");
+								// if(attemptingToTX) printf("attemptingToTX=True,");
+								// if(TX_ING) printf("TX_ING=True\n");
 								// break;
 								// csma.backoff_counter = 0;
 								op_sim_end("ERROR : TRY TO SEND Packet WHILE backoff_counter < 0","PK_SEND_CODE","","");
@@ -1337,7 +1375,7 @@ static void wban_mac_interrupt_process() {
 				}
 			}
 			if(IAM_BAN_HUB){
-				thput_msdu_kbps = (data_pkt_ppdu_kbits - 0.001*data_pkt_num*(header4mac2phy()+72))/(op_sim_time());
+				thput_msdu_kbps = (data_pkt_ppdu_kbits - 0.001*data_pkt_num*HEADER_BITS)/(op_sim_time());
 				fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT,RCV_MSDU_kbps=%f\n", op_sim_time(), node_id, thput_msdu_kbps);
 				fprintf(log, "t=%f,NODE_ID=%d,STAT,THROUGHPUT,RCV_PPDU_kbps=%f\n", op_sim_time(), node_id, data_pkt_ppdu_kbits/(op_sim_time()));
 				/* UP=8 means the UP in total */
@@ -1419,16 +1457,16 @@ static void wban_attempt_TX() {
 	// Packet* frame_MPDU_temp;
 	// double conn_round;
 	// double ack_tx_time;
-	int slotnum;
+	// int slotnum;
 	/* Stack tracing enrty point */
 	FIN(wban_attempt_TX);
 
 	// printf("\nt=%f,NODE_NAME=%s,mac_state=%d\n", op_sim_time(), node_attr.name, mac_state);
 	if(waitForACK || attemptingToTX || TX_ING){
-		if(waitForACK) printf("\t  waitForACK=True,");
-		if(attemptingToTX) printf("\t  attemptingToTX=True,");
-		if(TX_ING) printf("\t  TX_ING=True,");
-		printf("A packet is TX\n");
+		// if(waitForACK) printf("\t  waitForACK=True,");
+		// if(attemptingToTX) printf("\t  attemptingToTX=True,");
+		// if(TX_ING) printf("\t  TX_ING=True,");
+		// printf("A packet is TX\n");
 		FOUT;
 	}
 	// If we are not in an appropriate state, return
@@ -1473,7 +1511,7 @@ static void wban_attempt_TX() {
 			wban_attempt_TX_CSMA();
 		}
 		if(SF.IN_MAP_PHASE){
-			printf("\t  Retransmit with Scheduling\n");
+			// printf("\t  Retransmit with Scheduling\n");
 			pkt_tx_total++;
 			wban_send_mac_pk_to_phy(frame_MPDU_to_be_sent);
 		}
@@ -1519,13 +1557,13 @@ static void wban_attempt_TX() {
 			}
 		}
 		frame_MPDU_to_be_sent = op_subq_pk_remove(SUBQ_DATA, OPC_QPOS_PRIO);
-		if((1 == node_attr.protocol_ver) && (MAC_MAP1 == mac_state)){
-			subq_info_get(SUBQ_DATA);
-			slotnum = (int)(((subq_info.pksize*3*pSIFS)/SF.slot_sec) + (subq_info.bitsize + subq_info.pksize *2* header4mac2phy())/(node_attr.data_rate*1000.0*SF.slot_sec));
-			op_pk_nfd_set (frame_MPDU_to_be_sent, "slotnum", slotnum);
-			// printf("\t  Requires slotnum=%d for MAP2\n", slotnum);
-			// op_prg_odb_bkpt("req_map2");
-		}
+		// if((1 == node_attr.protocol_ver) && (MAC_MAP1 == mac_state)){
+		// 	subq_info_get(SUBQ_DATA);
+		// 	slotnum = (int)(((subq_info.pksize*3*pSIFS)/SF.slot_sec) + (subq_info.bitsize + subq_info.pksize *2* MAC2PHY_BITS)/(node_attr.data_rate*1000.0*SF.slot_sec));
+		// 	op_pk_nfd_set (frame_MPDU_to_be_sent, "slotnum", slotnum);
+		// 	// printf("\t  Requires slotnum=%d for MAP2\n", slotnum);
+		// 	// op_prg_odb_bkpt("req_map2");
+		// }
 		pkt_to_be_sent.enable = OPC_TRUE;
 	} else {
 		pkt_to_be_sent.enable = OPC_FALSE;
@@ -2090,9 +2128,9 @@ static void queue_status() {
 		op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 
 		if (op_subq_empty(i)) {
-			printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), node_attr.name, i, pk_capacity, bit_capacity);
+			// printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), node_attr.name, i, pk_capacity, bit_capacity);
 		} else {
-			printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
+			// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 		}
 	}
 	/* Stack tracing exit point */
@@ -2135,10 +2173,12 @@ static void subq_info_get (int subq_index) {
 		subq_info.bitsize = op_subq_stat (subq_index, OPC_QSTAT_BITSIZE);
 		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
 		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
-		printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
+		// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		pk_test_up = op_subq_pk_access(subq_index, OPC_QPOS_PRIO);
 		subq_info.up = op_pk_priority_get(pk_test_up);
-		// printf("\t  subq_info.up=UP%d\n", subq_info.up);
+		printf("\node_id = %d, subq_info.up=UP%d, ", node_id, subq_info.up);
+		printf("pksize = %f, bitsize = %f\n", subq_info.pksize, subq_info.bitsize);
+		op_prg_odb_bkpt("debug");
 	}
 
 	/* Stack tracing exit point */
@@ -2175,14 +2215,4 @@ static void subq_data_info_get () {
 
 	/* Stack tracing exit point */
 	FOUT;
-}
-
-/*--------------------------------------------------------------------------------
- * Function:	header4mac2phy()
- *
- * Description:	header bits add for mac to phy
- *             
- *--------------------------------------------------------------------------------*/
-static int header4mac2phy() {
-	return (int)ceil(LOG_M*BCH_CODE*(N_preamble + S_header*N_header));
 }
