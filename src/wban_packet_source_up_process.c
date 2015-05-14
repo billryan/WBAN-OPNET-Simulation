@@ -36,7 +36,7 @@ static void wban_source_init() {
 	/* get the name of the node */
 	op_ima_obj_attr_get (parent_id, "name", node_name);
 
-	printf("%s User Priority Traffic initialization.\n", node_name);
+	// printf("%s User Priority Traffic initialization.\n", node_name);
 	op_ima_obj_attr_get (own_id, "User Priority 7 Traffic Parameters", &traffic_source_id); 
 	traffic_source_comp_id = op_topo_child (traffic_source_id, OPC_OBJTYPE_GENERIC, 0);
 	/* Read the values of the up7-MSDU generation parameters, i.e. the attribute values of the surrounding module. */
@@ -291,126 +291,126 @@ static void wban_print_parameters() {
 
 	/* Stack tracing enrty point */	
 	FIN(wban_print_parameters);	
-		printf (" User Priority 7 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up7_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up7_msdu_size_dist_str);
+		// printf (" User Priority 7 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up7_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up7_msdu_size_dist_str);
 		if (up7_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up7_start_time);
+			// printf ("\t Start time           : %f\n", up7_start_time);
 		}
 		if (up7_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up7_stop_time);
+			// printf ("\t Stop time            : %f\n", up7_stop_time);
 		}
 
-		printf (" User Priority 6 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up6_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up6_msdu_size_dist_str);
+		// printf (" User Priority 6 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up6_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up6_msdu_size_dist_str);
 		if (up6_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up6_start_time);
+			// printf ("\t Start time           : %f\n", up6_start_time);
 		}
 		if (up6_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up6_stop_time);
+			// printf ("\t Stop time            : %f\n", up6_stop_time);
 		}
 
-		printf (" User Priority 5 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up5_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up5_msdu_size_dist_str);
+		// printf (" User Priority 5 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up5_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up5_msdu_size_dist_str);
 		if (up5_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up5_start_time);
+			// printf ("\t Start time           : %f\n", up5_start_time);
 		}
 		if (up5_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up5_stop_time);
+			// printf ("\t Stop time            : %f\n", up5_stop_time);
 		}
 
-		printf (" User Priority 4 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up4_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up4_msdu_size_dist_str);
+		// printf (" User Priority 4 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up4_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up4_msdu_size_dist_str);
 		if (up4_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up4_start_time);
+			// printf ("\t Start time           : %f\n", up4_start_time);
 		}
 		if (up4_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up4_stop_time);
+			// printf ("\t Stop time            : %f\n", up4_stop_time);
 		}
 
-		printf (" User Priority 3 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up3_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up3_msdu_size_dist_str);
+		// printf (" User Priority 3 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up3_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up3_msdu_size_dist_str);
 		if (up3_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up3_start_time);
+			// printf ("\t Start time           : %f\n", up3_start_time);
 		}
 		if (up3_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up3_stop_time);
+			// printf ("\t Stop time            : %f\n", up3_stop_time);
 		}
 
-		printf (" User Priority 2 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up2_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up2_msdu_size_dist_str);
+		// printf (" User Priority 2 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up2_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up2_msdu_size_dist_str);
 		if (up2_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up2_start_time);
+			// printf ("\t Start time           : %f\n", up2_start_time);
 		}
 		if (up2_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up2_stop_time);
+			// printf ("\t Stop time            : %f\n", up2_stop_time);
 		}
 
-		printf (" User Priority 1 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up1_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up1_msdu_size_dist_str);
+		// printf (" User Priority 1 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up1_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up1_msdu_size_dist_str);
 		if (up1_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up1_start_time);
+			// printf ("\t Start time           : %f\n", up1_start_time);
 		}
 		if (up1_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up1_stop_time);
+			// printf ("\t Stop time            : %f\n", up1_stop_time);
 		}
 
-		printf (" User Priority 0 Traffic parameters:\n");
-		printf ("\t MSDU Interarival PDF : %s\n", up0_msdu_interarrival_dist_str);
-		printf ("\t MSDU Size PDF        : %s\n", up0_msdu_size_dist_str);
+		// printf (" User Priority 0 Traffic parameters:\n");
+		// printf ("\t MSDU Interarival PDF : %s\n", up0_msdu_interarrival_dist_str);
+		// printf ("\t MSDU Size PDF        : %s\n", up0_msdu_size_dist_str);
 		if (up0_start_time == -1) {
-			printf ("\t Start time           : Infinity \n");
+			// printf ("\t Start time           : Infinity \n");
 		} else {
-			printf ("\t Start time           : %f\n", up0_start_time);
+			// printf ("\t Start time           : %f\n", up0_start_time);
 		}
 		if (up0_stop_time == -1) {
-			printf ("\t Stop time            : Infinity \n");
+			// printf ("\t Stop time            : Infinity \n");
 		} else {
-			printf ("\t Stop time            : %f\n", up0_stop_time);
+			// printf ("\t Stop time            : %f\n", up0_stop_time);
 		}
 
 		if (destination_id == HUB_ID) {
-			printf (" Destination ID : HUB_ID \n");
+			// printf (" Destination ID : HUB_ID \n");
 		} else if (destination_id == 0xFF) {
-			printf (" Destination ID : Broadcast - %d (%#X) \n", destination_id, destination_id);
+			// printf (" Destination ID : Broadcast - %d (%#X) \n", destination_id, destination_id);
 		} else {
-			printf (" Destination ID : %d (%#X)\n", destination_id, destination_id);
+			// printf (" Destination ID : %d (%#X)\n", destination_id, destination_id);
 		}
-		printf ("|-----------------------------------------------------------------------------|\n\n");
+		// printf ("|-----------------------------------------------------------------------------|\n\n");
 	/* Stack tracing exit point */
 	FOUT;
 }
