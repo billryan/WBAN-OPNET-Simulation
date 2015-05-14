@@ -123,11 +123,8 @@ static double Bits2Sec (double sizeinbits, double datarateinbits){
  *           SizeInBits : double, datarateinKbits : double
  *--------------------------------------------------------------------------------*/
 
-static double TX_TIME (double sizeinbits, double datarateinKbits){
-	
-	double res;
-	res = (sizeinbits/(1000 * datarateinKbits));
-	return (res);
+double TX_TIME (double sizeinbits, double datarateinKbits){
+	return sizeinbits/(1000 * datarateinKbits);
 }
 
 
