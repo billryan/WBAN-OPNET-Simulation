@@ -30,21 +30,10 @@ typedef struct {
 	int beacon_period_length;
 	int allocation_slot_length;
 	int rap1_start;
-	int rap1_length;
 	int rap1_end;
-	int rap2_start;
-	int rap2_end;
-	int b2_start;
+	int rap1_length;
 	int inactive_duration;
 } beacon_attributes;
-
-/* define the beacon2 frame parameters */
-typedef struct {
-	// int beacon_period_length;
-	// int allocation_slot_length;
-	int cap_end;
-	int map2_end;
-} beacon2_attributes;
 
 /* define the connection request parameters */
 typedef struct {
@@ -56,16 +45,6 @@ typedef struct {
 	int minimum_length;
 	int allocation_length;
 } connection_request_attributes;
-
-/* define the connection assignment parameters */
-typedef struct {
-	int eap2_start;
-	int	sender_address; // 48 bits
-	int allocation_id;
-	int interval_start;
-	int interval_end;
-	int allocation_length;
-} connection_assignment_attributes;
 
 /* define the MAP1 parameters of the node */
 typedef struct {
@@ -114,32 +93,21 @@ typedef struct {
 	double duration; // superfarm duration in second
 	int sleep_period; // the inactive portion in slots
 	int current_slot; // the current slot in the active portion of the superframe from 0 to beacon_period_length-1
-	int current_first_free_slot;
+	int free_slot;
+	int first_free_slot;
 
 	int beacon_period_length; // beacon period length in slots -all
 	int rap1_start;
 	int rap1_end;
 	int map1_start;
 	int map1_end;
-	int eap2_start;
-	int eap2_end;
-	int rap2_start;
-	int rap2_end;
-	int map2_start;
-	int map2_end;
-	int b2_start;
-	int b2_end;
-	int cap_start;
-	int cap_end;
+	int map1_len;
 	int inactive_duration;
 
 	double beacon_frame_tx_time;
 	double eap1_length2sec;
 	double rap1_length2sec;
 	double map1_length2sec;
-	double eap2_length2sec;
-	double rap2_length2sec;
-	double map2_length2sec;
 
 	double BI_Boundary; // Specfiy the time at which the beacon frame has been created to synchronize all node to this time reference
 	double eap1_start2sec;
@@ -148,15 +116,6 @@ typedef struct {
 	double rap1_end2sec;
 	double map1_start2sec;
 	double map1_end2sec;
-	double eap2_start2sec;
-	double eap2_end2sec;
-	double rap2_start2sec;
-	double rap2_end2sec;
-	double map2_start2sec;
-	double map2_end2sec;
-	double b2_start2sec;
-	double cap_start2sec;
-	double cap_end2sec;
 
 	double backoff_timer; // remaining backoff time from last CAP
 	Boolean CAP_ACTIVE;	// Contention Access Period (CAP) is active 
@@ -306,4 +265,15 @@ typedef struct
 	int slotnum;
 	int up;
 } assignment_map;
+
+typedef struct
+{
+	int bid;
+	int cid;
+	int nid;
+	int slot_start;
+	int slot_end;
+	int slotnum;
+	int up;
+} map1_schedule_map;
 #endif

@@ -4,32 +4,15 @@
 /* Misc */
 #define ESSENTIAL   0
 #define VERBOSE     1
-/** PHY Layer constatns		**/
-#define aMaxPHYPacketSize_Octet 	127								// size of PSDU
-#define aMaxPHYPacketSize_Bits 		(8*aMaxPHYPacketSize_Octet)		// 1016 bits
-#define aMaxPHYPacketSize_Symbols 	(2*aMaxPHYPacketSize_Octet)		// 254 Symbols
-#define aTurnaroundTime_Symbol 		12
+// protocol version
+#define BASE0 0
+#define PAPER1 1
 
-/** MAC Layer constants		**/
-#define aNumSuperframeSlots 16
-#define aBaseSlotDuration	60 	// The number of symbols forming a superframe slot for a superframe order equal to 0
-#define aMaxBE	5
-#define aMaxBeaconOverhead	75
-#define aMaxBeaconPayloadLength_Octet 	52
-#define aBaseSuperframeDuration	(aNumSuperframeSlots*aBaseSlotDuration)
-#define aUnitBackoffPeriod	20
-#define aMaxFrameRetries	3
-#define aMaxMACFrameSize_Bits  (aMaxPHYPacketSize_Bits-MAC_HEADER_SIZE)	//MAC Frame Payload (MSDU) size
-// 802.15.6 related 
-#define BeaconPeriodLength 64
+// frame (PPDU) size [bits]
+#define I_ACK_PPDU_BITS    411
+#define BEACON_PPDU_BITS   523
 #define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
-#define aMaxBeaconPeriodLength_Slots 256 //0-256 Slots
-//the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
-#define pAllocationSlotMin 500 //500 μs for NB PHY
-#define pAllocationSlotResolution 500 //500 μs for NB PHY
-#define allocationSlotLength 0 //for NB PHY, L=3 means that 2 ms per slot
-#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
-
+/** PHY Layer constatns		**/
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
 #define SYMBOL_RATE 600000.0 // 600 Ksps
@@ -41,41 +24,43 @@
 #define MILLI 0.001
 #define MICRO 0.000001
 #define BCH_CODE (51.0/63)
-#define T_PHY ((N_preamble + S_header*N_header)/SYMBOL_RATE)
-// CSMA/CA
+
+/** MAC Layer constants		**/
+// (int)ceil(LOG_M*BCH_CODE*(N_preamble + S_header*N_header));
+#define MAC2PHY_BITS         347
+#define MAC_HEADER_BITS      64
+#define HEADER_BITS          (MAC2PHY_BITS + MAC_HEADER_BITS)
+#define BeaconPeriodLength 64
+//the length of an allocation slot is equal to pAllocationSlotMin + L × pAllocationSlotResolution
+#define pAllocationSlotMin 500 //500 μs for NB PHY
+#define pAllocationSlotResolution 500 //500 μs for NB PHY
+#define allocationSlotLength 3 //for NB PHY, L=3 means that 2 ms per slot
+#define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
+
+
+/* CSMA/CA */
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
 // pCCATime = 63 / Symbol Rate
 // pCSMAMACPHYTime = 40 μs
 #define pCCATime (63.0/SYMBOL_RATE) // ms
 #define pCSMAMACPHYTime (40 * 0.000001) // 40 μs
 #define pCSMASlotLength2Sec (pCCATime + pCSMAMACPHYTime)
-/* 802.15.6 related MAC parameters */
 
+/* 802.15.6 related MAC parameters */
 /** MAC Layer attributes		**/
 #define macAckWaitDuration 54	// The max number of symbols to wait for an ACK
 #define mTimeOut 30 // 30 μs
-
-/** Frame Types Definitions according to the standard IEEE 802.15.4 2003 - p.112, Tab.65 **/
-#define BEACON_FRAME_TYPE 0
-#define DATA_FRAME_TYPE 1
-#define ACK_FRAME_TYPE 2
-#define COMMAND_FRAME_TYPE 3
 
 // WBAN bit rate [bps]
 #define WBAN_DATA_RATE 971400.0
 #define WBAN_DATA_RATE_KBITS (WBAN_DATA_RATE/1000.0)
 
-/* Node configuration constants     */
-#define DELAY_INFINITY 1000.0
-
-// broadcast address corresponds to 0xFFFF
-#define BROADCAST_ADDRESS 65535
-
 // temporary ID of HUB (Traffic Destination ID)
 #define	HUB_ID	-1
-
 // max nodes in a wban
 #define NODE_MAX 10
+// max nodes in all wban
+#define NODE_ALL_MAX 50
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes
@@ -86,13 +71,7 @@
 #define AUTO_ASSIGNED_NID -2 //NID auto assignment from HUB
 #define UNCONNECTED -1 //unconnected status
 
-// ACK frame (MPDU) size [bits]
-#define ACK_FRAME_SIZE_BITS 40
-#define I_ACK_PPDU_SIZE_BITS (72+121)
-#define BEACON_PPDU_BITS 321
-
 #define MAC_STATE_ALL 10
-// int i_test = 0;
 
 /* USER_PRIORITY for DATA */
 #define UP0     0
