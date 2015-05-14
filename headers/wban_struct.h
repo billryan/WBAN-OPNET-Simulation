@@ -101,6 +101,7 @@ typedef struct {
 	int rap1_end;
 	int map1_start;
 	int map1_end;
+	int map1_len;
 	int inactive_duration;
 
 	double beacon_frame_tx_time;
