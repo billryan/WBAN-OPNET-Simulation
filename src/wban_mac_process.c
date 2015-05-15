@@ -110,6 +110,7 @@ static void wban_mac_init() {
 		mac_attr.recipient_id = UNCONNECTED;
 		current_free_connected_NID++;
 		map1_sche_map[node_id].nid = mac_attr.sender_id;
+		printf("NODE_NAME=%s, NID=%d.\n", node_attr.name, mac_attr.sender_id);
 		// node_attr.recipient_id = node_attr.connectedHID;
 	}
 	SF.SLEEP = OPC_TRUE;
@@ -209,6 +210,7 @@ static void wban_parse_incoming_frame() {
 	int ban_id;
 	int recipient_id;
 	int sender_id;
+	int node_id_r = 0;
 	int ack_policy_fd;
 	// int eap_indicator_fd;
 	int frame_type_fd;
@@ -219,6 +221,7 @@ static void wban_parse_incoming_frame() {
 	int ppdu_bits;
 	double ete_delay;
 	double app_latency;
+	double snr;
 
 	/* Stack tracing enrty point */
 	FIN(wban_parse_incoming_frame);
@@ -231,6 +234,7 @@ static void wban_parse_incoming_frame() {
 	/* check from what input stream the packet is received and do the right processing*/
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
+			snr = snr_get(rcv_frame);
 			ppdu_bits = op_pk_total_size_get(rcv_frame);
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
@@ -241,13 +245,17 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "BAN ID", &ban_id);
 			op_pk_nfd_get (frame_MPDU, "Recipient ID", &recipient_id);
 			op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
-
 			// filter the incoming BAN packet - not implemented entirely
 			/*update the battery module*/
 			if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
 				FOUT;
 			}
-
+			if (IAM_BAN_HUB) {
+				node_id_r = rfind_nodeid(sender_id);
+				printf("t=%f,NODE_NAME=%s,NODE_ID_R=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id_r, mac_state, recipient_id, sender_id);
+				printf("SNR=%f\n", snr);
+				op_prg_odb_bkpt("snr");
+			}
 			/* repalce the mac_attr.receipient_id with Sender ID */
 			mac_attr.recipient_id = sender_id;
 			/*acquire "Frame Type" field*/
@@ -259,6 +267,8 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 
+			printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			op_prg_odb_bkpt("debug_app");
 			// log = fopen(log_name, "a");
 			// fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
@@ -426,9 +436,45 @@ void set_map1_map() {
 	slot_bits = node_attr.data_rate*1000.0*SF.slot_sec;
 	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* HEADER_BITS;
 	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
+	printf("node_id=%d, NODE_NAME=%s, pksize=%f, slotnum=%d\n", \
+		    node_id, node_attr.name, subq_info.pksize, slotnum);
+	op_prg_odb_bkpt("set_map1_map");
 	// reset map1_sche_map
 	map1_sche_map[node_id].slotnum = slotnum;
 
+	FOUT;
+}
+
+/*
+ * calculate the priority array
+ */
+void calc_prio_node() {
+	FIN(calc_prio_node);
+
+
+	FOUT;
+}
+
+/*
+ * calculate the rho by Hub
+ */
+void calc_prio_hub() {
+	double alpha = 1, beta = 0;
+	int i = 0;
+	FIN(calc_prio_node);
+
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		// ignore self
+		if (i == node_id) {
+			continue;
+		}
+		// same BAN ID
+		if (map1_sche_map[i].bid == map1_sche_map[node_id].bid) {
+			if (map1_sche_map[i].slotnum <= 0) {
+				continue;
+			}
+		}
+	}
 	FOUT;
 }
 
@@ -448,7 +494,7 @@ void map1_scheduling() {
 		FOUT;
 	}
 
-	// printf("NODE_NAME=%s, node_id=%d.\n", node_attr.name, node_id);
+	printf("NODE_NAME=%s, node_id=%d.\n", node_attr.name, node_id);
 	// calculate the connected node
 	connected_node = 0, slot_req_total = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -485,22 +531,22 @@ void map1_scheduling() {
 		// printf("free_slot = %d, slotnum = %d, rap1_start = %d.\n", \
 			   // SF.free_slot, map1_sche_map[i].slotnum, SF.rap1_start);
 		// cut off 
-		if ((map1_sche_map[i].slotnum > slot_avg) && \
-			(slot_req_total > SF.map1_len)) {
-			// printf("i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
-					// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
-			slot_req = max_int(slot_avg, map1_sche_map[i].slotnum - \
-									(slot_req_total - SF.map1_len));
-			slot_req_total -= map1_sche_map[i].slotnum - slot_req;
-			slot_avg = slot_req_total / connected_node;
-			map1_sche_map[i].slotnum = slot_req;
-			// printf("after_i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
-					// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
-			op_prg_odb_bkpt("debug");
-		}
-		// printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
-		// printf("ban_id = %d, node_id = %d, slotnum = %d.\n", \
-			    // map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		// if ((map1_sche_map[i].slotnum > slot_avg) && \
+		// 	(slot_req_total > SF.map1_len)) {
+		// 	// printf("i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+		// 			// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+		// 	slot_req = max_int(slot_avg, map1_sche_map[i].slotnum - \
+		// 							(slot_req_total - SF.map1_len));
+		// 	slot_req_total -= map1_sche_map[i].slotnum - slot_req;
+		// 	slot_avg = slot_req_total / connected_node;
+		// 	map1_sche_map[i].slotnum = slot_req;
+		// 	// printf("after_i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+		// 			// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+		// 	op_prg_odb_bkpt("debug");
+		// }
+		printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
+		printf("ban_id = %d, node_id = %d, slotnum = %d.\n", \
+			    map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
@@ -2213,4 +2259,18 @@ static void subq_data_info_get () {
 
 	/* Stack tracing exit point */
 	FOUT;
+}
+
+static double snr_get (Packet *ppdu_pkt) {
+	/* Determine current value of Signal-to-Noise-Ratio (SNR). */
+	return op_td_get_dbl (ppdu_pkt, OPC_TDA_RA_SNR);
+}
+
+static int rfind_nodeid (int nid) {
+	int i = 0;
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		if (map1_sche_map[i].nid == nid) return i;
+	}
+
+	return -1;
 }
