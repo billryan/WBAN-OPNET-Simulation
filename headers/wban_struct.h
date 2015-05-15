@@ -275,5 +275,11 @@ typedef struct
 	int slot_end;
 	int slotnum;
 	int up;
+	// average SNR received by Hub
+	double eta;
+	// priority factor
+	double rho;
+	// Utility function of Interference by Node
+	double infer;
 } map1_schedule_map;
 #endif
