@@ -8,6 +8,9 @@
 #define BASE0 0
 #define PAPER1 1
 
+// SF number for calculating SNR
+#define SF_NUM 10
+
 // frame (PPDU) size [bits]
 #define I_ACK_PPDU_BITS    411
 #define BEACON_PPDU_BITS   523
