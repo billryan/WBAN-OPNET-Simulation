@@ -424,8 +424,8 @@ void set_map1_map() {
 
 	subq_info_get(SUBQ_DATA);
 	slot_bits = node_attr.data_rate*1000.0*SF.slot_sec;
-	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* MAC2PHY_BITS;
-	slotnum = (int)(data_ack_bits / slot_bits);
+	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* HEADER_BITS;
+	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
 	// reset map1_sche_map
 	map1_sche_map[node_id].slotnum = slotnum;
 
