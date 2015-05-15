@@ -448,7 +448,7 @@ void map1_scheduling() {
 		FOUT;
 	}
 
-	printf("NODE_NAME=%s, node_id=%d.\n", node_attr.name, node_id);
+	// printf("NODE_NAME=%s, node_id=%d.\n", node_attr.name, node_id);
 	// calculate the connected node
 	connected_node = 0, slot_req_total = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -487,20 +487,20 @@ void map1_scheduling() {
 		// cut off 
 		if ((map1_sche_map[i].slotnum > slot_avg) && \
 			(slot_req_total > SF.map1_len)) {
-			printf("i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
-					i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+			// printf("i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+					// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 			slot_req = max_int(slot_avg, map1_sche_map[i].slotnum - \
 									(slot_req_total - SF.map1_len));
 			slot_req_total -= map1_sche_map[i].slotnum - slot_req;
 			slot_avg = slot_req_total / connected_node;
 			map1_sche_map[i].slotnum = slot_req;
-			printf("after_i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
-					i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
+			// printf("after_i = %d, slotnum = %d, map1_len = %d, slot_req_total = %d\n", \
+					// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 			op_prg_odb_bkpt("debug");
 		}
-		printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
-		printf("ban_id = %d, node_id = %d, slotnum = %d.\n", \
-			    map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		// printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
+		// printf("ban_id = %d, node_id = %d, slotnum = %d.\n", \
+			    // map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
@@ -767,19 +767,19 @@ static void wban_schedule_next_beacon() {
 	}
 
 	
-	printf("\t  Superframe parameters:\n");
-	printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
-	printf("\t  SF.rap1_start=%d\n", SF.rap1_start);
-	printf("\t  SF.rap1_start2sec=%f\n", SF.rap1_start2sec);
-	printf("\t  SF.rap1_end=%d\n", SF.rap1_end);
-	printf("\t  SF.rap1_end2sec=%f\n", SF.rap1_end2sec);
-	printf("\t  SF.map1_start=%d\n", SF.map1_start);
-	printf("\t  SF.map1_start2sec=%f\n", SF.map1_start2sec);
-	printf("\t  SF.map1_end=%d\n", SF.map1_end);
-	printf("\t  SF.map1_end2sec=%f\n", SF.map1_end2sec);
+	// printf("\t  Superframe parameters:\n");
+	// printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
+	// printf("\t  SF.rap1_start=%d\n", SF.rap1_start);
+	// printf("\t  SF.rap1_start2sec=%f\n", SF.rap1_start2sec);
+	// printf("\t  SF.rap1_end=%d\n", SF.rap1_end);
+	// printf("\t  SF.rap1_end2sec=%f\n", SF.rap1_end2sec);
+	// printf("\t  SF.map1_start=%d\n", SF.map1_start);
+	// printf("\t  SF.map1_start2sec=%f\n", SF.map1_start2sec);
+	// printf("\t  SF.map1_end=%d\n", SF.map1_end);
+	// printf("\t  SF.map1_end2sec=%f\n", SF.map1_end2sec);
 	// fprintf (log,"t=%f  -> Schedule Next Beacon at %f\n\n", op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_sec);
-	printf ("Schedule Next Beacon at %f\n", SF.BI_Boundary+SF.BI*SF.slot_sec);
-	op_prg_odb_bkpt("sch_beacon");
+	// printf ("Schedule Next Beacon at %f\n", SF.BI_Boundary+SF.BI*SF.slot_sec);
+	// op_prg_odb_bkpt("sch_beacon");
 
 	/* INCREMENT_SLOT at slot boundary, after beacon */
 	op_intrpt_schedule_self (SF.BI_Boundary + (SF.current_slot + 1) * SF.slot_sec, INCREMENT_SLOT);
@@ -2174,9 +2174,9 @@ static void subq_info_get (int subq_index) {
 		// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), node_attr.name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		pk_test_up = op_subq_pk_access(subq_index, OPC_QPOS_PRIO);
 		subq_info.up = op_pk_priority_get(pk_test_up);
-		printf("\node_id = %d, subq_info.up=UP%d, ", node_id, subq_info.up);
-		printf("pksize = %f, bitsize = %f\n", subq_info.pksize, subq_info.bitsize);
-		op_prg_odb_bkpt("debug");
+		// printf("\node_id = %d, subq_info.up=UP%d, ", node_id, subq_info.up);
+		// printf("pksize = %f, bitsize = %f\n", subq_info.pksize, subq_info.bitsize);
+		// op_prg_odb_bkpt("debug");
 	}
 
 	/* Stack tracing exit point */
