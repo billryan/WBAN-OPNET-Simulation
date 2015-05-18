@@ -1,6 +1,9 @@
 /* the attributes of the node (Device Mode, BAN ID, ...) */
 wban_node_attributes	\node_attr;
 
+/* node objid */
+Objid \nodeid;
+
 /* the Medium Access Attributes */
 wban_mac_attributes	\mac_attr;
 
@@ -97,8 +100,6 @@ Boolean	\waitForACK;
 Boolean	\attemptingToTX;
 
 Boolean	\TX_ING;
-
-int	\node_id;
 
 double	\t_tx_start;
 

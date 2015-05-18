@@ -104,14 +104,17 @@
 #define TRY_MAP_PACKET_TRANSMISSION_CODE 230
 
 
-/* Global variables	*/
+/** Global variables	**/
+
+/* attributes of the node (Device Mode, BAN ID, NID, ...) */
+wban_node_attributes nd_attrG[NODE_ALL_MAX];
+
 //extern double PPDU_sent_bits;	// Total number of bits (PPDU) dispatched to the network [kbits]
 int current_free_connected_NID = 32; // start assigning connected NID from ID 32
 int current_first_free_slot = -1;
 int unconnectedNID;
 //int sequence_num_beaconG = 0; //sequence number for beacon frame, global variable
 int SF_slot[BeaconPeriodLength];
-double I_ACK_TX_TIME = 0.0;
 
 /* SINR received by Node(Hub -> Node) */
 double	snr_node[NODE_ALL_MAX][SF_NUM];
@@ -131,7 +134,7 @@ map1_schedule_map map1_sche_map[NODE_ALL_MAX];
 data_stat_info data_stat_all[UP_ALL][DATA_STATE];
 
 /* State machine conditions */
-#define IAM_BAN_HUB (node_attr.is_BANhub == OPC_TRUE)
+#define IAM_BAN_HUB (nd_attrG[nodeid].dev_mode == HUB)
 
 #define IAM_WAITING_ACK (mac_attr.wait_ack==OPC_TRUE)
 
@@ -200,9 +203,8 @@ static void subq_info_get (int subq_index);
 static void subq_data_info_get(void);
 static int wban_norm_phy_bits(Packet* frame_MPDU);
 static void phy_to_radio(Packet* frame_MPDU);
-static double snr_get (Packet *ppdu_pkt);
 void calc_prio_node(void);
 void calc_prio_hub(void);
-static int rfind_nodeid (int nid);
+static int hp_rfind_nodeid (int nid);
 static double avg_snr_hub(int node_id_l);
 static void reset_map1_scheduling(int seq);
