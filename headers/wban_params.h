@@ -10,6 +10,8 @@
 
 // SF number for calculating SNR
 #define SF_NUM 10
+// slot num max
+#define SLOT_MAX 8
 
 // frame (PPDU) size [bits]
 #define I_ACK_PPDU_BITS    411
@@ -39,7 +41,6 @@
 #define pAllocationSlotResolution 500 //500 μs for NB PHY
 #define allocationSlotLength 3 //for NB PHY, L=3 means that 2 ms per slot
 #define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
-
 
 /* CSMA/CA */
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
