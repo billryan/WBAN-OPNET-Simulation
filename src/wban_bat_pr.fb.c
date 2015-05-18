@@ -16,8 +16,9 @@ static void wban_battery_init() {
 	Objid current_draw_id;
 	int protocol_ver;
 	char dir_path[200];
-	char buffer[30];
-	int i;
+	char date_time[30];
+	char net_name[100];
+	int i = 0;
 	time_t rawtime;
 	struct tm *p;
 
@@ -45,29 +46,21 @@ static void wban_battery_init() {
 
 	time(&rawtime);
 	p=localtime(&rawtime);
-    // strftime(buffer, 30, "%Y-%m-%d_%H-%M-%S", p);
-	// strftime(buffer, 30, "%Y-%m-%d_%H-%M", p);
-	strftime(buffer, 30, "%Y-%m-%d", p);
-    sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, protocol_ver);
-
-	for(i=0; i<(sizeof(dir_path)/sizeof(dir_path[0])); i++){
-		if (dir_path[i] == '\0'){
-			break;
-		}
+	// strftime(date_time, 30, "%Y-%m-%d_%H-%M-%S", p);
+	// strftime(date_time, 30, "%Y-%m-%d_%H-%M", p);
+	strftime(date_time, 30, "%Y_%m_%d_%H_%M", p);
+	while (dir_path[i++] != '\0')
+		;
+	if(prg_file_path_create(dir_path, PRGC_FILE_PATH_CREATE_OPT_DIRECTORY) == PrgC_Compcode_Failure){
+		op_sim_end("ERROR : Log File is not valid.","INVALID_FILE", "","");
 	}
+	// obtain the project-scenario-number
+	op_sim_info_get (OPC_STRING, OPC_SIM_INFO_OUTPUT_FILE_NAME, net_name);
 	if(dir_path[i-1] == '\\'){
-		sprintf(log_name, "%s%s-ver%d.trace", dir_path, buffer, protocol_ver);
+		sprintf(log_name, "%s%s-%s.trace", dir_path, net_name, date_time);
 	}else{
-		sprintf(log_name, "%s\\%s-ver%d.trace", dir_path, buffer, protocol_ver);
+		sprintf(log_name, "%s\\%s-%s.trace", dir_path, net_name, date_time);
 	}
-    /* Check for existence */
-    // if((_access( log_name, 0 )) != -1){
-    //     printf("File %s exists\n", log_name);
-    // 	log = fopen(log_name, "a");
-    // } else {
-    // 	printf("File %s unexists.\n", log_name);
-    // 	log = fopen(log_name, "w");
-    // }
 
 	op_ima_obj_attr_get (battery.own_id, "Power Supply", &battery.power_supply);
 	op_ima_obj_attr_get (battery.own_id, "Initial Energy", &battery.initial_energy);

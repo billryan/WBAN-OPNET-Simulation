@@ -8,10 +8,18 @@
 #define BASE0 0
 #define PAPER1 1
 
+/* recent SF number for statistics */
+#define SF_NUM 10
+/* slot required by Node */
+#define SLOT_REQ_MAX 8
+
 // frame (PPDU) size [bits]
 #define I_ACK_PPDU_BITS    411
 #define BEACON_PPDU_BITS   523
 #define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
+
+#define I_ACK_TX_TIME (I_ACK_PPDU_BITS / 1000 * nd_attrG[nodeid].data_rate)
+
 /** PHY Layer constatns		**/
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
@@ -37,7 +45,6 @@
 #define allocationSlotLength 3 //for NB PHY, L=3 means that 2 ms per slot
 #define allocationSlotLength2ms ((pAllocationSlotMin + allocationSlotLength*pAllocationSlotResolution) * 0.001) //2 ms default
 
-
 /* CSMA/CA */
 // pCSMASlotLength = pCCATime + pCSMAMACPHYTime
 // pCCATime = 63 / Symbol Rate
@@ -61,6 +68,8 @@
 #define NODE_MAX 10
 // max nodes in all wban
 #define NODE_ALL_MAX 50
+#define HUB 0
+#define NODE 1
 
 // Abbreviated addressing related to 802.15.6  
 #define UNCONNECTED_BROADCAST_NID 0  // For broadcast to unconnected nodes

@@ -1,32 +1,48 @@
 #ifndef BAN_STRUCT_H
 #define BAN_STRUCT_H
 
-/* define the general node parameters */
+/** struct definition **/
+/* node attributes */
 typedef struct {
-	Objid	parent_id; // ID of the node
-	Objid	objid;	// ID of the module which received the packets
-	Objid   my_battery; // Battery module ID
+	Objid objid;
+	Objid nodeid; // ID of the node
+	Objid srcid; // Source ID
+	Objid macid; // MAC module ID
+	Objid batid; // Battery module ID
 
-	char 	name [20];
+	char name[20]; // node name
 	// double	x; // X coordinate of the node
 	// double	y; // Y coordinate of the node
 	// double altitude; // The altitude of the node
 	double data_rate; // WBAN Data Rate
-	int	sender_address; // sender address of the node, 48 bits, for beacon frame
-	int ban_id;	// ban ID
-	int hub_id; //Hub ID
+	int	send_addr; // sender address of the node, 48 bits, for beacon frame
+	int bid; // BAN ID
+	int hid; // Hub ID
+	int nid; // Node ID
 	int unconnectedNID; // temporary unconnected NID
-	Boolean is_BANhub; // state if the node is a Hub or not
-	char Device_Mode[20]; // Can be a Node or a Hub
+	int dev_mode; // Device Mode, Hub(0) or Node(1)
 	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	int map_schedule; //Schedule strategy for MAP
-	int traffic_destination_address;	// the destination MAC address for Traffic Source data transmission
-	int traffic_dest_id;	// the destination ID for Traffic Source data transmission
+	int dest_id; // destination ID for Traffic
 } wban_node_attributes;
+
+/* MAC module parameters */
+typedef struct {
+	Objid objid;
+	int	sendid; // Sender ID of the node
+	int	rcvid; // Recipient ID of the node
+	int bid; // BAN ID
+
+	int max_packet_tries;
+	int MGMT_buffer_size;
+	int DATA_buffer_size;
+	Boolean wait_for_ack; //waiting for ack
+	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
+} wban_mac_attributes;
 
 /* define the beacon frame parameters */
 typedef struct {
-	int	sender_address; // 48 bits
+	int	send_addr; // 48 bits
 	int beacon_period_length;
 	int allocation_slot_length;
 	int rap1_start;
@@ -38,7 +54,7 @@ typedef struct {
 /* define the connection request parameters */
 typedef struct {
 	int recipient_address;
-	int	sender_address; // 48 bits
+	int	send_addr; // 48 bits
 	int requested_wakeup_phase;
 	int requested_wakeup_period;
 	int allocation_id;
@@ -128,28 +144,13 @@ typedef struct {
 	Boolean SLEEP;	// Inactive portion
 } wban_superframe_strucuture;
 
-/* define the MAC parameters */
-typedef struct {
-	Objid	objid;	// ID of the module which received the packets
-	Boolean Battery_Life_Extension; // if no BE = macMinBE, if yes BE = min(2,macMinBE);
-
-	int	sender_id; // Sender ID of the node
-	int	recipient_id; // Recipient ID of the node
-	int ban_id;	// ban ID
-
-	int max_packet_tries;
-	int MGMT_buffer_size;
-	int DATA_buffer_size;
-	Boolean wait_for_ack; //waiting for ack
-	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
-} wban_mac_attributes;
 
 /* define the packet to be sent parameters */
 typedef struct 
 {
 	Objid objid;
-	int	sender_id; // Sender ID of the node
-	int	recipient_id; // Recipient ID of the node
+	int	sendid; // Sender ID of the node
+	int	rcvid; // Recipient ID of the node
 	int ack_policy;
 	int seq_num;
 	int ppdu_bits; // length of PPDU
@@ -275,5 +276,11 @@ typedef struct
 	int slot_end;
 	int slotnum;
 	int up;
+	// average SNR received by Hub
+	double eta;
+	// priority factor
+	double rho;
+	// Utility function of Interference by Node
+	double infer;
 } map1_schedule_map;
 #endif
