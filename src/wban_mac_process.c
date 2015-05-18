@@ -234,7 +234,7 @@ static void wban_parse_incoming_frame() {
 	/* check from what input stream the packet is received and do the right processing*/
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
-			snr = snr_get(rcv_frame);
+			snr = op_td_get_dbl (rcv_frame, OPC_TDA_RA_SNR);
 			ppdu_bits = op_pk_total_size_get(rcv_frame);
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
@@ -249,12 +249,6 @@ static void wban_parse_incoming_frame() {
 			/*update the battery module*/
 			if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
 				FOUT;
-			}
-			if (IAM_BAN_HUB) {
-				node_id_r = rfind_nodeid(sender_id);
-				printf("t=%f,NODE_NAME=%s,NODE_ID_R=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), node_attr.name, node_id_r, mac_state, recipient_id, sender_id);
-				printf("SNR=%f\n", snr);
-				op_prg_odb_bkpt("snr");
 			}
 			/* repalce the mac_attr.receipient_id with Sender ID */
 			mac_attr.recipient_id = sender_id;
@@ -301,6 +295,12 @@ static void wban_parse_incoming_frame() {
 					// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,APP_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, app_latency);
 					// fclose(log);
 					// op_prg_odb_bkpt("debug_app");
+					if (IAM_BAN_HUB) {
+						node_id_r = rfind_nodeid(sender_id);
+						++pkt_num_sf[node_id_r];
+						snr_hub[node_id_r][sequence_num_beaconG % SF_NUM] += snr;
+					}
+
 					latency_avg[frame_subtype_fd] = (latency_avg[frame_subtype_fd] * data_stat_local[frame_subtype_fd][RCV].number + ete_delay)/(data_stat_local[frame_subtype_fd][RCV].number + 1);
 					data_stat_local[frame_subtype_fd][RCV].number += 1;
 					data_stat_local[frame_subtype_fd][RCV].ppdu_kbits += 0.001*ppdu_bits;
@@ -436,11 +436,14 @@ void set_map1_map() {
 	slot_bits = node_attr.data_rate*1000.0*SF.slot_sec;
 	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* HEADER_BITS;
 	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
+	// cut-off
+	if (slotnum > SLOT_REQ_MAX) slotnum = SLOT_REQ_MAX;
 	printf("node_id=%d, NODE_NAME=%s, pksize=%f, slotnum=%d\n", \
 		    node_id, node_attr.name, subq_info.pksize, slotnum);
 	op_prg_odb_bkpt("set_map1_map");
 	// reset map1_sche_map
 	map1_sche_map[node_id].slotnum = slotnum;
+	map1_sche_map[node_id].up = subq_info.up;
 
 	FOUT;
 }
@@ -455,11 +458,24 @@ void calc_prio_node() {
 	FOUT;
 }
 
+static double avg_snr_hub(int node_id_l) {
+	int i = 0;
+	double avg_snr = 0;
+	FIN(avg_snr_hub);
+	for (i = 0; i < SF_NUM; ++i) {
+		avg_snr += snr_hub[node_id_l][i];
+	}
+	avg_snr /= SF_NUM;
+
+	FRET(avg_snr);
+}
+
 /*
  * calculate the rho by Hub
  */
 void calc_prio_hub() {
-	double alpha = 1, beta = 0;
+	double alpha = 1, beta = 0, snr_base = 60;
+	double avg_snr = 0;
 	int i = 0;
 	FIN(calc_prio_node);
 
@@ -473,6 +489,8 @@ void calc_prio_hub() {
 			if (map1_sche_map[i].slotnum <= 0) {
 				continue;
 			}
+			avg_snr = avg_snr_hub(i);
+			rho_hub[i] = map1_sche_map[i].up + alpha * (avg_snr/snr_base) - beta * 1;
 		}
 	}
 	FOUT;
@@ -574,7 +592,6 @@ static void wban_send_beacon_frame () {
 	Packet* beacon_MPDU;
 	// double beacon_frame_tx_time;
 	int ppdu_bits = 0;
-	extern int sequence_num_beaconG;
 	/* Stack tracing enrty point */
 	FIN(wban_send_beacon_frame);
 	/* create a beacon frame */
@@ -1037,7 +1054,7 @@ static void wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum
  * No parameters  
  *--------------------------------------------------------------------------------*/
 static void wban_mac_interrupt_process() {
-	int i, j;
+	int i, j, nodeid_i = 0;
 	double data_pkt_num;
 	double data_pkt_latency_total;
 	double data_pkt_latency_avg;
@@ -1074,6 +1091,20 @@ static void wban_mac_interrupt_process() {
 						}
 						wban_battery_sleep_end(mac_state);
 					}else{
+						for (nodeid_i = 0; nodeid_i < NODE_ALL_MAX; ++nodeid_i) {
+							if (node_id == nodeid_i) {
+								continue;
+							}
+							if (map1_sche_map[nodeid_i].bid != map1_sche_map[node_id].bid) {
+								continue;
+							}
+							if (pkt_num_sf[nodeid_i] > 0) {
+								snr_hub[nodeid_i][sequence_num_beaconG % SF_NUM] /= pkt_num_sf[nodeid_i];
+							}
+							pkt_num_sf[nodeid_i] = 0;
+						}
+						
+						
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
 					}
@@ -1089,6 +1120,7 @@ static void wban_mac_interrupt_process() {
 				// map1_scheduling via Hub
 				case MAP1_SCHEDULE: {
 					map1_scheduling();
+					reset_map1_scheduling(sequence_num_beaconG);
 					break;
 				}
 
@@ -2261,11 +2293,6 @@ static void subq_data_info_get () {
 	FOUT;
 }
 
-static double snr_get (Packet *ppdu_pkt) {
-	/* Determine current value of Signal-to-Noise-Ratio (SNR). */
-	return op_td_get_dbl (ppdu_pkt, OPC_TDA_RA_SNR);
-}
-
 static int rfind_nodeid (int nid) {
 	int i = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -2273,4 +2300,19 @@ static int rfind_nodeid (int nid) {
 	}
 
 	return -1;
+}
+
+static void reset_map1_scheduling(int seq) {
+
+	int i = 0;
+	FIN(reset_map1_scheduling);
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		if (i == node_id) {
+			continue;
+		}
+		if (map1_sche_map[i].bid == map1_sche_map[node_id].bid) {
+			snr_hub[i][seq % SF_NUM] = 0;
+		}
+	}
+	FOUT;
 }
