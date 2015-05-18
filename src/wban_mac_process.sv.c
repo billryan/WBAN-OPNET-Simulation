@@ -118,8 +118,5 @@ int	\sequence_num_beaconG;
 
 double	\rho_hub[NODE_ALL_MAX];
 
-/* SINR received by Node(Hub -> Node) */
-double	\snr_node[NODE_ALL_MAX][SF_NUM];
-
 /* SINR received by Hub(Node -> Hub) */
 double	\snr_hub[NODE_ALL_MAX][SF_NUM];
