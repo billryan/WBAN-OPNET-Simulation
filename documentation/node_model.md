@@ -32,3 +32,17 @@ WBAN中的节点可分为两类：
 	- 当前通道内空闲信道评估（CCA）
 	- 数据传输和接收
 	- 使用QPSK调制
+
+## 节点属性
+
+### 能量
+
+5月18日后的能量模块已不再单独提供，将其直接统一到 MAC 进程模型中，便于中心控制，也便于基于能量的调度。能量属性分组在节点属性的 **BAT** 中，BAT 即为之前的 battery 缩写，提供如下三种属性：
+
+- `Power Supply`: 2 AA Batteries (3V)
+- `Current Draw`: WLAN, BAN, BLUETOOTH
+	1. Receive Mode
+	2. Transmission Mode
+	3. Idle Mode
+	4. Sleep Mode
+- `Initial Energy`: 

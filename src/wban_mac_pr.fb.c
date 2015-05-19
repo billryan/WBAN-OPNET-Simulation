@@ -56,12 +56,8 @@ wban_mac_init()
 	op_ima_obj_attr_get (mac_attr_comp_id, "DATA Buffer Size", &mac_attr.DATA_buffer_size);
 	mac_attr.wait_for_ack = OPC_FALSE;
 
-	/* get the battery attribute ID */
-	nd_attrG[nodeid].batid = op_id_from_name (nodeid, OPC_OBJTYPE_PROC, "Battery");
-	if (nd_attrG[nodeid].batid == OPC_NIL) {
-		op_sim_end("CANNOT FIND THE BATTERY ID","CHECK IF THE NAME OF THE BATTERY MODULE IS [Battery]","","");
-	}
-	
+	/* get the battery attributes */
+	wban_battery_init();
 	wban_log_file_init();
 	/* get the value to check if this node is Hub or not */
 	op_ima_obj_attr_get (nodeid, "Device Mode", &nd_attrG[nodeid].dev_mode);
@@ -2039,6 +2035,30 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	FOUT;
 }
 
+static void
+wban_battery_init()
+	{
+	/* Stack tracing enrty point */
+	FIN(wban_battery_init ());
+	/** read Battery Attributes and set the activity var **/
+	op_ima_obj_attr_get (nodeid, "Voltage", &bat_attrG[nodeid].voltage);
+	op_ima_obj_attr_get (nodeid, "Init Energy", &bat_attrG[nodeid].engy_init);
+	bat_attrG[nodeid].engy_remainning = bat_attrG[nodeid].engy_init;
+	bat_attrG[nodeid].engy_consumed = 0;
+	/* get the current draw in different mode */
+	op_ima_obj_attr_get (nodeid, "Current TX", &bat_attrG[nodeid].tx_mA);
+	op_ima_obj_attr_get (nodeid, "Current RX", &bat_attrG[nodeid].rx_mA);
+	op_ima_obj_attr_get (nodeid, "Current Idle", &bat_attrG[nodeid].idle_uA);
+	op_ima_obj_attr_get (nodeid, "Current Sleep", &bat_attrG[nodeid].sleep_uA);
+	/* init the activity variable */
+	nd_attrG[nodeid].is_idle = OPC_TRUE;
+	nd_attrG[nodeid].is_sleep = OPC_FALSE;
+	nd_attrG[nodeid].last_idle_time = 0.0;
+	nd_attrG[nodeid].sleeping_time = 0.0;
+	/* Stack tracing exit point */
+	FOUT;
+	}
+
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_update_tx
  *
@@ -2046,21 +2066,40 @@ static void phy_to_radio(Packet* frame_MPDU) {
  *
  * Input : 	PPDU BITS and MAC STATE
  *--------------------------------------------------------------------------------*/
-static void wban_battery_update_tx(double tx_timeL, int mac_stateL) {
-	Ici * iciptr;
+static void
+wban_battery_update_tx (double tx_timeL, int mac_stateL)
+	{
+	double tx_energy, rx_energy, idle_energy, consumed_energy;
+	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_tx);
-	
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "TIME", tx_timeL);
-	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), PACKET_TX_CODE, nd_attrG[nodeid].batid); 
-	op_ici_install (OPC_NIL);
-	
+	/* compute the consumed energy when transmitting a packet */
+	tx_energy = bat_attrG[nodeid].tx_mA * MILLI * \
+				tx_timeL * bat_attrG[nodeid].voltage;
+	/* node can rx while tx at OPNET */
+	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
+				tx_timeL * bat_attrG[nodeid].voltage;
+	/* compute the time spent by the node in idle state */
+	idle_duration = op_sim_time() - tx_timeL - nd_attrG[nodeid].last_idle_time;
+	// printf("t=%f,NODE_NAME=%s,PACKET_TX_CODE,tx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,tx_timeL,activity.last_idle_time);
+	if(idle_duration < 0){
+		idle_duration = 0;
+	}
+	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+				  idle_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_tx += tx_energy;
+	bat_attrG[nodeid].engy_rx -= rx_energy;
+	bat_attrG[nodeid].engy_idle += idle_energy;
+	/* update the consumed energy with the one of in idle state */
+	consumed_energy = tx_energy + idle_energy - rx_energy;
+	bat_attrG[nodeid].engy_consumed += consumed_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_remainning -= consumed_energy;
+	/* update the time when the node enters the idle state. we add tx_timeL, because the remote process is generated at the time to start transmission */
+	nd_attrG[nodeid].last_idle_time = op_sim_time();
 	/* Stack tracing exit point */
 	FOUT;
-}
+	}
 
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_update_rx
@@ -2069,21 +2108,45 @@ static void wban_battery_update_tx(double tx_timeL, int mac_stateL) {
  *
  * Input : 	PPDU BITS and MAC STATE
  *--------------------------------------------------------------------------------*/
-static void wban_battery_update_rx(double rx_timeL, int mac_stateL) {
-	Ici * iciptr;
+static void
+wban_battery_update_rx (double rx_timeL, int mac_stateL)
+	{
+	double rx_energy, idle_energy, consumed_energy;
+	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_rx);
-	
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "TIME", rx_timeL);
-	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), PACKET_RX_CODE, nd_attrG[nodeid].batid);
-	op_ici_install (OPC_NIL);
-	
+	/* compute the consumed energy when receiving a packet */
+	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
+				rx_timeL * bat_attrG[nodeid].voltage;
+	/* compute the time spent by the node in idle state */
+	if(op_sim_time() < nd_attrG[nodeid].last_idle_time){
+		idle_duration = 0;
+	}else{
+		idle_duration = op_sim_time() - rx_timeL - nd_attrG[nodeid].last_idle_time;
+	}
+	// printf("t=%f,NODE_NAME=%s,PACKET_RX_CODE,rx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,rx_time,activity.last_idle_time);
+	if(idle_duration < 0){
+		idle_duration = 0;
+	}
+	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+				  idle_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_rx += rx_energy;
+	bat_attrG[nodeid].engy_idle += idle_energy;
+	/* update the consumed energy with the one of in idle state */
+	consumed_energy= rx_energy + idle_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += consumed_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_remainning -= consumed_energy;
+	/* update the time when the node enters the idle state */
+	nd_attrG[nodeid].last_idle_time = op_sim_time();
+	/* the sleep time shoulde be at least at current time */
+	// if(compare_doubles(activity.sleeping_time, op_sim_time()) != 1){
+	// 	activity.sleeping_time = op_sim_time();
+	// }
 	/* Stack tracing exit point */
 	FOUT;
-}
+	}
 
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_cca
@@ -2092,21 +2155,35 @@ static void wban_battery_update_rx(double rx_timeL, int mac_stateL) {
  *
  * Input : 
  *--------------------------------------------------------------------------------*/
-static void wban_battery_cca(int mac_stateL) {
-	Ici * iciptr;
-	
+static void
+wban_battery_cca(int mac_stateL)
+	{
+	double cca_energy, idle_energy, consumed_energy;
+	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_cca);
-
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), CCA_CODE, nd_attrG[nodeid].batid);
-	op_ici_install (OPC_NIL);
-	
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
+	// printf("t=%f,NODE_NAME=%s,CCA_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
+	if(idle_duration < 0){
+		idle_duration = 0;
+	}
+	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+				  idle_duration * bat_attrG[nodeid].voltage;
+	/* compute the consumed energy when receiving a packet */
+	cca_energy = bat_attrG[nodeid].rx_mA * MILLI * \
+				 pCCATime * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_cca += cca_energy;
+	bat_attrG[nodeid].engy_idle += idle_energy;
+	/* update the consumed energy with the one of in idle state */
+	consumed_energy = cca_energy + idle_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_remainning -= consumed_energy;
+	/* update the time when the node enters the idle state. we add pCCATime, because the remote process is generated at the time to start transmission */
+	/* do not update idle_time in CCA for breaking idle time while RX */
+	// activity.last_idle_time = op_sim_time()+pCCATime;
 	/* Stack tracing exit point */
 	FOUT;
-}
+	}
 
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_sleep_start
@@ -2115,21 +2192,32 @@ static void wban_battery_cca(int mac_stateL) {
  *
  * Input : 
  *--------------------------------------------------------------------------------*/
-static void wban_battery_sleep_start(int mac_stateL) {
-	Ici * iciptr;
-	
+static void
+wban_battery_sleep_start(int mac_stateL)
+	{
+	double idle_energy, idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_sleep_start);
-
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), START_OF_SLEEP_PERIOD_CODE, nd_attrG[nodeid].batid);
-	op_ici_install (OPC_NIL);
-	
+	/* compute the time spent by the node in idle state */
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
+	// printf("t=%f,NODE_NAME=%s,START_OF_SLEEP_PERIOD_CODE,bat_attrG[nodeid].last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
+	if(idle_duration < 0){
+		idle_duration = 0;
+	}
+	if(idle_duration > 0.000070){
+		/* update the consumed energy with the one of in idle state */
+		idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+					  idle_duration * bat_attrG[nodeid].voltage;
+		bat_attrG[nodeid].engy_idle += idle_energy;
+		/* update the current energy level */
+		bat_attrG[nodeid].engy_remainning -= idle_energy;
+	}
+	nd_attrG[nodeid].sleeping_time = op_sim_time();
+	nd_attrG[nodeid].is_idle = OPC_FALSE;
+	nd_attrG[nodeid].is_sleep = OPC_TRUE;
 	/* Stack tracing exit point */
 	FOUT;
-}
+	}
 
 /*--------------------------------------------------------------------------------
  * Function:	wban_battery_sleep_end
@@ -2138,21 +2226,29 @@ static void wban_battery_sleep_start(int mac_stateL) {
  *
  * Input : 
  *--------------------------------------------------------------------------------*/
-static void wban_battery_sleep_end(int mac_stateL) {
-	Ici * iciptr;
-	
+static void
+wban_battery_sleep_end (int mac_stateL)
+	{
+	double sleep_duration, sleep_energy;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_sleep_end);
+	/* compute the time spent by the node in sleep state */
+	sleep_duration = op_sim_time() - nd_attrG[nodeid].sleeping_time;
+	if(sleep_duration > 0.000070){
+		/* energy consumed during sleeping mode */
+		sleep_energy = bat_attrG[nodeid].sleep_uA * MICRO * \
+					   sleep_duration * bat_attrG[nodeid].voltage;
+		bat_attrG[nodeid].engy_sleep += sleep_energy;
+		/* update the current energy level */
+		bat_attrG[nodeid].engy_remainning -= sleep_energy;
+	}
 
-	iciptr = op_ici_create ("wban_battery_ici_format");
-	op_ici_attr_set (iciptr, "MAC STATE", mac_stateL);
-	op_ici_install (iciptr);
-	op_intrpt_schedule_remote (op_sim_time(), END_OF_SLEEP_PERIOD_CODE, nd_attrG[nodeid].batid);
-	op_ici_install (OPC_NIL);
-	
+	nd_attrG[nodeid].last_idle_time = op_sim_time();
+	nd_attrG[nodeid].is_idle = OPC_TRUE;
+	nd_attrG[nodeid].is_sleep = OPC_FALSE;
 	/* Stack tracing exit point */
 	FOUT;
-}
+	}
 
 /*-----------------------------------------------------------------------------
  * Function:	queue_status
