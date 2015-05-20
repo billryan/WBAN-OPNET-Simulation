@@ -107,17 +107,20 @@ Boolean	\attemptingToTX;
 
 Boolean	\TX_ING;
 
-double	\t_tx_start;
+/* Wireless tx lock, 1 for txing, 0 otherwise */
+int \sv_tx_stat;
 
-double	\t_tx_end;
+double	\sv_t_tx_start;
 
-double	\t_tx_interval;
+double	\sv_t_tx_end;
 
-double	\t_rx_start;
+double	\sv_t_tx_duration;
 
-double	\t_rx_end;
+double	\sv_t_rx_start;
 
-double	\t_rx_interval;
+double	\sv_t_rx_end;
+
+double	\sv_t_rx_duration;
 
 int	\pkt_num_sf[NODE_ALL_MAX];
 

@@ -125,12 +125,12 @@ wban_mac_init()
 		ack_seq_nid[i] = -1;
 	}
 	/* initialization for TX/RX STAT */
-	t_tx_start = 0;
-	t_tx_end = 0;
-	t_tx_interval = 0;
-	t_rx_start = 0;
-	t_rx_end = 0;
-	t_rx_interval = 0;
+	sv_t_tx_start = 0;
+	sv_t_tx_end = 0;
+	sv_t_tx_duration = 0;
+	sv_t_rx_start = 0;
+	sv_t_rx_end = 0;
+	sv_t_rx_duration = 0;
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -704,7 +704,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	// op_prg_odb_bkpt("rcv_beacon");
 	op_pk_destroy (beacon_MSDU_rx);
 	op_pk_destroy (beacon_MPDU_rx);
-
 	mac_attr.rcvid = rcv_sender_id;
 	if (UNCONNECTED_NID == mac_attr.sendid) {
 		/* We will try to connect to this BAN  if our scheduled access length
@@ -1083,9 +1082,6 @@ static void wban_mac_interrupt_process() {
 			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
-					if (op_sim_time() > 1.1) {
-						op_prg_odb_bkpt("debug_radio");
-					}
 					// pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 					TX_ING = OPC_FALSE;
@@ -1255,13 +1251,13 @@ static void wban_mac_interrupt_process() {
 					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
 						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 					}
-					wban_battery_cca(mac_state);
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
 			
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
+					wban_battery_cca(mac_state);
 					/* bug with open-zigbee, for statwire interupt can sustain a duration */
 					if ((!csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
 						// printf("t=%f,%s CCA with BUSY\n", op_sim_time(), nd_attrG[nodeid].name);
@@ -1383,51 +1379,32 @@ static void wban_mac_interrupt_process() {
 		case OPC_INTRPT_STAT: // statistic interrupt from PHY layer
 		{
 			switch (op_intrpt_stat()) {	/*begin switch (op_intrpt_stat())*/ 
-				case RX_BUSY_STAT :	/* Case of the end of the BUSY RECEIVER STATISTIC */
-					if((mac_state != MAC_SLEEP) && ((waitForACK)||(IAM_BAN_HUB))){
-						/* if during the CCA the channel was busy for a while, then csma.CCA_CHANNEL_IDLE = OPC_FALSE*/
-						if (op_stat_local_read(RX_BUSY_STAT) == 1.0) {
-							t_rx_start = op_sim_time();
+				case RX_BUSY_STAT:
+					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
+						sv_t_rx_start = op_sim_time();
+						/* exclude self interupt */
+						if (0 == sv_tx_stat) {
 							csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-						}else{
-							t_rx_end = op_sim_time();
-							if(t_rx_start > 0){
-								t_rx_interval = t_rx_end - t_rx_start;
-								wban_battery_update_rx(t_rx_interval, mac_state);
-							}
 						}
-					}else{
-						t_rx_start = 0;
-						t_rx_end = 0;
+					} else {
+						sv_t_rx_end = op_sim_time();
+						sv_t_rx_duration = sv_t_rx_end - sv_t_rx_start;
+						wban_battery_update_rx(sv_t_rx_duration, mac_state);
 					}
-					printf("t=%f,NODE_NAME=%s,RX_BUSY_STAT==%f\n", op_sim_time(), \
-							nd_attrG[nodeid].name, op_stat_local_read(RX_BUSY_STAT));
-					op_prg_odb_bkpt("debug_radio");
 					break;
-				case TX_BUSY_STAT :
-					if(mac_state != MAC_SLEEP){
-						if (op_stat_local_read (TX_BUSY_STAT) == 1.0){
-							t_tx_start = op_sim_time();
-						}else{
-							t_tx_end = op_sim_time();
-							if(t_tx_start > 0){
-								t_tx_interval = t_tx_end - t_tx_start;
-								wban_battery_update_tx(t_tx_interval, mac_state);
-							}
-							
-						}
-					}else{
-						t_tx_start = 0;
-						t_tx_end = 0;
+				case TX_BUSY_STAT:
+					/* Set TX Stat, half duplex support */
+					if (op_stat_local_read (TX_BUSY_STAT) == 1.0) {
+						sv_tx_stat = 1;
+						sv_t_tx_start = op_sim_time();
+					} else {
+						sv_tx_stat = 0;
+						sv_t_tx_end = op_sim_time();
+						sv_t_tx_duration = sv_t_tx_end - sv_t_tx_start;
+						wban_battery_update_tx(sv_t_tx_duration, mac_state);
 					}
-					printf("t=%f,NODE_NAME=%s,TX_BUSY_STAT==%f\n", op_sim_time(), \
-							nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
-					op_prg_odb_bkpt("debug_radio");
-					// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
-				case RX_COLLISION_STAT :
-					// fprintf(log,"t=%f  -> $$$$$ COLLISION $$$$$$$  \n\n",op_sim_time());
-					// printf("t=%f,NODE_NAME=%s,NID=%d  -> COLLISION OCCUR\n", op_sim_time(), nd_attrG[nodeid].name, mac_attr.sendid);
+				case RX_COLLISION_STAT:
 					break;
 				default : break;
 			}/*end switch (op_intrpt_stat())*/
@@ -1471,6 +1448,13 @@ static void wban_mac_interrupt_process() {
 				fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,STAT,LATENCY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
 				fprintf(log, "UP=8,LATENCY_AVG=%f\n", data_pkt_latency_avg);
 			}
+			/* Energy Statistics */
+			fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
+			fprintf(log, "TX=%f,RX=%f,", bat_attrG[nodeid].engy_tx, bat_attrG[nodeid].engy_rx);
+			fprintf(log, "CCA=%f,IDLE=%f,", bat_attrG[nodeid].engy_cca, bat_attrG[nodeid].engy_idle);
+			fprintf(log, "SLEEP=%f,", bat_attrG[nodeid].engy_sleep);
+			fprintf(log, "REMAINNING=%f,", bat_attrG[nodeid].engy_remainning);
+			fprintf(log, "TOTAL=%f\n", bat_attrG[nodeid].engy_consumed);
 			fclose(log);
 			// op_prg_odb_bkpt("debug_end");
 			// wban_battery_end();
@@ -2049,10 +2033,6 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	op_pk_bulk_size_set (frame_PPDU, bulk_size);
 
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0){
-		printf("node_name=%s, current_slot=%d,\n", nd_attrG[nodeid].name, SF.current_slot);
-		op_prg_odb_bkpt("debug_radio");
-		// op_intrpt_schedule_self(op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);
-		// FOUT;
 		op_sim_end("ERROR : TRY TO SEND Packet WHILE THE TX CHANNEL IS BUSY","PK_SEND_CODE","","");
 	}
 	op_pk_send (frame_PPDU, STRM_FROM_MAC_TO_RADIO);
@@ -2102,18 +2082,18 @@ wban_battery_update_tx (double tx_timeL, int mac_stateL)
 	/* compute the consumed energy when transmitting a packet */
 	tx_energy = bat_attrG[nodeid].tx_mA * MILLI * \
 				tx_timeL * bat_attrG[nodeid].voltage;
-	/* node can rx while tx at OPNET */
+	/* node can rx while tx at the same time in OPNET(duplex) */
 	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
 				tx_timeL * bat_attrG[nodeid].voltage;
 	/* compute the time spent by the node in idle state */
-	idle_duration = op_sim_time() - tx_timeL - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,PACKET_TX_CODE,tx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,tx_timeL,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - tx_timeL;
+	// if(idle_duration < 0){
+	// 	idle_duration = 0;
+	// }
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
 				  idle_duration * bat_attrG[nodeid].voltage;
 	bat_attrG[nodeid].engy_tx += tx_energy;
+	/* decrease rx energy in tx stage, increse it in the rx stage */
 	bat_attrG[nodeid].engy_rx -= rx_energy;
 	bat_attrG[nodeid].engy_idle += idle_energy;
 	/* update the consumed energy with the one of in idle state */
@@ -2121,8 +2101,10 @@ wban_battery_update_tx (double tx_timeL, int mac_stateL)
 	bat_attrG[nodeid].engy_consumed += consumed_energy;
 	/* update the current energy level */
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
-	/* update the time when the node enters the idle state. we add tx_timeL, because the remote process is generated at the time to start transmission */
+	/* update the time when the node enters the idle state */
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=%f,rx=%f,cca=0.0,idle=%f,sleep=0.0\n", tx_energy, rx_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2145,13 +2127,9 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
 				rx_timeL * bat_attrG[nodeid].voltage;
 	/* compute the time spent by the node in idle state */
-	if(op_sim_time() < nd_attrG[nodeid].last_idle_time){
-		idle_duration = 0;
-	}else{
-		idle_duration = op_sim_time() - rx_timeL - nd_attrG[nodeid].last_idle_time;
-	}
-	// printf("t=%f,NODE_NAME=%s,PACKET_RX_CODE,rx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,rx_time,activity.last_idle_time);
-	if(idle_duration < 0){
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - rx_timeL;
+	/* idle energy has been calculated in tx stage */
+	if (0 == compare_doubles(op_sim_time(), nd_attrG[nodeid].last_idle_time)) {
 		idle_duration = 0;
 	}
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
@@ -2166,10 +2144,8 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
 	/* update the time when the node enters the idle state */
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
-	/* the sleep time shoulde be at least at current time */
-	// if(compare_doubles(activity.sleeping_time, op_sim_time()) != 1){
-	// 	activity.sleeping_time = op_sim_time();
-	// }
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=0.0,rx=%f,cca=0.0,idle=%f,sleep=0.0\n", rx_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2188,11 +2164,7 @@ wban_battery_cca(int mac_stateL)
 	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_cca);
-	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,CCA_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - pCCATime;
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
 				  idle_duration * bat_attrG[nodeid].voltage;
 	/* compute the consumed energy when receiving a packet */
@@ -2203,10 +2175,11 @@ wban_battery_cca(int mac_stateL)
 	/* update the consumed energy with the one of in idle state */
 	consumed_energy = cca_energy + idle_energy;
 	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += consumed_energy;
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
-	/* update the time when the node enters the idle state. we add pCCATime, because the remote process is generated at the time to start transmission */
-	/* do not update idle_time in CCA for breaking idle time while RX */
-	// activity.last_idle_time = op_sim_time()+pCCATime;
+	nd_attrG[nodeid].last_idle_time = op_sim_time();
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=0.0,rx=0.0,cca=%f,idle=%f,sleep=0.0\n", cca_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2226,21 +2199,18 @@ wban_battery_sleep_start(int mac_stateL)
 	FIN(wban_battery_sleep_start);
 	/* compute the time spent by the node in idle state */
 	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,START_OF_SLEEP_PERIOD_CODE,bat_attrG[nodeid].last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
-	if(idle_duration > 0.000070){
-		/* update the consumed energy with the one of in idle state */
-		idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
-					  idle_duration * bat_attrG[nodeid].voltage;
-		bat_attrG[nodeid].engy_idle += idle_energy;
-		/* update the current energy level */
-		bat_attrG[nodeid].engy_remainning -= idle_energy;
-	}
+	/* update the consumed energy with the one of in idle state */
+	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+				  idle_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_idle += idle_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += idle_energy;
+	bat_attrG[nodeid].engy_remainning -= idle_energy;
 	nd_attrG[nodeid].sleeping_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_FALSE;
 	nd_attrG[nodeid].is_sleep = OPC_TRUE;
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=0.0,rx=0.0,cca=0.0,idle=%f,sleep=0.0\n", idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2260,18 +2230,18 @@ wban_battery_sleep_end (int mac_stateL)
 	FIN(wban_battery_sleep_end);
 	/* compute the time spent by the node in sleep state */
 	sleep_duration = op_sim_time() - nd_attrG[nodeid].sleeping_time;
-	if(sleep_duration > 0.000070){
-		/* energy consumed during sleeping mode */
-		sleep_energy = bat_attrG[nodeid].sleep_uA * MICRO * \
-					   sleep_duration * bat_attrG[nodeid].voltage;
-		bat_attrG[nodeid].engy_sleep += sleep_energy;
-		/* update the current energy level */
-		bat_attrG[nodeid].engy_remainning -= sleep_energy;
-	}
-
+	/* energy consumed during sleeping mode */
+	sleep_energy = bat_attrG[nodeid].sleep_uA * MICRO * \
+				   sleep_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_sleep += sleep_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += sleep_energy;
+	bat_attrG[nodeid].engy_remainning -= sleep_energy;
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_TRUE;
 	nd_attrG[nodeid].is_sleep = OPC_FALSE;
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=0.0,rx=0.0,cca=0.0,idle=0.0,sleep=%f\n", sleep_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}

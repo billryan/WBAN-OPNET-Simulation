@@ -233,13 +233,14 @@ static double dabs (double a) {
  *           a : double, b : double 
  *--------------------------------------------------------------------------------*/
 static int compare_doubles (double a, double b) {
-	if(dabs(a-b)<=0.0000001)
+	if (dabs(a-b) < 0.000001) {
 		return 0;
-	else {
-		if(a>b)
+	} else {
+		if(a > b) {
 			return 1;
-		else 
+		} else {
 			return -1;
+		}
 	}
 }
 
