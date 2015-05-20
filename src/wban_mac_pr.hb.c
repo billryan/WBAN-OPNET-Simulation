@@ -108,6 +108,8 @@
 
 /* attributes of the node (Device Mode, BAN ID, NID, ...) */
 wban_node_attributes nd_attrG[NODE_ALL_MAX];
+/* attributes of the Battery(Energy) module */
+wban_battery_attributes bat_attrG[NODE_ALL_MAX];
 
 //extern double PPDU_sent_bits;	// Total number of bits (PPDU) dispatched to the network [kbits]
 int current_free_connected_NID = 32; // start assigning connected NID from ID 32
@@ -187,7 +189,8 @@ static void wban_attempt_TX_CSMA(void);
 static void wban_backoff_delay_set( int user_priority);
 static double wban_backoff_period_boundary_get(void);
 
-// battery update functions
+// battery(energy) module
+static void wban_battery_init();
 static void wban_battery_update_tx (double tx_timeL, int mac_state);
 static void wban_battery_update_rx (double rx_timeL, int mac_state);
 static void wban_battery_cca(int mac_state);
@@ -208,3 +211,5 @@ void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
 static double avg_snr_hub(int node_id_l);
 static void reset_map1_scheduling(int seq);
+
+static double hp_tx_time (int ppdu_bits);

@@ -17,7 +17,7 @@ static void wban_source_init() {
 	Objid own_id;	/* Object ID of the surrounding processor or queue */
 	Objid traffic_source_comp_id; 
 	Objid traffic_source_id;
-	char device_mode[20];	/* mode of the device: Hub or Node */
+	int dev_mode; /* mode of the device: Hub(0) or Node(1) */
 	double temp;
 	
 	/* Stack tracing enrty point */
@@ -29,8 +29,8 @@ static void wban_source_init() {
 	parent_id = op_topo_parent (own_id);
 	/* set the initial number of sequence number to 0 */
 	dataSN = 0;
-	/* get the value to check if this node is PAN coordinator or not */
-	op_ima_obj_attr_get (parent_id, "Device Mode", device_mode);
+	/* get the value to check if this node is Hub or not */
+	op_ima_obj_attr_get (parent_id, "Device Mode", &dev_mode);
 	/* get destination ID */
 	op_ima_obj_attr_get (own_id, "Destination ID", &destination_id);
 	/* get the name of the node */
@@ -102,7 +102,7 @@ static void wban_source_init() {
 	op_ima_obj_attr_get (traffic_source_comp_id, "Stop Time",              &up0_stop_time);	
 
 	/* if you are Hub do not send packets itself */
-	if ((strcmp(device_mode, "Hub") == 0) && (destination_id == HUB_ID)) {
+	if ((HUB == dev_mode) && (destination_id == HUB_ID)) {
 		up7_start_time = SC_INFINITE_TIME;
 		up6_start_time = SC_INFINITE_TIME;
 		up5_start_time = SC_INFINITE_TIME;

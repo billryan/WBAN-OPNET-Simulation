@@ -8,7 +8,6 @@ typedef struct {
 	Objid nodeid; // ID of the node
 	Objid srcid; // Source ID
 	Objid macid; // MAC module ID
-	Objid batid; // Battery module ID
 
 	char name[20]; // node name
 	// double	x; // X coordinate of the node
@@ -24,6 +23,11 @@ typedef struct {
 	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	int map_schedule; //Schedule strategy for MAP
 	int dest_id; // destination ID for Traffic
+	/* node activity */
+	Boolean is_idle;
+	Boolean is_sleep;
+	double last_idle_time;
+	double sleeping_time;
 } wban_node_attributes;
 
 /* MAC module parameters */
@@ -39,6 +43,27 @@ typedef struct {
 	Boolean wait_for_ack; //waiting for ack
 	int wait_ack_seq_num;	// the sequence number of the waiting ACK	
 } wban_mac_attributes;
+
+/* Battery */
+typedef struct {
+	/* Power Supply in Volt */
+	double voltage;
+	/* current draw in milli/micro Amper */
+	double tx_mA;
+	double rx_mA;
+	double idle_uA;
+	double sleep_uA;
+	/* Energy consumed in TX, RX, CCA, IDLE, SlEEP, Joule */
+	double engy_tx;
+	double engy_rx;
+	double engy_cca;
+	double engy_idle;
+	double engy_sleep;
+	/* energy init, remainning, consumed. Joule */
+	double engy_init;
+	double engy_remainning;
+	double engy_consumed;
+} wban_battery_attributes;
 
 /* define the beacon frame parameters */
 typedef struct {
