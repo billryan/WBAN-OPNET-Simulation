@@ -249,8 +249,8 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 
-			printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
-			op_prg_odb_bkpt("debug_app");
+			// printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
+			// op_prg_odb_bkpt("debug_app");
 			// log = fopen(log_name, "a");
 			// fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), nd_attrG[nodeid].name, nodeid, mac_state, recipient_id, sender_id);
 			// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
@@ -870,7 +870,7 @@ static void wban_send_i_ack_frame (int seq_num) {
 	// fclose(log);
 
 	phy_to_radio(frame_MPDU);
-	ack_sent = op_sim_time() + I_ACK_TX_TIME + pSIFS;
+	ack_sent = op_sim_time() + hp_tx_time(I_ACK_PPDU_BITS) + pSIFS;
 	if(ack_sent < phase_end_timeG){
 		op_intrpt_schedule_self(ack_sent, TRY_PACKET_TRANSMISSION_CODE);
 	}
@@ -1063,6 +1063,9 @@ static void wban_mac_interrupt_process() {
 			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
+					if (op_sim_time() > 1.1) {
+						op_prg_odb_bkpt("debug_radio");
+					}
 					// pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 					TX_ING = OPC_FALSE;
@@ -1366,39 +1369,40 @@ static void wban_mac_interrupt_process() {
 						if (op_stat_local_read(RX_BUSY_STAT) == 1.0) {
 							t_rx_start = op_sim_time();
 							csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-							// printf("t=%f,NODE_NAME=%s,RX_BUSY_STAT==1.0\n", op_sim_time(), nd_attrG[nodeid].name);
 						}else{
 							t_rx_end = op_sim_time();
 							if(t_rx_start > 0){
 								t_rx_interval = t_rx_end - t_rx_start;
 								wban_battery_update_rx(t_rx_interval, mac_state);
 							}
-							// printf("t=%f,NODE_NAME=%s,RX_BUSY_STAT==0.0\n", op_sim_time(), nd_attrG[nodeid].name);
 						}
 					}else{
 						t_rx_start = 0;
 						t_rx_end = 0;
 					}
-					// op_prg_odb_bkpt("debug_radio");
+					printf("t=%f,NODE_NAME=%s,RX_BUSY_STAT==%f\n", op_sim_time(), \
+							nd_attrG[nodeid].name, op_stat_local_read(RX_BUSY_STAT));
+					op_prg_odb_bkpt("debug_radio");
 					break;
 				case TX_BUSY_STAT :
 					if(mac_state != MAC_SLEEP){
 						if (op_stat_local_read (TX_BUSY_STAT) == 1.0){
 							t_tx_start = op_sim_time();
-							// printf("t=%f,NODE_NAME=%s,TX_BUSY_STAT==1.0\n", op_sim_time(), nd_attrG[nodeid].name);
 						}else{
 							t_tx_end = op_sim_time();
 							if(t_tx_start > 0){
 								t_tx_interval = t_tx_end - t_tx_start;
 								wban_battery_update_tx(t_tx_interval, mac_state);
 							}
-							// printf("t=%f,NODE_NAME=%s,TX_BUSY_STAT==0.0\n", op_sim_time(), nd_attrG[nodeid].name);
+							
 						}
 					}else{
 						t_tx_start = 0;
 						t_tx_end = 0;
 					}
-					// op_prg_odb_bkpt("debug_radio");
+					printf("t=%f,NODE_NAME=%s,TX_BUSY_STAT==%f\n", op_sim_time(), \
+							nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
+					op_prg_odb_bkpt("debug_radio");
 					// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
 					break;
 				case RX_COLLISION_STAT :
@@ -1814,7 +1818,7 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* pkt_to_be_sentL) {
 	pk_tx_time = TX_TIME(wban_norm_phy_bits(frame_MPDU_to_be_sent), nd_attrG[nodeid].data_rate);
 	phase_remaining_time = phase_end_timeG - op_sim_time();
 	if(pkt_to_be_sentL->ack_policy != N_ACK_POLICY){
-		if (compare_doubles(phase_remaining_time, pk_tx_time+I_ACK_TX_TIME+pSIFS+3*MICRO) >=0) {
+		if (compare_doubles(phase_remaining_time, pk_tx_time+hp_tx_time(I_ACK_PPDU_BITS)+pSIFS+3*MICRO) >=0) {
 			FRET(OPC_TRUE);
 		} else {
 			// printf("%s No enough time for I_ACK_POLICY packet transmission in this phase.\n", nd_attrG[nodeid].name);
@@ -1956,9 +1960,9 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS, N_ACK_PACKET_SENT);
 			break;
 		case I_ACK_POLICY:
-			ack_expire_time = op_sim_time() + PPDU_tx_time + I_ACK_TX_TIME + 2*pSIFS;
+			ack_expire_time = op_sim_time() + PPDU_tx_time + hp_tx_time(I_ACK_PPDU_BITS) + 2*pSIFS;
 			if(ack_expire_time > phase_end_timeG){
-				ack_expire_time = op_sim_time() + PPDU_tx_time + I_ACK_TX_TIME + pSIFS + 3*MICRO;
+				ack_expire_time = op_sim_time() + PPDU_tx_time + hp_tx_time(I_ACK_PPDU_BITS) + pSIFS + 3*MICRO;
 			}
 			waitForACK = OPC_TRUE;
 			mac_attr.wait_ack_seq_num = seq_num;
@@ -2025,6 +2029,8 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	op_pk_bulk_size_set (frame_PPDU, bulk_size);
 
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0){
+		printf("node_name=%s, current_slot=%d,\n", nd_attrG[nodeid].name, SF.current_slot);
+		op_prg_odb_bkpt("debug_radio");
 		// op_intrpt_schedule_self(op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		// FOUT;
 		op_sim_end("ERROR : TRY TO SEND Packet WHILE THE TX CHANNEL IS BUSY","PK_SEND_CODE","","");
@@ -2395,6 +2401,13 @@ hp_rfind_nodeid (int nid) {
 
 	FRET(-1);
 }
+
+static double
+hp_tx_time (int ppdu_bits)
+	{
+	FIN (hp_tx_time());
+	FRET(ppdu_bits / (1000 * nd_attrG[nodeid].data_rate));
+	}
 
 static void reset_map1_scheduling(int seq) {
 

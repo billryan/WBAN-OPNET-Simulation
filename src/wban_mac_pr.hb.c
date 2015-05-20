@@ -211,3 +211,5 @@ void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
 static double avg_snr_hub(int node_id_l);
 static void reset_map1_scheduling(int seq);
+
+static double hp_tx_time (int ppdu_bits);
