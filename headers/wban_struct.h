@@ -13,7 +13,9 @@ typedef struct {
 	// double	x; // X coordinate of the node
 	// double	y; // Y coordinate of the node
 	// double altitude; // The altitude of the node
+	/* PHY Attributes */
 	double data_rate; // WBAN Data Rate
+	double tx_power;
 	int	send_addr; // sender address of the node, 48 bits, for beacon frame
 	int bid; // BAN ID
 	int hid; // Hub ID

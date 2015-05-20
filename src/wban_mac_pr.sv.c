@@ -4,6 +4,12 @@ wban_node_attributes	\node_attr;
 /* node objid */
 Objid \nodeid;
 
+/* wireless tx objid */
+Objid \radio_tx_id;
+
+/* wireless rx objid */
+Objid \radio_rx_id;
+
 /* the Medium Access Attributes */
 wban_mac_attributes	\mac_attr;
 

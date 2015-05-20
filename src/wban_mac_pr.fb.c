@@ -183,6 +183,26 @@ static void wban_log_file_init() {
 	FOUT;
 }
 
+static void
+wban_init_channel(Objid nodeidL)
+	{
+	Objid channel_id, rx_channel_info_id, tx_channel_info_id;
+	/** initialize channel data rate and tx power **/
+	FIN(wban_init_channel());
+	/* Store the channel object ids as state variables. */
+	radio_tx_id = op_id_from_name (nodeidL, OPC_OBJTYPE_RATX, "tx");
+	op_ima_obj_attr_get (radio_tx_id, "channel", &channel_id);
+	tx_channel_info_id = op_topo_child (channel_id, OPC_OBJTYPE_RATXCH, 0);
+	op_ima_obj_attr_set (tx_channel_info_id, "data rate", nd_attrG[nodeidL].data_rate);
+	// op_ima_obj_attr_set (tx_channel_info_id, "power", nd_attrG[nodeidL].tx_power);
+	radio_rx_id = op_id_from_name (nodeidL, OPC_OBJTYPE_RARX, "rx");
+	op_ima_obj_attr_get (radio_rx_id, "channel", &channel_id);
+	rx_channel_info_id = op_topo_child (channel_id, OPC_OBJTYPE_RARXCH, 0);
+	op_ima_obj_attr_set (rx_channel_info_id, "data rate", nd_attrG[nodeidL].data_rate);
+	/* Set RX power threshold as a reciever state */
+	// op_ima_obj_state_set (radio_rx_id, &(modmem_ptr->rx_power_threshold));
+	FOUT;
+	}
 /*--------------------------------------------------------------------------------
  * Function:	wban_parse_incoming_frame
  *
@@ -421,7 +441,7 @@ void set_map1_map() {
 	FIN(set_map1_map);
 
 	subq_info_get(SUBQ_DATA);
-	slot_bits = nd_attrG[nodeid].data_rate*1000.0*SF.slot_sec;
+	slot_bits = nd_attrG[nodeid].data_rate * SF.slot_sec;
 	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* HEADER_BITS;
 	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
 	// cut-off
@@ -628,9 +648,9 @@ static void wban_send_beacon_frame () {
 		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
 		op_prg_odb_bkpt("init");
-		SF.first_free_slot = 1 + (int)(TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate)/SF.slot_sec);
+		SF.first_free_slot = 1 + (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
 	}
-	SF.current_slot = (int)(TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate)/SF.slot_sec);
+	SF.current_slot = (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
 
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
@@ -657,7 +677,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	
 	/* Stack tracing enrty point */
 	FIN(wban_extract_beacon_frame);
-	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU_rx), nd_attrG[nodeid].data_rate);
+	beacon_frame_tx_time = hp_tx_time(wban_norm_phy_bits(beacon_MPDU_rx));
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
@@ -1815,7 +1835,7 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* pkt_to_be_sentL) {
 		// printf("%s has NO packet TXing\n", nd_attrG[nodeid].name);
 		FRET(OPC_FALSE);
 	}
-	pk_tx_time = TX_TIME(wban_norm_phy_bits(frame_MPDU_to_be_sent), nd_attrG[nodeid].data_rate);
+	pk_tx_time = hp_tx_time(wban_norm_phy_bits(frame_MPDU_to_be_sent));
 	phase_remaining_time = phase_end_timeG - op_sim_time();
 	if(pkt_to_be_sentL->ack_policy != N_ACK_POLICY){
 		if (compare_doubles(phase_remaining_time, pk_tx_time+hp_tx_time(I_ACK_PPDU_BITS)+pSIFS+3*MICRO) >=0) {
@@ -1950,7 +1970,7 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			break;
 	}
 
-	PPDU_tx_time = TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate);
+	PPDU_tx_time = hp_tx_time(ppdu_bits);
 
 	switch (ack_policy){
 		case N_ACK_POLICY:
@@ -2020,7 +2040,7 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	/* create PHY frame (PPDU) that encapsulates connection_request MAC frame (MPDU) */
 	frame_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
 
-	op_pk_nfd_set (frame_PPDU, "RATE", nd_attrG[nodeid].data_rate);
+	// op_pk_nfd_set (frame_PPDU, "RATE", nd_attrG[nodeid].data_rate);
 	/* wrap connection_request MAC frame (MPDU) in PHY frame (PPDU) */
 	op_pk_nfd_set_pkt (frame_PPDU, "PSDU", frame_MPDU);
 	op_pk_nfd_set (frame_PPDU, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU))/8); //[bytes]
@@ -2406,7 +2426,7 @@ static double
 hp_tx_time (int ppdu_bits)
 	{
 	FIN (hp_tx_time());
-	FRET(ppdu_bits / (1000 * nd_attrG[nodeid].data_rate));
+	FRET(ppdu_bits / nd_attrG[nodeid].data_rate);
 	}
 
 static void reset_map1_scheduling(int seq) {

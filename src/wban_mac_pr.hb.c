@@ -213,3 +213,4 @@ static double avg_snr_hub(int node_id_l);
 static void reset_map1_scheduling(int seq);
 
 static double hp_tx_time (int ppdu_bits);
+static void wban_init_channel(Objid nodeidL);
