@@ -204,6 +204,13 @@ typedef struct {
 	double ppdu_kbits;
 } data_stat_info;
 
+/* pakcets received */
+typedef struct {
+	double number;
+	double ppdu_kbits;
+	double snr_db;
+} st_pkt_rx;
+
 /* statistic vectors */
 typedef struct {
 	Stathandle data_pkt_fail;
