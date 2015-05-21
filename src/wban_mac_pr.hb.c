@@ -47,6 +47,7 @@
 #define TIME_SLOT_CODE 2
 #define INCREMENT_SLOT 3
 #define MAP1_SCHEDULE  4
+#define SEND_PKT 	   5
 #define TRY_PACKET_TRANSMISSION_CODE 23
 #define TRY_PROCESS_LAST_PACKET_CODE 25
 #define SEND_I_ACK 26
@@ -213,3 +214,4 @@ static double avg_snr_hub(int node_id_l);
 static void reset_map1_scheduling(int seq);
 
 static double hp_tx_time (int ppdu_bits);
+static void wban_init_channel(Objid nodeidL);

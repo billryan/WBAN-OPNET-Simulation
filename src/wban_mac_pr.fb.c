@@ -91,15 +91,12 @@ wban_mac_init()
 		op_ima_obj_attr_get (conn_req_attr_comp_id, "Allocation Length", &conn_req_attr.allocation_length);
 		map1_sche_map[nodeid].slotnum = conn_req_attr.allocation_length;
 		map1_sche_map[nodeid].bid = mac_attr.bid;
-		// printf("nodeid = %d, bid = %d.\n", nodeid, mac_attr.bid);
 		/* start assigning connected NID from ID 32 */
 		nd_attrG[nodeid].nid = 32 + ((current_free_connected_NID - 32) % 214);
 		mac_attr.sendid = nd_attrG[nodeid].nid;
 		mac_attr.rcvid = UNCONNECTED;
 		current_free_connected_NID++;
 		map1_sche_map[nodeid].nid = mac_attr.sendid;
-		printf("NODE_NAME=%s, NID=%d.\n", nd_attrG[nodeid].name, mac_attr.sendid);
-		// nd_attrG[nodeid].rcvid = nd_attrG[nodeid].connectedHID;
 	}
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
@@ -125,12 +122,12 @@ wban_mac_init()
 		ack_seq_nid[i] = -1;
 	}
 	/* initialization for TX/RX STAT */
-	t_tx_start = 0;
-	t_tx_end = 0;
-	t_tx_interval = 0;
-	t_rx_start = 0;
-	t_rx_end = 0;
-	t_rx_interval = 0;
+	sv_t_tx_start = 0;
+	sv_t_tx_end = 0;
+	sv_t_tx_duration = 0;
+	sv_t_rx_start = 0;
+	sv_t_rx_end = 0;
+	sv_t_rx_duration = 0;
 	
 	/* Stack tracing exit point */
 	FOUT;
@@ -183,6 +180,26 @@ static void wban_log_file_init() {
 	FOUT;
 }
 
+static void
+wban_init_channel(Objid nodeidL)
+	{
+	Objid channel_id, rx_channel_info_id, tx_channel_info_id;
+	/** initialize channel data rate and tx power **/
+	FIN(wban_init_channel());
+	/* Store the channel object ids as state variables. */
+	radio_tx_id = op_id_from_name (nodeidL, OPC_OBJTYPE_RATX, "tx");
+	op_ima_obj_attr_get (radio_tx_id, "channel", &channel_id);
+	tx_channel_info_id = op_topo_child (channel_id, OPC_OBJTYPE_RATXCH, 0);
+	op_ima_obj_attr_set (tx_channel_info_id, "data rate", nd_attrG[nodeidL].data_rate);
+	// op_ima_obj_attr_set (tx_channel_info_id, "power", nd_attrG[nodeidL].tx_power);
+	radio_rx_id = op_id_from_name (nodeidL, OPC_OBJTYPE_RARX, "rx");
+	op_ima_obj_attr_get (radio_rx_id, "channel", &channel_id);
+	rx_channel_info_id = op_topo_child (channel_id, OPC_OBJTYPE_RARXCH, 0);
+	op_ima_obj_attr_set (rx_channel_info_id, "data rate", nd_attrG[nodeidL].data_rate);
+	/* Set RX power threshold as a reciever state */
+	// op_ima_obj_state_set (radio_rx_id, &(modmem_ptr->rx_power_threshold));
+	FOUT;
+	}
 /*--------------------------------------------------------------------------------
  * Function:	wban_parse_incoming_frame
  *
@@ -223,6 +240,8 @@ static void wban_parse_incoming_frame() {
 	switch (Stream_ID) {
 		case STRM_FROM_RADIO_TO_MAC: /*A PHY FRAME (PPDU) FROM THE RADIO RECIEVER*/
 			snr = op_td_get_dbl (rcv_frame, OPC_TDA_RA_SNR);
+			// printf("NODE_NAME=%s,snr=%f.\n", nd_attrG[nodeid].name, snr);
+			// op_prg_odb_bkpt("snr");
 			ppdu_bits = op_pk_total_size_get(rcv_frame);
 			/* get MAC frame (MPDU=PSDU) from received PHY frame (PPDU)*/
 			op_pk_nfd_get_pkt (rcv_frame, "PSDU", &frame_MPDU);
@@ -249,7 +268,6 @@ static void wban_parse_incoming_frame() {
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 
-			// printf("FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,ETE_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, ete_delay);
 			// op_prg_odb_bkpt("debug_app");
 			// log = fopen(log_name, "a");
 			// fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), nd_attrG[nodeid].name, nodeid, mac_state, recipient_id, sender_id);
@@ -389,13 +407,11 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 	// printf("\nt=%f,NODE_NAME=%s,NID=%d,MAC_STATE=%d\n", op_sim_time(), nd_attrG[nodeid].name, mac_attr.sendid, mac_state);
 	/*Check if the frame is loop*/
 	if (mac_attr.sendid == sender_id) {
-		// printf ("\t  Loop: DISCARD FRAME \n");
 		op_pk_destroy (frame_MPDU);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
 	if (nd_attrG[nodeid].bid != ban_id) {
-		// printf ("\t  The packet BAN_ID %d from NID=%d!=%d(BAN_ID of Me)\n", ban_id, sender_id, nd_attrG[nodeid].bid);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
 	}
@@ -403,8 +419,6 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 		/* Stack tracing exit point */
 		FRET(OPC_TRUE);
 	} else {
-		// printf("\t Packet not for me. BAN_ID=%d,SENDER_ID=%d,RECIPIENT_ID=%d\n", ban_id,sender_id,recipient_id);
-		// printf("\t Me: BAN_ID=%d,SENDER_ID=%d,RECIPIENT_ID=%d\n", nd_attrG[nodeid].bid,mac_attr.sendid,mac_attr.rcvid);
 		op_pk_destroy (frame_MPDU);
 		/* Stack tracing exit point */
 		FRET(OPC_FALSE);
@@ -421,13 +435,13 @@ void set_map1_map() {
 	FIN(set_map1_map);
 
 	subq_info_get(SUBQ_DATA);
-	slot_bits = nd_attrG[nodeid].data_rate*1000.0*SF.slot_sec;
+	slot_bits = nd_attrG[nodeid].data_rate * SF.slot_sec;
 	data_ack_bits = subq_info.bitsize + subq_info.pksize *2* HEADER_BITS;
 	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
 	// cut-off
 	if (slotnum > SLOT_REQ_MAX) slotnum = SLOT_REQ_MAX;
-	printf("nodeid=%d, NODE_NAME=%s, pksize=%f, slotnum=%d\n", \
-		    nodeid, nd_attrG[nodeid].name, subq_info.pksize, slotnum);
+	// printf("nodeid=%d, NODE_NAME=%s, pksize=%f, slotnum=%d\n", \
+	// 	    nodeid, nd_attrG[nodeid].name, subq_info.pksize, slotnum);
 	op_prg_odb_bkpt("set_map1_map");
 	// reset map1_sche_map
 	map1_sche_map[nodeid].slotnum = slotnum;
@@ -500,7 +514,7 @@ void map1_scheduling() {
 		FOUT;
 	}
 
-	printf("NODE_NAME=%s, nodeid=%d.\n", nd_attrG[nodeid].name, nodeid);
+	// printf("NODE_NAME=%s, nodeid=%d.\n", nd_attrG[nodeid].name, nodeid);
 	// calculate the connected node
 	connected_node = 0, slot_req_total = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -550,9 +564,9 @@ void map1_scheduling() {
 		// 			// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 		// 	op_prg_odb_bkpt("debug");
 		// }
-		printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
-		printf("ban_id = %d, nodeid = %d, slotnum = %d.\n", \
-			    map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		// printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
+		// printf("ban_id = %d, nodeid = %d, slotnum = %d.\n", \
+			    // map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
@@ -628,9 +642,9 @@ static void wban_send_beacon_frame () {
 		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
 		op_prg_odb_bkpt("init");
-		SF.first_free_slot = 1 + (int)(TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate)/SF.slot_sec);
+		SF.first_free_slot = 1 + (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
 	}
-	SF.current_slot = (int)(TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate)/SF.slot_sec);
+	SF.current_slot = (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
 
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
@@ -657,7 +671,7 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	
 	/* Stack tracing enrty point */
 	FIN(wban_extract_beacon_frame);
-	beacon_frame_tx_time = TX_TIME(wban_norm_phy_bits(beacon_MPDU_rx), nd_attrG[nodeid].data_rate);
+	beacon_frame_tx_time = hp_tx_time(wban_norm_phy_bits(beacon_MPDU_rx));
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sequence_number_fd);
@@ -684,7 +698,6 @@ static void wban_extract_beacon_frame(Packet* beacon_MPDU_rx){
 	// op_prg_odb_bkpt("rcv_beacon");
 	op_pk_destroy (beacon_MSDU_rx);
 	op_pk_destroy (beacon_MPDU_rx);
-
 	mac_attr.rcvid = rcv_sender_id;
 	if (UNCONNECTED_NID == mac_attr.sendid) {
 		/* We will try to connect to this BAN  if our scheduled access length
@@ -795,6 +808,9 @@ static void wban_schedule_next_beacon() {
 								map1_sche_map[nodeid].slot_start * SF.slot_sec;
 			SF.map1_end2sec = SF.BI_Boundary + \
 								(1 + map1_sche_map[nodeid].slot_end) * SF.slot_sec;
+			if (op_sim_time() + pSIFS < SF.BI_Boundary + (SF.current_slot + 1) * SF.slot_sec) {
+				op_intrpt_schedule_self (op_sim_time() + pSIFS, START_OF_SLEEP_PERIOD);
+			}
 			op_intrpt_schedule_self (SF.map1_start2sec, START_OF_MAP1_PERIOD_CODE);
 			op_intrpt_schedule_self (SF.map1_end2sec, END_OF_MAP1_PERIOD_CODE);
 		}
@@ -817,7 +833,7 @@ static void wban_schedule_next_beacon() {
 		op_intrpt_schedule_self (op_sim_time() + pSIFS, MAP1_SCHEDULE);
 	}
 
-	
+	// printf("NODE_NAME=%s\n", nd_attrG[nodeid].name);
 	// printf("\t  Superframe parameters:\n");
 	// printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
 	// printf("\t  SF.rap1_start=%d\n", SF.rap1_start);
@@ -902,7 +918,6 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 	/* if I'm waiting for an ACK */
 	if (waitForACK) {
 		if (mac_attr.wait_ack_seq_num == seq_num) { /* yes, I have received my ACK */
-			
 			/* disable the invocation of only the next interrupt of WAITING_ACK_END_CODE */
 			op_intrpt_disable (OPC_INTRPT_SELF, WAITING_ACK_END_CODE, OPC_TRUE);
 			// printf("\nt=%f,NODE_NAME=%s,MAC_STATE=%d,TX_SUCC,SENDER_ID=%d,RECIPIENT_ID=%d,", op_sim_time(), nd_attrG[nodeid].name, mac_state, mac_attr.sendid, mac_attr.rcvid);
@@ -946,10 +961,8 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			/* Try to send another packet after pSIFS */
 			op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		} else	{	/* No, This is not my ACK, I'm Still Waiting */
-			// printf("WRONG ACK Frame Reception [RCV = %d], Still Waiting ACK [RQST = %d] \n", seq_num , mac_attr.wait_ack_seq_num );
 		}
 	} else {/* if (mac_attributes.wait_ack == OPC_FALSE) */ 
-		// printf ("I'm not Waiting ACK Frame - ACK Frame Destroyed\n");
 	}
 	
 	/* destroy the ACK packet */
@@ -1063,9 +1076,6 @@ static void wban_mac_interrupt_process() {
 			switch (op_intrpt_code()) { /* begin switch (op_intrpt_code()) */
 				case BEACON_INTERVAL_CODE: /* Beacon Interval Expiration - end of the Beacon Interval and start of a new one */
 				{
-					if (op_sim_time() > 1.1) {
-						op_prg_odb_bkpt("debug_radio");
-					}
 					// pkt_to_be_sent.enable = OPC_FALSE;
 					attemptingToTX = OPC_FALSE;
 					TX_ING = OPC_FALSE;
@@ -1161,7 +1171,6 @@ static void wban_mac_interrupt_process() {
 						wban_battery_sleep_end(mac_state);
 					}
 					mac_state = MAC_MAP1;
-					// mac_state = MAC_SLEEP;
 					phase_start_timeG = SF.map1_start2sec;
 					phase_end_timeG = SF.map1_end2sec;
 					SF.IN_MAP_PHASE = OPC_TRUE;
@@ -1203,13 +1212,9 @@ static void wban_mac_interrupt_process() {
 				case START_OF_SLEEP_PERIOD: /* Start of Sleep Period */
 				{
 					mac_state = MAC_SLEEP;
+					wban_battery_sleep_start(mac_state);
 					SF.ENABLE_TX_NEW = OPC_FALSE;
 					// pkt_to_be_sent.enable = OPC_TRUE;
-
-					// log = fopen(log_name, "a");
-					// fprintf (log,"t=%f,nodeid=%d  -> ++++++++++ START OF SLEEP PERIOD ++++++++++ \n\n", op_sim_time(), nodeid);
-					// printf (" [Node %s] t=%f  -> ++++++++++  START OF SLEEP PERIOD ++++++++++ \n\n", nd_attrG[nodeid].name, op_sim_time());
-					// fclose(log);
 					break;
 				};/* end of Start of Sleep Period */
 
@@ -1235,13 +1240,13 @@ static void wban_mac_interrupt_process() {
 					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
 						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
 					}
-					wban_battery_cca(mac_state);
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
 			
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
+					wban_battery_cca(mac_state);
 					/* bug with open-zigbee, for statwire interupt can sustain a duration */
 					if ((!csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
 						// printf("t=%f,%s CCA with BUSY\n", op_sim_time(), nd_attrG[nodeid].name);
@@ -1290,6 +1295,7 @@ static void wban_mac_interrupt_process() {
 					pkt_tx_fail++;
 					// printf("\nt=%f,NODE_NAME=%s,NID=%d,mac_state=%d\n", op_sim_time(), nd_attrG[nodeid].name,mac_attr.sendid,mac_state);
 					// printf("\t  Wait for ACK END at %f,pkt_tx_fail=%d,phase_end_timeG=%f\n", op_sim_time(), pkt_tx_fail, phase_end_timeG);
+					// op_prg_odb_bkpt("debug_ack");
 					if(!SF.IN_MAP_PHASE){
 						if(pkt_tx_fail%2 == 0){
 							csma.CW_double = OPC_TRUE;
@@ -1363,51 +1369,40 @@ static void wban_mac_interrupt_process() {
 		case OPC_INTRPT_STAT: // statistic interrupt from PHY layer
 		{
 			switch (op_intrpt_stat()) {	/*begin switch (op_intrpt_stat())*/ 
-				case RX_BUSY_STAT :	/* Case of the end of the BUSY RECEIVER STATISTIC */
-					if((mac_state != MAC_SLEEP) && ((waitForACK)||(IAM_BAN_HUB))){
-						/* if during the CCA the channel was busy for a while, then csma.CCA_CHANNEL_IDLE = OPC_FALSE*/
-						if (op_stat_local_read(RX_BUSY_STAT) == 1.0) {
-							t_rx_start = op_sim_time();
+				case RX_BUSY_STAT:
+					/* do not receive any packets if SLEEP */
+					if (mac_state == MAC_SLEEP) {
+						break;
+					}
+					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
+						sv_t_rx_start = op_sim_time();
+						/* exclude self interupt */
+						if (0 == sv_tx_stat) {
 							csma.CCA_CHANNEL_IDLE = OPC_FALSE;
-						}else{
-							t_rx_end = op_sim_time();
-							if(t_rx_start > 0){
-								t_rx_interval = t_rx_end - t_rx_start;
-								wban_battery_update_rx(t_rx_interval, mac_state);
-							}
 						}
-					}else{
-						t_rx_start = 0;
-						t_rx_end = 0;
+					} else {
+						sv_t_rx_end = op_sim_time();
+						sv_t_rx_duration = sv_t_rx_end - sv_t_rx_start;
+						wban_battery_update_rx(sv_t_rx_duration, mac_state);
 					}
-					printf("t=%f,NODE_NAME=%s,RX_BUSY_STAT==%f\n", op_sim_time(), \
-							nd_attrG[nodeid].name, op_stat_local_read(RX_BUSY_STAT));
-					op_prg_odb_bkpt("debug_radio");
+					// printf("t=%f, NODE_NAME=%s, RX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (RX_BUSY_STAT));
 					break;
-				case TX_BUSY_STAT :
-					if(mac_state != MAC_SLEEP){
-						if (op_stat_local_read (TX_BUSY_STAT) == 1.0){
-							t_tx_start = op_sim_time();
-						}else{
-							t_tx_end = op_sim_time();
-							if(t_tx_start > 0){
-								t_tx_interval = t_tx_end - t_tx_start;
-								wban_battery_update_tx(t_tx_interval, mac_state);
-							}
-							
-						}
-					}else{
-						t_tx_start = 0;
-						t_tx_end = 0;
+				case TX_BUSY_STAT:
+					/* Set TX Stat, half duplex support */
+					if (op_stat_local_read (TX_BUSY_STAT) == 1.0) {
+						sv_tx_stat = 1;
+						sv_t_tx_start = op_sim_time();
+					} else {
+						sv_tx_stat = 0;
+						sv_t_tx_end = op_sim_time();
+						sv_t_tx_duration = sv_t_tx_end - sv_t_tx_start;
+						wban_battery_update_tx(sv_t_tx_duration, mac_state);
 					}
-					printf("t=%f,NODE_NAME=%s,TX_BUSY_STAT==%f\n", op_sim_time(), \
-							nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
-					op_prg_odb_bkpt("debug_radio");
-					// op_intrpt_schedule_self (op_sim_time(), TRY_PACKET_TRANSMISSION_CODE);
+					// printf("t=%f, NODE_NAME=%s, TX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
 					break;
-				case RX_COLLISION_STAT :
-					// fprintf(log,"t=%f  -> $$$$$ COLLISION $$$$$$$  \n\n",op_sim_time());
-					// printf("t=%f,NODE_NAME=%s,NID=%d  -> COLLISION OCCUR\n", op_sim_time(), nd_attrG[nodeid].name, mac_attr.sendid);
+				case RX_COLLISION_STAT:
+					// printf("t=%f, NODE_NAME=%s, COL-RX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (RX_BUSY_STAT));
+					op_prg_odb_bkpt("debug_col");
 					break;
 				default : break;
 			}/*end switch (op_intrpt_stat())*/
@@ -1451,6 +1446,13 @@ static void wban_mac_interrupt_process() {
 				fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,STAT,LATENCY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
 				fprintf(log, "UP=8,LATENCY_AVG=%f\n", data_pkt_latency_avg);
 			}
+			/* Energy Statistics */
+			fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
+			fprintf(log, "TX=%f,RX=%f,", bat_attrG[nodeid].engy_tx, bat_attrG[nodeid].engy_rx);
+			fprintf(log, "CCA=%f,IDLE=%f,", bat_attrG[nodeid].engy_cca, bat_attrG[nodeid].engy_idle);
+			fprintf(log, "SLEEP=%f,", bat_attrG[nodeid].engy_sleep);
+			fprintf(log, "REMAINNING=%f,", bat_attrG[nodeid].engy_remainning);
+			fprintf(log, "TOTAL=%f\n", bat_attrG[nodeid].engy_consumed);
 			fclose(log);
 			// op_prg_odb_bkpt("debug_end");
 			// wban_battery_end();
@@ -1815,7 +1817,7 @@ static Boolean can_fit_TX (packet_to_be_sent_attributes* pkt_to_be_sentL) {
 		// printf("%s has NO packet TXing\n", nd_attrG[nodeid].name);
 		FRET(OPC_FALSE);
 	}
-	pk_tx_time = TX_TIME(wban_norm_phy_bits(frame_MPDU_to_be_sent), nd_attrG[nodeid].data_rate);
+	pk_tx_time = hp_tx_time(wban_norm_phy_bits(frame_MPDU_to_be_sent));
 	phase_remaining_time = phase_end_timeG - op_sim_time();
 	if(pkt_to_be_sentL->ack_policy != N_ACK_POLICY){
 		if (compare_doubles(phase_remaining_time, pk_tx_time+hp_tx_time(I_ACK_PPDU_BITS)+pSIFS+3*MICRO) >=0) {
@@ -1884,61 +1886,15 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			data_stat_local[frame_subtype][SENT].ppdu_kbits += 0.001*ppdu_bits;
 			data_stat_all[frame_subtype][SENT].number += 1;
 			data_stat_all[frame_subtype][SENT].ppdu_kbits += 0.001*ppdu_bits;
-
-			// stat_vec.ppdu_sent_kbits = stat_vec.ppdu_sent_kbits + 1.0*ppdu_bits/1000.0; // in kbits
-			// stat_vec.ppdu_sent_nbr = stat_vec.ppdu_sent_nbr + 1;
-			// op_stat_write(stat_vec.data_pkt_sent, ppdu_bits);
-			// op_stat_write(stat_vecG.data_pkt_sent, ppdu_bits);
-			switch(frame_subtype){
-				case UP0:
-					// op_stat_write(stat_vec.up0_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up0_sent, ppdu_bits);
-					break;
-				case UP1:
-					// op_stat_write(stat_vec.up1_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up1_sent, ppdu_bits);
-					break;
-				case UP2:
-					// op_stat_write(stat_vec.up2_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up2_sent, ppdu_bits);
-					break;
-				case UP3:
-					// op_stat_write(stat_vec.up3_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up3_sent, ppdu_bits);
-					break;
-				case UP4:
-					// op_stat_write(stat_vec.up4_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up4_sent, ppdu_bits);
-					break;
-				case UP5:
-					// op_stat_write(stat_vec.up5_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up5_sent, ppdu_bits);
-					break;
-				case UP6:
-					// op_stat_write(stat_vec.up6_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up6_sent, ppdu_bits);
-					break;
-				case UP7:
-					// op_stat_write(stat_vec.up7_sent, ppdu_bits);
-					// op_stat_write(stat_vecG.up7_sent, ppdu_bits);
-					break;
-				default:
-					break;
-			}
 			break;
 		}
 		case MANAGEMENT:
 			switch(frame_subtype){
 				case BEACON:
-					// op_stat_write (beacon_frame_hndl, 1.0);
 					break;
 				case CONNECTION_ASSIGNMENT:
-					// printf("\t  Hub send Connection Assignment packet\n");
-					// op_prg_odb_bkpt("send_assign");
 					break;
 				case CONNECTION_REQUEST:
-					// printf("\t  Node send Connection Request packet\n");
-					// op_prg_odb_bkpt("send_req");
 					break;
 				default:
 					break;
@@ -1950,7 +1906,7 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			break;
 	}
 
-	PPDU_tx_time = TX_TIME(ppdu_bits, nd_attrG[nodeid].data_rate);
+	PPDU_tx_time = hp_tx_time(ppdu_bits);
 
 	switch (ack_policy){
 		case N_ACK_POLICY:
@@ -1960,7 +1916,7 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			op_intrpt_schedule_self (op_sim_time() + PPDU_tx_time + pSIFS, N_ACK_PACKET_SENT);
 			break;
 		case I_ACK_POLICY:
-			ack_expire_time = op_sim_time() + PPDU_tx_time + hp_tx_time(I_ACK_PPDU_BITS) + 2*pSIFS;
+			ack_expire_time = op_sim_time() + PPDU_tx_time + hp_tx_time(I_ACK_PPDU_BITS) + 2 * pSIFS;
 			if(ack_expire_time > phase_end_timeG){
 				ack_expire_time = op_sim_time() + PPDU_tx_time + hp_tx_time(I_ACK_PPDU_BITS) + pSIFS + 3*MICRO;
 			}
@@ -1975,9 +1931,6 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 			// fprintf(log,"t=%f   ----------- START TX [DEST_ID = %d, SEQ = %d, with ACK expiring at %f] %d retries  \n\n", op_sim_time(), pkt_to_be_sent.rcvid, mac_attr.wait_ack_seq_num, ack_expire_time,pkt_tx_total+pkt_tx_out_phase);
 			// printf("t=%f,%s start TX with ACK expiring at %f, %d tx failure\n", op_sim_time(), nd_attrG[nodeid].name, ack_expire_time, pkt_tx_fail);
 			op_intrpt_schedule_self(ack_expire_time, WAITING_ACK_END_CODE);
-			
-			// op_stat_write(statistic_global_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
-			// op_stat_write(statistic_vector.sent_pkt, (double)(op_pk_total_size_get(frame_PPDU)));
 			break;
 		case L_ACK_POLICY:
 			break;
@@ -1986,8 +1939,6 @@ static void wban_send_mac_pk_to_phy(Packet* frame_MPDU) {
 		default: 
 			break;
 	}
-
-	
 	/* Stack tracing exit point */
 	FOUT;
 }
@@ -2020,7 +1971,7 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	/* create PHY frame (PPDU) that encapsulates connection_request MAC frame (MPDU) */
 	frame_PPDU = op_pk_create_fmt("wban_frame_PPDU_format");
 
-	op_pk_nfd_set (frame_PPDU, "RATE", nd_attrG[nodeid].data_rate);
+	// op_pk_nfd_set (frame_PPDU, "RATE", nd_attrG[nodeid].data_rate);
 	/* wrap connection_request MAC frame (MPDU) in PHY frame (PPDU) */
 	op_pk_nfd_set_pkt (frame_PPDU, "PSDU", frame_MPDU);
 	op_pk_nfd_set (frame_PPDU, "LENGTH", ((double) op_pk_total_size_get(frame_MPDU))/8); //[bytes]
@@ -2029,10 +1980,6 @@ static void phy_to_radio(Packet* frame_MPDU) {
 	op_pk_bulk_size_set (frame_PPDU, bulk_size);
 
 	if (op_stat_local_read(TX_BUSY_STAT) == 1.0){
-		printf("node_name=%s, current_slot=%d,\n", nd_attrG[nodeid].name, SF.current_slot);
-		op_prg_odb_bkpt("debug_radio");
-		// op_intrpt_schedule_self(op_sim_time()+pSIFS, TRY_PACKET_TRANSMISSION_CODE);
-		// FOUT;
 		op_sim_end("ERROR : TRY TO SEND Packet WHILE THE TX CHANNEL IS BUSY","PK_SEND_CODE","","");
 	}
 	op_pk_send (frame_PPDU, STRM_FROM_MAC_TO_RADIO);
@@ -2082,18 +2029,18 @@ wban_battery_update_tx (double tx_timeL, int mac_stateL)
 	/* compute the consumed energy when transmitting a packet */
 	tx_energy = bat_attrG[nodeid].tx_mA * MILLI * \
 				tx_timeL * bat_attrG[nodeid].voltage;
-	/* node can rx while tx at OPNET */
+	/* node can rx while tx at the same time in OPNET(duplex) */
 	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
 				tx_timeL * bat_attrG[nodeid].voltage;
 	/* compute the time spent by the node in idle state */
-	idle_duration = op_sim_time() - tx_timeL - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,PACKET_TX_CODE,tx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,tx_timeL,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - tx_timeL;
+	// if(idle_duration < 0){
+	// 	idle_duration = 0;
+	// }
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
 				  idle_duration * bat_attrG[nodeid].voltage;
 	bat_attrG[nodeid].engy_tx += tx_energy;
+	/* decrease rx energy in tx stage, increse it in the rx stage */
 	bat_attrG[nodeid].engy_rx -= rx_energy;
 	bat_attrG[nodeid].engy_idle += idle_energy;
 	/* update the consumed energy with the one of in idle state */
@@ -2101,8 +2048,10 @@ wban_battery_update_tx (double tx_timeL, int mac_stateL)
 	bat_attrG[nodeid].engy_consumed += consumed_energy;
 	/* update the current energy level */
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
-	/* update the time when the node enters the idle state. we add tx_timeL, because the remote process is generated at the time to start transmission */
+	/* update the time when the node enters the idle state */
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
+	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
+	// printf("tx=%f,rx=%f,cca=0.0,idle=%f,sleep=0.0\n", tx_energy, rx_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2121,17 +2070,17 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_rx);
+	/* do not add energy for receiving other nodes (Node mode) */
+	if (!IAM_BAN_HUB && !waitForACK) {
+		FOUT;
+	}
 	/* compute the consumed energy when receiving a packet */
 	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
 				rx_timeL * bat_attrG[nodeid].voltage;
 	/* compute the time spent by the node in idle state */
-	if(op_sim_time() < nd_attrG[nodeid].last_idle_time){
-		idle_duration = 0;
-	}else{
-		idle_duration = op_sim_time() - rx_timeL - nd_attrG[nodeid].last_idle_time;
-	}
-	// printf("t=%f,NODE_NAME=%s,PACKET_RX_CODE,rx_timeL=%f,activity.last_idle_time=%f\n", op_sim_time(),node_name,rx_time,activity.last_idle_time);
-	if(idle_duration < 0){
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - rx_timeL;
+	/* idle energy has been calculated in tx stage */
+	if (0 == compare_doubles(op_sim_time(), nd_attrG[nodeid].last_idle_time)) {
 		idle_duration = 0;
 	}
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
@@ -2142,14 +2091,9 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	consumed_energy= rx_energy + idle_energy;
 	/* update the current energy level */
 	bat_attrG[nodeid].engy_consumed += consumed_energy;
-	/* update the current energy level */
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
 	/* update the time when the node enters the idle state */
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
-	/* the sleep time shoulde be at least at current time */
-	// if(compare_doubles(activity.sleeping_time, op_sim_time()) != 1){
-	// 	activity.sleeping_time = op_sim_time();
-	// }
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2168,11 +2112,7 @@ wban_battery_cca(int mac_stateL)
 	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_cca);
-	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,CCA_CODE,activity.last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
+	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time - pCCATime;
 	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
 				  idle_duration * bat_attrG[nodeid].voltage;
 	/* compute the consumed energy when receiving a packet */
@@ -2183,10 +2123,9 @@ wban_battery_cca(int mac_stateL)
 	/* update the consumed energy with the one of in idle state */
 	consumed_energy = cca_energy + idle_energy;
 	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += consumed_energy;
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
-	/* update the time when the node enters the idle state. we add pCCATime, because the remote process is generated at the time to start transmission */
-	/* do not update idle_time in CCA for breaking idle time while RX */
-	// activity.last_idle_time = op_sim_time()+pCCATime;
+	nd_attrG[nodeid].last_idle_time = op_sim_time();
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2206,18 +2145,13 @@ wban_battery_sleep_start(int mac_stateL)
 	FIN(wban_battery_sleep_start);
 	/* compute the time spent by the node in idle state */
 	idle_duration = op_sim_time() - nd_attrG[nodeid].last_idle_time;
-	// printf("t=%f,NODE_NAME=%s,START_OF_SLEEP_PERIOD_CODE,bat_attrG[nodeid].last_idle_time=%f\n", op_sim_time(),node_name,activity.last_idle_time);
-	if(idle_duration < 0){
-		idle_duration = 0;
-	}
-	if(idle_duration > 0.000070){
-		/* update the consumed energy with the one of in idle state */
-		idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
-					  idle_duration * bat_attrG[nodeid].voltage;
-		bat_attrG[nodeid].engy_idle += idle_energy;
-		/* update the current energy level */
-		bat_attrG[nodeid].engy_remainning -= idle_energy;
-	}
+	/* update the consumed energy with the one of in idle state */
+	idle_energy = bat_attrG[nodeid].idle_uA * MICRO * \
+				  idle_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_idle += idle_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += idle_energy;
+	bat_attrG[nodeid].engy_remainning -= idle_energy;
 	nd_attrG[nodeid].sleeping_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_FALSE;
 	nd_attrG[nodeid].is_sleep = OPC_TRUE;
@@ -2240,15 +2174,13 @@ wban_battery_sleep_end (int mac_stateL)
 	FIN(wban_battery_sleep_end);
 	/* compute the time spent by the node in sleep state */
 	sleep_duration = op_sim_time() - nd_attrG[nodeid].sleeping_time;
-	if(sleep_duration > 0.000070){
-		/* energy consumed during sleeping mode */
-		sleep_energy = bat_attrG[nodeid].sleep_uA * MICRO * \
-					   sleep_duration * bat_attrG[nodeid].voltage;
-		bat_attrG[nodeid].engy_sleep += sleep_energy;
-		/* update the current energy level */
-		bat_attrG[nodeid].engy_remainning -= sleep_energy;
-	}
-
+	/* energy consumed during sleeping mode */
+	sleep_energy = bat_attrG[nodeid].sleep_uA * MICRO * \
+				   sleep_duration * bat_attrG[nodeid].voltage;
+	bat_attrG[nodeid].engy_sleep += sleep_energy;
+	/* update the current energy level */
+	bat_attrG[nodeid].engy_consumed += sleep_energy;
+	bat_attrG[nodeid].engy_remainning -= sleep_energy;
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_TRUE;
 	nd_attrG[nodeid].is_sleep = OPC_FALSE;
@@ -2285,22 +2217,18 @@ static void queue_status() {
 	{
 		/* Obtain object ID of the ith subqueue */
 		subq_objid = op_topo_child (queue_objid, OPC_OBJMTYPE_ALL, i);
-
 		// set pk capacity of SUBQ_MAN and SUBQ_DATA
 		if (SUBQ_MAN == i) {
 			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.MGMT_buffer_size);
 		} else if (SUBQ_DATA == i) {
 			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.DATA_buffer_size);
 		}
-		
 		/* Get current subqueue attribute settings */
 		op_ima_obj_attr_get (subq_objid, "bit capacity", &bit_capacity);
 		op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 
 		if (op_subq_empty(i)) {
-			// printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), nd_attrG[nodeid].name, i, pk_capacity, bit_capacity);
 		} else {
-			// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), nd_attrG[nodeid].name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 		}
 	}
 	/* Stack tracing exit point */
@@ -2335,7 +2263,6 @@ static void subq_info_get (int subq_index) {
 	op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 	
 	if (op_subq_empty(subq_index)) {
-		// printf("t=%f Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), nd_attrG[nodeid].name, subq_index, pk_capacity, bit_capacity);
 		subq_info.pksize = 0;
 		subq_info.bitsize = 0;
 	} else {
@@ -2343,12 +2270,8 @@ static void subq_info_get (int subq_index) {
 		subq_info.bitsize = op_subq_stat (subq_index, OPC_QSTAT_BITSIZE);
 		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
 		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
-		// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), nd_attrG[nodeid].name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		pk_test_up = op_subq_pk_access(subq_index, OPC_QPOS_PRIO);
 		subq_info.up = op_pk_priority_get(pk_test_up);
-		// printf("\nodeid = %d, subq_info.up=UP%d, ", nodeid, subq_info.up);
-		// printf("pksize = %f, bitsize = %f\n", subq_info.pksize, subq_info.bitsize);
-		// op_prg_odb_bkpt("debug");
 	}
 
 	/* Stack tracing exit point */
@@ -2406,7 +2329,7 @@ static double
 hp_tx_time (int ppdu_bits)
 	{
 	FIN (hp_tx_time());
-	FRET(ppdu_bits / (1000 * nd_attrG[nodeid].data_rate));
+	FRET(ppdu_bits / nd_attrG[nodeid].data_rate);
 	}
 
 static void reset_map1_scheduling(int seq) {
