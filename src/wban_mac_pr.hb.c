@@ -116,11 +116,10 @@ wban_battery_attributes bat_attrG[NODE_ALL_MAX];
 int current_free_connected_NID = 32; // start assigning connected NID from ID 32
 int current_first_free_slot = -1;
 int unconnectedNID;
-//int sequence_num_beaconG = 0; //sequence number for beacon frame, global variable
 int SF_slot[BeaconPeriodLength];
 
 /* SINR received by Node(Hub -> Node) */
-double	snr_node[NODE_ALL_MAX][SF_NUM];
+double	hb_snr_node[NODE_ALL_MAX][SF_NUM];
 
 // enum MAC_STATES mac_state = MAC_SETUP; //initialize MAC states with MAC_SETUP
 enum SF_STATES sf_state = SF_SLEEP; //initialize Superframe states with SF_SLEEP
@@ -210,8 +209,8 @@ static void phy_to_radio(Packet* frame_MPDU);
 void calc_prio_node(void);
 void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
-static double avg_snr_hub(int node_id_l);
-static void reset_map1_scheduling(int seq);
+static double hp_avg_snr(int node_id_l);
+static void reset_pkt_snr_rx(int seq);
 
 static double hp_tx_time (int ppdu_bits);
 static void wban_init_channel(Objid nodeidL);

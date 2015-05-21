@@ -34,9 +34,6 @@ packet_to_be_sent_attributes	\pkt_to_be_sent;
 /* the parameters of subqueue */
 subqueue_info	\subq_info;
 
-/* Stat for Data */
-data_stat_info	\data_stat_local[UP_ALL][DATA_STATE];
-
 double	\latency_avg[UP_ALL];
 
 double	\latency_avg_all;
@@ -122,11 +119,17 @@ double	\sv_t_rx_end;
 
 double	\sv_t_rx_duration;
 
+/* Stat for Data */
+data_stat_info	\data_stat_local[UP_ALL][DATA_STATE];
+
+/* statistics of packet received for SNR */
+st_pkt_rx	\sv_st_pkt_rx[NODE_ALL_MAX][SF_NUM];
+
 int	\pkt_num_sf[NODE_ALL_MAX];
 
-int	\sequence_num_beaconG;
+int	\sv_beacon_seq;
 
 double	\rho_hub[NODE_ALL_MAX];
 
 /* SINR received by Hub(Node -> Hub) */
-double	\snr_hub[NODE_ALL_MAX][SF_NUM];
+double	\sv_snr_hub[NODE_ALL_MAX][SF_NUM];
