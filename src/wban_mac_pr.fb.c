@@ -514,7 +514,7 @@ void map1_scheduling() {
 		FOUT;
 	}
 
-	printf("NODE_NAME=%s, nodeid=%d.\n", nd_attrG[nodeid].name, nodeid);
+	// printf("NODE_NAME=%s, nodeid=%d.\n", nd_attrG[nodeid].name, nodeid);
 	// calculate the connected node
 	connected_node = 0, slot_req_total = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
@@ -564,9 +564,9 @@ void map1_scheduling() {
 		// 			// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 		// 	op_prg_odb_bkpt("debug");
 		// }
-		printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
-		printf("ban_id = %d, nodeid = %d, slotnum = %d.\n", \
-			    map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
+		// printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
+		// printf("ban_id = %d, nodeid = %d, slotnum = %d.\n", \
+			    // map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
 		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[i].slot_start = SF.free_slot;
 			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
@@ -833,17 +833,17 @@ static void wban_schedule_next_beacon() {
 		op_intrpt_schedule_self (op_sim_time() + pSIFS, MAP1_SCHEDULE);
 	}
 
-	printf("NODE_NAME=%s\n", nd_attrG[nodeid].name);
-	printf("\t  Superframe parameters:\n");
-	printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
-	printf("\t  SF.rap1_start=%d\n", SF.rap1_start);
-	printf("\t  SF.rap1_start2sec=%f\n", SF.rap1_start2sec);
-	printf("\t  SF.rap1_end=%d\n", SF.rap1_end);
-	printf("\t  SF.rap1_end2sec=%f\n", SF.rap1_end2sec);
-	printf("\t  SF.map1_start=%d\n", SF.map1_start);
-	printf("\t  SF.map1_start2sec=%f\n", SF.map1_start2sec);
-	printf("\t  SF.map1_end=%d\n", SF.map1_end);
-	printf("\t  SF.map1_end2sec=%f\n", SF.map1_end2sec);
+	// printf("NODE_NAME=%s\n", nd_attrG[nodeid].name);
+	// printf("\t  Superframe parameters:\n");
+	// printf("\t  SF.first_free_slot=%d\n", SF.first_free_slot);
+	// printf("\t  SF.rap1_start=%d\n", SF.rap1_start);
+	// printf("\t  SF.rap1_start2sec=%f\n", SF.rap1_start2sec);
+	// printf("\t  SF.rap1_end=%d\n", SF.rap1_end);
+	// printf("\t  SF.rap1_end2sec=%f\n", SF.rap1_end2sec);
+	// printf("\t  SF.map1_start=%d\n", SF.map1_start);
+	// printf("\t  SF.map1_start2sec=%f\n", SF.map1_start2sec);
+	// printf("\t  SF.map1_end=%d\n", SF.map1_end);
+	// printf("\t  SF.map1_end2sec=%f\n", SF.map1_end2sec);
 	// fprintf (log,"t=%f  -> Schedule Next Beacon at %f\n\n", op_sim_time(), SF.BI_Boundary+SF.BI*SF.slot_sec);
 	// printf ("Schedule Next Beacon at %f\n", SF.BI_Boundary+SF.BI*SF.slot_sec);
 	// op_prg_odb_bkpt("sch_beacon");
@@ -961,10 +961,8 @@ static void wban_extract_i_ack_frame(Packet* ack_frame) {
 			/* Try to send another packet after pSIFS */
 			op_intrpt_schedule_self (op_sim_time() + pSIFS, TRY_PACKET_TRANSMISSION_CODE);
 		} else	{	/* No, This is not my ACK, I'm Still Waiting */
-			printf("WRONG ACK Frame Reception [RCV = %d], Still Waiting ACK [RQST = %d] \n", seq_num , mac_attr.wait_ack_seq_num );
 		}
 	} else {/* if (mac_attributes.wait_ack == OPC_FALSE) */ 
-		printf ("I'm not Waiting ACK Frame - ACK Frame Destroyed\n");
 	}
 	
 	/* destroy the ACK packet */
@@ -1387,6 +1385,7 @@ static void wban_mac_interrupt_process() {
 						sv_t_rx_duration = sv_t_rx_end - sv_t_rx_start;
 						wban_battery_update_rx(sv_t_rx_duration, mac_state);
 					}
+					// printf("t=%f, NODE_NAME=%s, RX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (RX_BUSY_STAT));
 					break;
 				case TX_BUSY_STAT:
 					/* Set TX Stat, half duplex support */
@@ -1399,8 +1398,10 @@ static void wban_mac_interrupt_process() {
 						sv_t_tx_duration = sv_t_tx_end - sv_t_tx_start;
 						wban_battery_update_tx(sv_t_tx_duration, mac_state);
 					}
+					// printf("t=%f, NODE_NAME=%s, TX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
 					break;
 				case RX_COLLISION_STAT:
+					// printf("t=%f, NODE_NAME=%s, COL-RX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (RX_BUSY_STAT));
 					op_prg_odb_bkpt("debug_col");
 					break;
 				default : break;
@@ -2069,6 +2070,10 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	double idle_duration;
 	/* Stack tracing enrty point */
 	FIN(wban_battery_update_rx);
+	/* do not add energy for receiving other nodes (Node mode) */
+	if (!IAM_BAN_HUB && !waitForACK) {
+		FOUT;
+	}
 	/* compute the consumed energy when receiving a packet */
 	rx_energy = bat_attrG[nodeid].rx_mA * MILLI * \
 				rx_timeL * bat_attrG[nodeid].voltage;
@@ -2086,12 +2091,9 @@ wban_battery_update_rx (double rx_timeL, int mac_stateL)
 	consumed_energy= rx_energy + idle_energy;
 	/* update the current energy level */
 	bat_attrG[nodeid].engy_consumed += consumed_energy;
-	/* update the current energy level */
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
 	/* update the time when the node enters the idle state */
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
-	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
-	// printf("tx=0.0,rx=%f,cca=0.0,idle=%f,sleep=0.0\n", rx_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2124,8 +2126,6 @@ wban_battery_cca(int mac_stateL)
 	bat_attrG[nodeid].engy_consumed += consumed_energy;
 	bat_attrG[nodeid].engy_remainning -= consumed_energy;
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
-	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
-	// printf("tx=0.0,rx=0.0,cca=%f,idle=%f,sleep=0.0\n", cca_energy, idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2155,8 +2155,6 @@ wban_battery_sleep_start(int mac_stateL)
 	nd_attrG[nodeid].sleeping_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_FALSE;
 	nd_attrG[nodeid].is_sleep = OPC_TRUE;
-	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
-	// printf("tx=0.0,rx=0.0,cca=0.0,idle=%f,sleep=0.0\n", idle_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2186,8 +2184,6 @@ wban_battery_sleep_end (int mac_stateL)
 	nd_attrG[nodeid].last_idle_time = op_sim_time();
 	nd_attrG[nodeid].is_idle = OPC_TRUE;
 	nd_attrG[nodeid].is_sleep = OPC_FALSE;
-	// printf("t=%f,NODE_NAME=%s,ENERGY,", op_sim_time(), nd_attrG[nodeid].name);
-	// printf("tx=0.0,rx=0.0,cca=0.0,idle=0.0,sleep=%f\n", sleep_energy);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -2221,22 +2217,18 @@ static void queue_status() {
 	{
 		/* Obtain object ID of the ith subqueue */
 		subq_objid = op_topo_child (queue_objid, OPC_OBJMTYPE_ALL, i);
-
 		// set pk capacity of SUBQ_MAN and SUBQ_DATA
 		if (SUBQ_MAN == i) {
 			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.MGMT_buffer_size);
 		} else if (SUBQ_DATA == i) {
 			op_ima_obj_attr_set (subq_objid, "pk capacity", (double)mac_attr.DATA_buffer_size);
 		}
-		
 		/* Get current subqueue attribute settings */
 		op_ima_obj_attr_get (subq_objid, "bit capacity", &bit_capacity);
 		op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 
 		if (op_subq_empty(i)) {
-			// printf("t=%f,%s Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), nd_attrG[nodeid].name, i, pk_capacity, bit_capacity);
 		} else {
-			// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), nd_attrG[nodeid].name, i, op_subq_stat (i, OPC_QSTAT_PKSIZE), op_subq_stat (i, OPC_QSTAT_BITSIZE), op_subq_stat (i, OPC_QSTAT_FREE_PKSIZE), op_subq_stat (i, OPC_QSTAT_FREE_BITSIZE));
 		}
 	}
 	/* Stack tracing exit point */
@@ -2271,7 +2263,6 @@ static void subq_info_get (int subq_index) {
 	op_ima_obj_attr_get (subq_objid, "pk capacity", &pk_capacity);
 	
 	if (op_subq_empty(subq_index)) {
-		// printf("t=%f Subqueue #%d is empty, wait for MAC frames \n\t -> capacity [%#e frames, %#e bits]. \n\n", op_sim_time(), nd_attrG[nodeid].name, subq_index, pk_capacity, bit_capacity);
 		subq_info.pksize = 0;
 		subq_info.bitsize = 0;
 	} else {
@@ -2279,12 +2270,8 @@ static void subq_info_get (int subq_index) {
 		subq_info.bitsize = op_subq_stat (subq_index, OPC_QSTAT_BITSIZE);
 		subq_info.free_pksize = op_subq_stat (subq_index, OPC_QSTAT_FREE_PKSIZE);
 		subq_info.free_bitsize = op_subq_stat (subq_index, OPC_QSTAT_FREE_BITSIZE);
-		// printf("t=%f,%s Subqueue #%d is non empty,\n\t -> occupied space [%#e frames, %#e bits] - empty space [%#e frames, %#e bits] \n\n", op_sim_time(), nd_attrG[nodeid].name, subq_index, subq_info.pksize, subq_info.bitsize, subq_info.free_pksize, subq_info.free_bitsize);
 		pk_test_up = op_subq_pk_access(subq_index, OPC_QPOS_PRIO);
 		subq_info.up = op_pk_priority_get(pk_test_up);
-		// printf("\nodeid = %d, subq_info.up=UP%d, ", nodeid, subq_info.up);
-		// printf("pksize = %f, bitsize = %f\n", subq_info.pksize, subq_info.bitsize);
-		// op_prg_odb_bkpt("debug");
 	}
 
 	/* Stack tracing exit point */
