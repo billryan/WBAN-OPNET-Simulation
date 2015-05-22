@@ -481,24 +481,67 @@ static double hp_avg_snr(int nodeid_l) {
  * calculate the rho by Hub
  */
 void calc_prio_hub() {
-	double alpha = 1, beta = 0, snr_base = 60;
-	double avg_snr_db = 0;
-	int i = 0;
+	double alpha = 2, beta = 0;
+	/* Average SNR of Node i */
+	double snr_avg_i;
+	/* eta = alpha * f(snr) */
+	double eta_i;
+	double rho_i, nid_i;
+	double snr_max = 0.001, snr_min = 0, snr_avg_db;
+	int i = 0, j = 0;
 	FIN(calc_prio_node);
-
+	/* first traverse, get the snr_max and snr_min */
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		// ignore self
 		if (i == nodeid) {
 			continue;
 		}
 		// same BAN ID
-		if (map1_sche_map[i].bid == map1_sche_map[nodeid].bid) {
-			if (map1_sche_map[i].slotnum <= 0) {
-				continue;
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			snr_avg_i = hp_avg_snr(i);
+			if (snr_avg_i > snr_max) {
+				snr_max = snr_avg_i;
+			} else if (snr_avg_i < snr_min) {
+				snr_min = snr_avg_i;
 			}
-			avg_snr_db = hp_avg_snr(i);
-			rho_hub[i] = map1_sche_map[i].up + alpha * (avg_snr_db/snr_base) - beta * 1;
 		}
+	}
+	snr_avg_db = (snr_max + snr_min) / 2;
+	/* second traverse, get the eta([0,2]) */
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		sv_rho_hub[i] = 0;
+		// ignore self
+		if (i == nodeid) {
+			continue;
+		}
+		// same BAN ID
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			eta_i = (hp_avg_snr(i) - snr_min) / (snr_avg_db - snr_min);
+			eta_i = eta_i * eta_i;
+			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i;
+		}
+	}
+	/* sort rho by nid */
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		sv_nid_rho[i].nid = i;
+		sv_nid_rho[i].rho = sv_rho_hub[i];
+		// same BAN ID
+		if (i == nodeid || nd_attrG[i].bid != nd_attrG[nodeid].bid) {
+			sv_nid_rho[i].rho = -1;
+		}
+	}
+	/* insertion sort */
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		j = i;
+		rho_i = sv_nid_rho[i].rho;
+		nid_i = sv_nid_rho[i].nid;
+		while (j > 0 && sv_nid_rho[j - 1].rho < rho_i) {
+			sv_nid_rho[j].nid = sv_nid_rho[j - 1].nid;
+			sv_nid_rho[j].rho = sv_nid_rho[j - 1].rho;
+			j = j - 1;
+		}
+		sv_nid_rho[j].nid = nid_i;
+		sv_nid_rho[j].rho = rho_i;
 	}
 	FOUT;
 }
@@ -508,11 +551,11 @@ void calc_prio_hub() {
  *
  */
 void map1_scheduling() {
-	int i = 0;
+	int i = 0, j;
 	int slot_avg = 0, slot_req_total = 0, slot_req = 0;
 	int connected_node = 0;
 	FIN(map1_scheduling);
-
+	calc_prio_hub();
 	// printf("map1_scheduling...\n");
 	// disable map1
 	if (SF.rap1_start == 0) {
@@ -540,16 +583,18 @@ void map1_scheduling() {
 	// update free_slot
 	SF.free_slot = SF.first_free_slot;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		/* mapping to real nid */
+		j = sv_nid_rho[i].nid;
 		// ignore self
-		if (i == nodeid) {
+		if (j == nodeid) {
 			continue;
 		}
 		// same BAN ID
-		if (map1_sche_map[i].bid != map1_sche_map[nodeid].bid) {
+		if (nd_attrG[j].bid != nd_attrG[nodeid].bid) {
 			continue;
 		}
 		// ignore node which do not use MAP1
-		if (map1_sche_map[i].slotnum <= 0) {
+		if (map1_sche_map[j].slotnum <= 0) {
 			continue;
 		}
 		// allocation
@@ -569,20 +614,20 @@ void map1_scheduling() {
 		// 			// i, map1_sche_map[i].slotnum, SF.map1_len, slot_req_total);
 		// 	op_prg_odb_bkpt("debug");
 		// }
-		// printf("SF.free_slot = %d, i = %d, ", SF.free_slot, i);
-		// printf("ban_id = %d, nodeid = %d, slotnum = %d.\n", \
-			    // map1_sche_map[i].bid, map1_sche_map[i].nid, map1_sche_map[i].slotnum);
-		if (SF.free_slot + map1_sche_map[i].slotnum <= SF.map1_end + 1) {
-			map1_sche_map[i].slot_start = SF.free_slot;
-			map1_sche_map[i].slot_end = SF.free_slot + map1_sche_map[i].slotnum - 1;
-			SF.free_slot = map1_sche_map[i].slot_end + 1;
+		// printf("SF.free_slot=%d,j = %d,rho=%f,", SF.free_slot, j, sv_nid_rho[i].rho);
+		// printf("ban_id=%d,nodeid=%d,slotnum=%d.\n", \
+			    // nd_attrG[j].bid, nd_attrG[j].nid, map1_sche_map[j].slotnum);
+		if (SF.free_slot + map1_sche_map[j].slotnum <= SF.map1_end + 1) {
+			map1_sche_map[j].slot_start = SF.free_slot;
+			map1_sche_map[j].slot_end = SF.free_slot + map1_sche_map[j].slotnum - 1;
+			SF.free_slot = map1_sche_map[j].slot_end + 1;
 		} else {
-			map1_sche_map[i].slot_start = 0;
-			map1_sche_map[i].slot_end = 0;
+			map1_sche_map[j].slot_start = 0;
+			map1_sche_map[j].slot_end = 0;
 		}
 
-		op_prg_odb_bkpt("map1_schedule");
 	}
+	op_prg_odb_bkpt("map1_schedule");
 
 	FOUT;
 }

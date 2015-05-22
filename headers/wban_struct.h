@@ -317,4 +317,11 @@ typedef struct
 	// Utility function of Interference by Node
 	double infer;
 } map1_schedule_map;
+
+typedef struct
+{
+	int nid;
+	double rho;
+	/* data */
+} nid_rho;
 #endif
