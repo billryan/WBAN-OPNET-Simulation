@@ -129,7 +129,9 @@ int	\pkt_num_sf[NODE_ALL_MAX];
 
 int	\sv_beacon_seq;
 
-double	\rho_hub[NODE_ALL_MAX];
+double	\sv_rho_hub[NODE_ALL_MAX];
+
+nid_rho \sv_nid_rho[NODE_ALL_MAX];
 
 /* SINR received by Hub(Node -> Hub) */
 double	\sv_snr_hub[NODE_ALL_MAX][SF_NUM];
