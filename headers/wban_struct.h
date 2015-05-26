@@ -310,6 +310,8 @@ typedef struct
 	int slot_end;
 	int slotnum;
 	int up;
+	// average SNR received from Hub
+	double snr;
 	// average SNR received by Hub
 	double eta;
 	// priority factor

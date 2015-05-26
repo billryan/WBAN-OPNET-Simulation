@@ -9,7 +9,7 @@
 #define PAPER1 1
 
 /* recent SF number for statistics */
-#define SF_NUM 10
+#define SF_NUM 15
 /* slot required by Node */
 #define SLOT_REQ_MAX 8
 

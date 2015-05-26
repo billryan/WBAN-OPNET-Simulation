@@ -17,6 +17,7 @@ wban_mac_init()
 	Objid mac_attr_id;
 	Objid srcid;
 	int i, j;
+	// double t_send_beacon;
 
 	/* Stack tracing enrty point */
 	FIN(wban_mac_init);
@@ -83,6 +84,8 @@ wban_mac_init()
 		/* update rap1_end with rap1_start + rap1_length */
 		// beacon_attr.rap1_end = beacon_attr.rap1_start + beacon_attr.rap1_length - 1;
 		beacon_attr.rap1_length = beacon_attr.rap1_end - beacon_attr.rap1_start + 1;
+		// t_send_beacon = op_sim_time() + floor (op_dist_uniform(12)) * hp_tx_time(BEACON_PPDU_BITS);
+		// op_intrpt_schedule_self(t_send_beacon, BEACON_INTERVAL_CODE);
 		wban_send_beacon_frame ();
 	} else { /* if the node is not Hub */
 		/* get the Connection Request for the Node */
@@ -274,6 +277,10 @@ static void wban_parse_incoming_frame() {
 			sv_st_pkt_rx[sid][sv_beacon_seq % SF_NUM].number += 1;
 			// sv_st_pkt_rx[sid][sv_beacon_seq % SF_NUM].ppdu_kbits += ppdu_bits / 1000.0;
 			sv_st_pkt_rx[sid][sv_beacon_seq % SF_NUM].snr_db += snr;
+			// if (!IAM_BAN_HUB) {
+			// 	printf("node=%s,snr=%f,from_node=%s\n", nd_attrG[nodeid].name, snr, nd_attrG[sid].name);
+			// 	op_prg_odb_bkpt("snr_db");
+			// }
 			// op_prg_odb_bkpt("debug_app");
 			// log = fopen(log_name, "a");
 			// fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,MAC_STATE=%d,RX,RECIPIENT_ID=%d,SENDER_ID=%d,", op_sim_time(), nd_attrG[nodeid].name, nodeid, mac_state, recipient_id, sender_id);
@@ -320,7 +327,6 @@ static void wban_parse_incoming_frame() {
 					// printf ("\t  Management Packet reception\n");
 					switch (frame_subtype_fd) {
 						case BEACON: 
-							// printf ("\t    Beacon Packet reception\n");
 							wban_extract_beacon_frame (frame_MPDU);
 							break;
 						case SECURITY_ASSOCIATION: 
@@ -429,11 +435,10 @@ static Boolean is_packet_for_me(Packet* frame_MPDU, int ban_id, int recipient_id
 }
 
 
-void set_map1_map() {
-	int slotnum = 0;
-	double slot_bits = 0.0;
-	double data_ack_bits = 0.0;
-	FIN(set_map1_map);
+void reset_map1_map() {
+	int slotnum, i;
+	double slot_bits, data_ack_bits, snr_db;
+	FIN(reset_map1_map);
 
 	subq_info_get(SUBQ_DATA);
 	slot_bits = nd_attrG[nodeid].data_rate * SF.slot_sec;
@@ -441,12 +446,24 @@ void set_map1_map() {
 	slotnum = (int)(ceil)(data_ack_bits / slot_bits);
 	// cut-off
 	if (slotnum > SLOT_REQ_MAX) slotnum = SLOT_REQ_MAX;
-	// printf("nodeid=%d, NODE_NAME=%s, pksize=%f, slotnum=%d\n", \
-	// 	    nodeid, nd_attrG[nodeid].name, subq_info.pksize, slotnum);
-	op_prg_odb_bkpt("set_map1_map");
+	/* collect the average SNR received from Hub */
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		// ignore self
+		if (i == nodeid) {
+			continue;
+		}
+		// same BAN ID
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			if (!IAM_BAN_HUB && nd_attrG[i].dev_mode == HUB) {
+				snr_db = hp_avg_snr(i);
+				break;
+			}
+		}
+	}
 	// reset map1_sche_map
 	map1_sche_map[nodeid].slotnum = slotnum;
 	map1_sche_map[nodeid].up = subq_info.up;
+	map1_sche_map[nodeid].snr = snr_db;
 
 	FOUT;
 }
@@ -463,18 +480,25 @@ void calc_prio_node() {
 
 static double hp_avg_snr(int nodeid_l) {
 	int i = 0;
-	double avg_snr = 0, pkt_num = 0;
-	FIN(hp_avg_snr);
+	double snr_sf_i = 0;
+	double snr_avg = 0, snr_var = 0;
+	FIN(hp_snr_avg);
 	for (i = 0; i < SF_NUM; ++i) {
-		pkt_num += sv_st_pkt_rx[nodeid_l][i].number;
-		avg_snr += sv_st_pkt_rx[nodeid_l][i].snr_db;
+		if (sv_st_pkt_rx[nodeid_l][i].number > 0) {
+			snr_sf_i = sv_st_pkt_rx[nodeid_l][i].snr_db / sv_st_pkt_rx[nodeid_l][i].number;
+		} else {
+			snr_sf_i = 0;
+		}
+		snr_avg += snr_sf_i;
+		snr_var += snr_sf_i * snr_sf_i;
 	}
-	if (pkt_num > 0) {
-		avg_snr /= pkt_num;
-	} else {
-		avg_snr = 0;
+	snr_avg /= SF_NUM;
+	snr_var = snr_var / SF_NUM - snr_avg * snr_avg;
+	if (sv_beacon_seq < SF_NUM) {
+		snr_var = 0;
 	}
-	FRET(avg_snr);
+	snr_avg -= snr_var;
+	FRET(snr_avg);
 }
 
 /*
@@ -489,7 +513,7 @@ void calc_prio_hub() {
 	double rho_i, nid_i;
 	double snr_max = 0.001, snr_min = 0, snr_avg_db;
 	int i = 0, j = 0;
-	FIN(calc_prio_node);
+	FIN(calc_prio_hub);
 	/* first traverse, get the snr_max and snr_min */
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		// ignore self
@@ -498,7 +522,7 @@ void calc_prio_hub() {
 		}
 		// same BAN ID
 		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
-			snr_avg_i = hp_avg_snr(i);
+			snr_avg_i = map1_sche_map[i].snr;
 			if (snr_avg_i > snr_max) {
 				snr_max = snr_avg_i;
 			} else if (snr_avg_i < snr_min) {
@@ -516,11 +540,14 @@ void calc_prio_hub() {
 		}
 		// same BAN ID
 		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
-			eta_i = (hp_avg_snr(i) - snr_min) / (snr_avg_db - snr_min);
+			eta_i = (map1_sche_map[i].snr - snr_min) / (snr_avg_db - snr_min);
 			eta_i = eta_i * eta_i;
 			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i;
+			printf("before sorting,node=%s,snr_i=%f,eta_i=%f,", nd_attrG[i].name,map1_sche_map[i].snr,eta_i);
+			printf("rho=%f\n", sv_rho_hub[i]);
 		}
 	}
+	op_prg_odb_bkpt("debug_rho");
 	/* sort rho by nid */
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		sv_nid_rho[i].nid = i;
@@ -593,6 +620,7 @@ void map1_scheduling() {
 		if (nd_attrG[j].bid != nd_attrG[nodeid].bid) {
 			continue;
 		}
+
 		// ignore node which do not use MAP1
 		if (map1_sche_map[j].slotnum <= 0) {
 			continue;
@@ -615,8 +643,7 @@ void map1_scheduling() {
 		// 	op_prg_odb_bkpt("debug");
 		// }
 		// printf("SF.free_slot=%d,j = %d,rho=%f,", SF.free_slot, j, sv_nid_rho[i].rho);
-		// printf("ban_id=%d,nodeid=%d,slotnum=%d.\n", \
-			    // nd_attrG[j].bid, nd_attrG[j].nid, map1_sche_map[j].slotnum);
+
 		if (SF.free_slot + map1_sche_map[j].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[j].slot_start = SF.free_slot;
 			map1_sche_map[j].slot_end = SF.free_slot + map1_sche_map[j].slotnum - 1;
@@ -625,7 +652,10 @@ void map1_scheduling() {
 			map1_sche_map[j].slot_start = 0;
 			map1_sche_map[j].slot_end = 0;
 		}
-
+		// printf("bid=%d,node=%s,slotnum=%d,", \
+		// 	    nd_attrG[j].bid, nd_attrG[j].name, map1_sche_map[j].slotnum);
+		// printf("rho=%f,", sv_nid_rho[i].rho);
+		// printf("slot_start=%d,slot_end=%d\n", map1_sche_map[j].slot_start,map1_sche_map[j].slot_end);
 	}
 	op_prg_odb_bkpt("map1_schedule");
 
@@ -1136,7 +1166,7 @@ static void wban_mac_interrupt_process() {
 					if(!IAM_BAN_HUB){
 						if (nd_attrG[nodeid].protocol_ver == PAPER1) {
 							// update map1_map slotnum
-							set_map1_map();
+							reset_map1_map();
 						}
 						wban_battery_sleep_end(mac_state);
 					}else{
