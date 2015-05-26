@@ -543,8 +543,8 @@ void calc_prio_hub() {
 			eta_i = (map1_sche_map[i].snr - snr_min) / (snr_avg_db - snr_min);
 			eta_i = eta_i * eta_i;
 			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i;
-			printf("before sorting,node=%s,snr_i=%f,eta_i=%f,", nd_attrG[i].name,map1_sche_map[i].snr,eta_i);
-			printf("rho=%f\n", sv_rho_hub[i]);
+			// printf("before sorting,node=%s,snr_i=%f,eta_i=%f,", nd_attrG[i].name,map1_sche_map[i].snr,eta_i);
+			// printf("rho=%f\n", sv_rho_hub[i]);
 		}
 	}
 	op_prg_odb_bkpt("debug_rho");
@@ -581,6 +581,7 @@ void map1_scheduling() {
 	int i = 0, j;
 	int slot_avg = 0, slot_req_total = 0, slot_req = 0;
 	int connected_node = 0;
+	int slot_seq;
 	FIN(map1_scheduling);
 	calc_prio_hub();
 	// printf("map1_scheduling...\n");
@@ -609,6 +610,9 @@ void map1_scheduling() {
 
 	// update free_slot
 	SF.free_slot = SF.first_free_slot;
+	// reset slot nid mapping
+	reset_slot_nid(SLOT_NUM);
+	reset_map1_sche_map(nd_attrG[nodeid].bid);
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		/* mapping to real nid */
 		j = sv_nid_rho[i].nid;
@@ -621,13 +625,13 @@ void map1_scheduling() {
 			continue;
 		}
 
+		printf("free_slot=%d,node=%s,slotnum=%d\n", \
+			   SF.free_slot, nd_attrG[j].name,map1_sche_map[j].slotnum);
 		// ignore node which do not use MAP1
 		if (map1_sche_map[j].slotnum <= 0) {
 			continue;
 		}
 		// allocation
-		// printf("free_slot = %d, slotnum = %d, rap1_start = %d.\n", \
-			   // SF.free_slot, map1_sche_map[i].slotnum, SF.rap1_start);
 		// cut off 
 		// if ((map1_sche_map[i].slotnum > slot_avg) && \
 		// 	(slot_req_total > SF.map1_len)) {
@@ -643,10 +647,15 @@ void map1_scheduling() {
 		// 	op_prg_odb_bkpt("debug");
 		// }
 		// printf("SF.free_slot=%d,j = %d,rho=%f,", SF.free_slot, j, sv_nid_rho[i].rho);
-
+		slot_seq = SF.free_slot;
 		if (SF.free_slot + map1_sche_map[j].slotnum <= SF.map1_end + 1) {
 			map1_sche_map[j].slot_start = SF.free_slot;
 			map1_sche_map[j].slot_end = SF.free_slot + map1_sche_map[j].slotnum - 1;
+			while (slot_seq <= map1_sche_map[j].slot_end) {
+				printf("t=%f,hub=%s,slot_seq=%d,nodeid=%d\n", op_sim_time(), nd_attrG[nodeid].name, slot_seq, j);
+				sv_slot_nid[slot_seq] = j;
+				++slot_seq;
+			}
 			SF.free_slot = map1_sche_map[j].slot_end + 1;
 		} else {
 			map1_sche_map[j].slot_start = 0;
@@ -1476,8 +1485,13 @@ static void wban_mac_interrupt_process() {
 					// printf("t=%f, NODE_NAME=%s, TX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (TX_BUSY_STAT));
 					break;
 				case RX_COLLISION_STAT:
-					// printf("t=%f, NODE_NAME=%s, COL-RX_BUSY_STAT=%f\n", op_sim_time(), nd_attrG[nodeid].name, op_stat_local_read (RX_BUSY_STAT));
-					op_prg_odb_bkpt("debug_col");
+					if (SF.IN_MAP_PHASE && IAM_BAN_HUB) {
+						printf("t=%f, node_rx=%s, ", op_sim_time(), nd_attrG[nodeid].name);
+						printf("node_col=%s, BUSY_STAT=%f\n", nd_attrG[sv_slot_nid[SF.current_slot]].name, op_stat_local_read (RX_BUSY_STAT));
+						printf("current_slot=%d,slot_nid=%d\n", SF.current_slot,sv_slot_nid[SF.current_slot]);
+						op_prg_odb_bkpt("debug_col");
+					}
+					
 					break;
 				default : break;
 			}/*end switch (op_intrpt_stat())*/
@@ -2416,6 +2430,32 @@ reset_pkt_snr_rx(int seq)
 		sv_st_pkt_rx[i][seq % SF_NUM].number = 0;
 		sv_st_pkt_rx[i][seq % SF_NUM].ppdu_kbits = 0;
 		sv_st_pkt_rx[i][seq % SF_NUM].snr_db = 0;
+	}
+	FOUT;
+	}
+
+static void
+reset_slot_nid(int seq)
+	{
+	int i;
+	FIN(reset_pkt_snr_rx);
+	for (i = 0; i < seq; ++i) {
+		sv_slot_nid[i] = 0;
+	}
+	FOUT;
+	}
+
+static void
+reset_map1_sche_map(int bid)
+	{
+	int i;
+	FIN(reset_pkt_snr_rx);
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		// same BAN ID
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			map1_sche_map[i].slot_start = 0;
+			map1_sche_map[i].slot_end = 0;
+		}
 	}
 	FOUT;
 	}

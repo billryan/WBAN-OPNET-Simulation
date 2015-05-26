@@ -10,6 +10,8 @@
 
 /* recent SF number for statistics */
 #define SF_NUM 15
+/* Maximum slot number in a Superframe */
+#define SLOT_NUM 255
 /* slot required by Node */
 #define SLOT_REQ_MAX 8
 
