@@ -3,6 +3,7 @@
 #include "headers\wban_params.h"
 #include "headers\wban_math.h"
 #include <math.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <io.h>
 #include <stdio.h>
@@ -211,7 +212,10 @@ void calc_prio_node(void);
 void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
 static double hp_avg_snr(int node_id_l);
+static double hp_avg_pkt_thr(int nodeid_l);
 static void reset_pkt_snr_rx(int seq);
-
+static void reset_slot_nid(int seq);
+static void reset_map1_sche_map(void);
+static void reset_map1_pkt_thr(int seq);
 static double hp_tx_time (int ppdu_bits);
 static void wban_init_channel(Objid nodeidL);

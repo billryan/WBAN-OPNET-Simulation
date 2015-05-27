@@ -125,6 +125,18 @@ data_stat_info	\data_stat_local[UP_ALL][DATA_STATE];
 /* statistics of packet received for SNR */
 st_pkt_rx	\sv_st_pkt_rx[NODE_ALL_MAX][SF_NUM];
 
+/* statistics of packet received for MAP */
+st_map_pkt  \sv_st_map_pkt[NODE_ALL_MAX][SF_NUM];
+
+/* record map1 mapping */
+int \sv_slot_nodeid[SLOT_NUM];
+
+/* statistics of packet collided in MAP(HUB) */
+int	\sv_map_pkt_col[NODE_ALL_MAX][SF_NUM];
+
+/* statistics of packet received in MAP(HUB) */
+int	\sv_map_pkt_thr[NODE_ALL_MAX][SF_NUM];
+
 int	\pkt_num_sf[NODE_ALL_MAX];
 
 int	\sv_beacon_seq;

@@ -211,6 +211,12 @@ typedef struct {
 	double snr_db;
 } st_pkt_rx;
 
+/* slot allocated and packet received */
+typedef struct {
+	int slot;
+	int thr;
+} st_map_pkt;
+
 /* statistic vectors */
 typedef struct {
 	Stathandle data_pkt_fail;
