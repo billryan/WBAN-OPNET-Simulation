@@ -128,6 +128,9 @@ st_pkt_rx	\sv_st_pkt_rx[NODE_ALL_MAX][SF_NUM];
 /* statistics of packet received for MAP */
 st_map_pkt  \sv_st_map_pkt[NODE_ALL_MAX][SF_NUM];
 
+/* length of MAP and valid packets number in a SF */
+st_map_pkt \sv_st_map_hub[SF_NUM];
+
 /* record map1 mapping */
 int \sv_slot_nodeid[SLOT_NUM];
 
