@@ -208,7 +208,6 @@ static void subq_data_info_get(void);
 static int wban_norm_phy_bits(Packet* frame_MPDU);
 static void phy_to_radio(Packet* frame_MPDU);
 static void reset_map1_map(void);
-void calc_prio_node(void);
 void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
 static double hp_avg_snr(int node_id_l);
