@@ -220,6 +220,7 @@ static void wban_parse_incoming_frame() {
 	int sender_id;
 	/* sender nodeid */
 	int sid;
+	int sf_slot_nodeid;
 	int ack_policy_fd;
 	// int eap_indicator_fd;
 	int frame_type_fd;
@@ -278,7 +279,7 @@ static void wban_parse_incoming_frame() {
 			// sv_st_pkt_rx[sid][sv_beacon_seq % SF_NUM].ppdu_kbits += ppdu_bits / 1000.0;
 			sv_st_pkt_rx[sid][sv_beacon_seq % SF_NUM].snr_db += snr;
 			// if (!IAM_BAN_HUB) {
-			// 	printf("node=%s,snr=%f,from_node=%s\n", nd_attrG[nodeid].name, snr, nd_attrG[sid].name);
+			// printf("node=%s,snr=%f,from_node=%s\n", nd_attrG[nodeid].name, snr, nd_attrG[sid].name);
 			// 	op_prg_odb_bkpt("snr_db");
 			// }
 			// op_prg_odb_bkpt("debug_app");
@@ -314,7 +315,10 @@ static void wban_parse_incoming_frame() {
 					// fprintf(log, "FRAME_TYPE=%d,FRAME_SUBTYPE=%d,PPDU_BITS=%d,APP_DELAY=%f\n", frame_type_fd, frame_subtype_fd, ppdu_bits, app_latency);
 					// fclose(log);
 					// op_prg_odb_bkpt("debug_app");
-
+					if (SF.IN_MAP_PHASE) {
+						sf_slot_nodeid = sv_slot_nodeid[SF.current_slot];
+						++sv_st_map_pkt[sf_slot_nodeid][sv_beacon_seq % SF_NUM].thr;
+					}
 					latency_avg[frame_subtype_fd] = (latency_avg[frame_subtype_fd] * data_stat_local[frame_subtype_fd][RCV].number + ete_delay)/(data_stat_local[frame_subtype_fd][RCV].number + 1);
 					data_stat_local[frame_subtype_fd][RCV].number += 1;
 					data_stat_local[frame_subtype_fd][RCV].ppdu_kbits += 0.001*ppdu_bits;
@@ -501,21 +505,55 @@ static double hp_avg_snr(int nodeid_l) {
 	FRET(snr_avg);
 }
 
+static double
+hp_avg_pkt_thr(int nodeid_l)
+	{
+	int i = 0;
+	double thr_sf_i = 0;
+	double thr_avg = 0, thr_var = 0;
+	FIN(hp_avg_pkt_thr);
+	for (i = 0; i < SF_NUM; ++i) {
+		if (sv_st_map_pkt[nodeid_l][i].slot > 0) {
+			thr_sf_i = 1.0 * sv_st_map_pkt[nodeid_l][i].thr / sv_st_map_pkt[nodeid_l][i].slot;
+		} else {
+			thr_sf_i = 0;
+		}
+		thr_avg += thr_sf_i;
+		thr_var += thr_sf_i * thr_sf_i;
+	}
+	thr_avg /= SF_NUM;
+	thr_var = thr_var / SF_NUM - thr_avg * thr_avg;
+	if (sv_beacon_seq < SF_NUM) {
+		thr_var = 0;
+	}
+	// thr_avg = thr_var - thr_avg;
+	FRET(thr_avg);
+	}
+
 /*
  * calculate the rho by Hub
  */
 void calc_prio_hub() {
-	double alpha = 2, beta = 0;
+	/** 
+	*	rho = UP + alpha*f(SINR) + beta*f(I) 
+	**/
+	double alpha = 2, beta = 2;
 	/* Average SNR of Node i */
-	double snr_avg_i;
-	/* eta = alpha * f(snr) */
+	double snr_avg_i, thr_avg_i, nid_i;
+	/* eta = alpha * f(SINR) */
 	double eta_i;
-	double rho_i, nid_i;
-	double snr_max = 0.001, snr_min = 0, snr_avg_db;
+	/* gamma = beta * f(I) */
+	double gamma_i;
+	/* rho = UP + alpha*f(SINR) + beta*f(I) */
+	double rho_i;
+	double pkt_thr_util[NODE_ALL_MAX];
+	double snr_max = INT_MIN, snr_min = INT_MAX, snr_avg_db;
+	double thr_max = INT_MIN, thr_min = INT_MAX, thr_avg;
 	int i = 0, j = 0;
 	FIN(calc_prio_hub);
-	/* first traverse, get the snr_max and snr_min */
+	/* obtain the snr_max(thr_max) and snr_min(thr_min) */
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		pkt_thr_util[i] = 0;
 		// ignore self
 		if (i == nodeid) {
 			continue;
@@ -525,12 +563,26 @@ void calc_prio_hub() {
 			snr_avg_i = map1_sche_map[i].snr;
 			if (snr_avg_i > snr_max) {
 				snr_max = snr_avg_i;
-			} else if (snr_avg_i < snr_min) {
+			}
+			if (snr_avg_i <= snr_min) {
 				snr_min = snr_avg_i;
+			}
+			thr_avg_i = hp_avg_pkt_thr(i);
+			pkt_thr_util[i] = thr_avg_i;
+			if (thr_avg_i > thr_max) {
+				thr_max = thr_avg_i;
+			}
+			if (thr_avg_i <= thr_min) {
+				thr_min = thr_avg_i;
 			}
 		}
 	}
 	snr_avg_db = (snr_max + snr_min) / 2;
+	thr_avg    = (thr_max + thr_min) / 2;
+	/* pre-processing avoid zero INF */
+	if (snr_avg_db == snr_min) snr_avg_db = snr_min + 0.001;
+	if (thr_avg == thr_min) thr_avg = thr_min + 0.001;
+
 	/* second traverse, get the eta([0,2]) */
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		sv_rho_hub[i] = 0;
@@ -542,9 +594,13 @@ void calc_prio_hub() {
 		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
 			eta_i = (map1_sche_map[i].snr - snr_min) / (snr_avg_db - snr_min);
 			eta_i = eta_i * eta_i;
-			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i;
-			// printf("before sorting,node=%s,snr_i=%f,eta_i=%f,", nd_attrG[i].name,map1_sche_map[i].snr,eta_i);
-			// printf("rho=%f\n", sv_rho_hub[i]);
+			gamma_i = (pkt_thr_util[i] - thr_min) / (thr_avg - thr_min);
+			gamma_i = gamma_i * gamma_i;
+			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i + beta * gamma_i;
+			printf("node=%s,", nd_attrG[i].name);
+			printf("UP=%d,", map1_sche_map[i].up);
+			printf("snr_i=%f,eta_i=%f,", map1_sche_map[i].snr,eta_i);
+			printf("gamma_i=%f,rho=%f\n", gamma_i,sv_rho_hub[i]);
 		}
 	}
 	op_prg_odb_bkpt("debug_rho");
@@ -612,7 +668,8 @@ void map1_scheduling() {
 	SF.free_slot = SF.first_free_slot;
 	// reset slot nid mapping
 	reset_slot_nid(SLOT_NUM);
-	reset_map1_sche_map(nd_attrG[nodeid].bid);
+	reset_map1_sche_map();
+	reset_map1_pkt_thr(sv_beacon_seq);
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		/* mapping to real nid */
 		j = sv_nid_rho[i].nid;
@@ -624,14 +681,17 @@ void map1_scheduling() {
 		if (nd_attrG[j].bid != nd_attrG[nodeid].bid) {
 			continue;
 		}
-
-		printf("free_slot=%d,node=%s,slotnum=%d\n", \
-			   SF.free_slot, nd_attrG[j].name,map1_sche_map[j].slotnum);
 		// ignore node which do not use MAP1
 		if (map1_sche_map[j].slotnum <= 0) {
 			continue;
 		}
+		// exceeding map end
+		if (SF.free_slot > SF.map1_end) {
+			continue;
+		}
 		// allocation
+		// printf("free_slot=%d,node=%s,slotnum=%d\n", \
+		// 	   SF.free_slot, nd_attrG[j].name,map1_sche_map[j].slotnum);
 		// cut off 
 		// if ((map1_sche_map[i].slotnum > slot_avg) && \
 		// 	(slot_req_total > SF.map1_len)) {
@@ -652,14 +712,15 @@ void map1_scheduling() {
 			map1_sche_map[j].slot_start = SF.free_slot;
 			map1_sche_map[j].slot_end = SF.free_slot + map1_sche_map[j].slotnum - 1;
 			while (slot_seq <= map1_sche_map[j].slot_end) {
-				printf("t=%f,hub=%s,slot_seq=%d,nodeid=%d\n", op_sim_time(), nd_attrG[nodeid].name, slot_seq, j);
-				sv_slot_nid[slot_seq] = j;
+				// printf("t=%f,hub=%s,slot_seq=%d,nodeid=%d\n", op_sim_time(), nd_attrG[nodeid].name, slot_seq, j);
+				sv_slot_nodeid[slot_seq] = j;
+				++sv_st_map_pkt[j][sv_beacon_seq % SF_NUM].slot;
 				++slot_seq;
 			}
 			SF.free_slot = map1_sche_map[j].slot_end + 1;
 		} else {
-			map1_sche_map[j].slot_start = 0;
-			map1_sche_map[j].slot_end = 0;
+			map1_sche_map[j].slot_start = SF.free_slot;
+			map1_sche_map[j].slot_end = SF.map1_end;
 		}
 		// printf("bid=%d,node=%s,slotnum=%d,", \
 		// 	    nd_attrG[j].bid, nd_attrG[j].name, map1_sche_map[j].slotnum);
@@ -707,7 +768,7 @@ static void wban_send_beacon_frame () {
 	// op_pk_nfd_set (beacon_MPDU, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
 	op_pk_nfd_set (beacon_MPDU, "Recipient ID", BROADCAST_NID);
 	op_pk_nfd_set (beacon_MPDU, "Sender ID", mac_attr.sendid);
-	op_pk_nfd_set (beacon_MPDU, "BAN ID", mac_attr.bid);
+	op_pk_nfd_set (beacon_MPDU, "BAN ID",  mac_attr.bid);
 	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
 
 	// update the superframe parameters
@@ -1179,14 +1240,19 @@ static void wban_mac_interrupt_process() {
 						}
 						wban_battery_sleep_end(mac_state);
 					}else{
-						for (nodeid_i = 0; nodeid_i < NODE_ALL_MAX; ++nodeid_i) {
-							if (nodeid == nodeid_i) {
+						printf("beacon_seq=%d,hub=%s\n", sv_beacon_seq,nd_attrG[nodeid].name);
+						for (i = 0; i < NODE_ALL_MAX; ++i) {
+							if (nodeid == i) {
 								continue;
 							}
-							if (map1_sche_map[nodeid_i].bid != map1_sche_map[nodeid].bid) {
-								continue;
+							if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+								printf("node=%s, ", nd_attrG[i].name);
+								printf("slot allocated=%d, ", sv_st_map_pkt[i][sv_beacon_seq % SF_NUM].slot);
+								printf("pkt_thr=%d, ", sv_st_map_pkt[i][sv_beacon_seq % SF_NUM].thr);
+								printf("utility=%f\n", hp_avg_pkt_thr(i));
 							}
 						}
+						op_prg_odb_bkpt("pkt_thr");
 						
 						
 						/* value for the next superframe. End Device will obtain this value from beacon */
@@ -1486,9 +1552,9 @@ static void wban_mac_interrupt_process() {
 					break;
 				case RX_COLLISION_STAT:
 					if (SF.IN_MAP_PHASE && IAM_BAN_HUB) {
-						printf("t=%f, node_rx=%s, ", op_sim_time(), nd_attrG[nodeid].name);
-						printf("node_col=%s, BUSY_STAT=%f\n", nd_attrG[sv_slot_nid[SF.current_slot]].name, op_stat_local_read (RX_BUSY_STAT));
-						printf("current_slot=%d,slot_nid=%d\n", SF.current_slot,sv_slot_nid[SF.current_slot]);
+						// printf("t=%f, node_rx=%s, ", op_sim_time(), nd_attrG[nodeid].name);
+						// printf("node_col=%s, BUSY_STAT=%f\n", nd_attrG[sv_slot_nodeid[SF.current_slot]].name, op_stat_local_read (RX_COLLISION_STAT));
+						// printf("current_slot=%d,slot_nid=%d\n", SF.current_slot,sv_slot_nodeid[SF.current_slot]);
 						op_prg_odb_bkpt("debug_col");
 					}
 					
@@ -2438,23 +2504,38 @@ static void
 reset_slot_nid(int seq)
 	{
 	int i;
-	FIN(reset_pkt_snr_rx);
+	FIN(reset_slot_nid);
 	for (i = 0; i < seq; ++i) {
-		sv_slot_nid[i] = 0;
+		sv_slot_nodeid[i] = 0;
 	}
 	FOUT;
 	}
 
 static void
-reset_map1_sche_map(int bid)
+reset_map1_sche_map()
+	{
+	int i;
+	FIN(reset_map1_sche_map);
+	for (i = 0; i < NODE_ALL_MAX; ++i) {
+		// same BAN ID
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			map1_sche_map[i].slot_start = 0;
+			map1_sche_map[i].slot_end = 0;
+		}
+	}
+	FOUT;
+	}
+
+static void
+reset_map1_pkt_thr(int seq)
 	{
 	int i;
 	FIN(reset_pkt_snr_rx);
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		// same BAN ID
 		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
-			map1_sche_map[i].slot_start = 0;
-			map1_sche_map[i].slot_end = 0;
+			sv_st_map_pkt[i][seq % SF_NUM].slot = 0;
+			sv_st_map_pkt[i][seq % SF_NUM].thr = 0;
 		}
 	}
 	FOUT;
