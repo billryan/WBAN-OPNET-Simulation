@@ -318,6 +318,7 @@ static void wban_parse_incoming_frame() {
 					if (SF.IN_MAP_PHASE) {
 						sf_slot_nodeid = sv_slot_nodeid[SF.current_slot];
 						++sv_st_map_pkt[sf_slot_nodeid][sv_beacon_seq % SF_NUM].thr;
+						++sv_st_map_hub[sv_beacon_seq % SF_NUM].thr;
 					}
 					latency_avg[frame_subtype_fd] = (latency_avg[frame_subtype_fd] * data_stat_local[frame_subtype_fd][RCV].number + ete_delay)/(data_stat_local[frame_subtype_fd][RCV].number + 1);
 					data_stat_local[frame_subtype_fd][RCV].number += 1;
@@ -482,7 +483,9 @@ void calc_prio_node() {
 	FOUT;
 }
 
-static double hp_avg_snr(int nodeid_l) {
+static double
+hp_avg_snr(int nodeid_l)
+	{
 	int i = 0;
 	double snr_sf_i = 0;
 	double snr_avg = 0, snr_var = 0;
@@ -503,7 +506,7 @@ static double hp_avg_snr(int nodeid_l) {
 	}
 	snr_avg -= snr_var;
 	FRET(snr_avg);
-}
+	}
 
 static double
 hp_avg_pkt_thr(int nodeid_l)
@@ -629,47 +632,85 @@ void calc_prio_hub() {
 	FOUT;
 }
 
-/*-----
- * 
- *
- */
-void map1_scheduling() {
-	int i = 0, j;
-	int slot_avg = 0, slot_req_total = 0, slot_req = 0;
-	int connected_node = 0;
-	int slot_seq;
-	FIN(map1_scheduling);
-	calc_prio_hub();
-	// printf("map1_scheduling...\n");
-	// disable map1
-	if (SF.rap1_start == 0) {
+static void
+resize_map_len()
+	{
+	int i;
+	int map_slots = 0, map_thr = 0;
+	int slot_req_total = 0;
+	double map_util = 0, epsilon1 = 0.70, epsilon2 = 0.85;
+	int miu = 2, rap_start_min = 3, rap_start_max = 255;
+	FIN(resize_map_len);
+	// resize MAP after SF_NUM SF
+	if (sv_beacon_seq < SF_NUM) {
 		FOUT;
 	}
-
-	// printf("NODE_NAME=%s, nodeid=%d.\n", nd_attrG[nodeid].name, nodeid);
-	// calculate the connected node
-	connected_node = 0, slot_req_total = 0;
+	for (i = 0; i < SF_NUM; ++i) {
+		map_slots += sv_st_map_hub[i].slot;
+		map_thr   += sv_st_map_hub[i].thr;
+	}
+	printf("map_slots=%d,map_thr=%d\n", map_slots, map_thr);
+	// MAP utilization
+	if (map_slots > 0) {
+		map_util = 1.0 * map_thr / map_slots;
+	} else {
+		map_util = 0;
+	}
+	printf("map_util=%f,", map_util);
+	printf("before,rap1_start=%d,", SF.rap1_start);
+	// resize MAP length
+	if (map_util > epsilon2) {
+		SF.rap1_start += miu;
+	} else if (map_util < epsilon1) {
+		SF.rap1_start -= miu;
+	}
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		// ignore self
 		if (i == nodeid) {
 			continue;
 		}
 		// same BAN ID
-		if (map1_sche_map[i].bid == map1_sche_map[nodeid].bid) {
-			++connected_node;
-			if (map1_sche_map[i].slotnum > 0) {
-				slot_req_total += map1_sche_map[i].slotnum;
-			}
+		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+			slot_req_total += map1_sche_map[i].slotnum;
 		}
 	}
-	slot_avg = slot_req_total / connected_node;
+	printf("slot_req_total=%d,", slot_req_total);
+	// slot require by node
+	if (SF.first_free_slot + slot_req_total < SF.rap1_start) {
+		SF.rap1_start = SF.first_free_slot + slot_req_total;
+	}
+	// post processing for MAP length
+	rap_start_max = SF.SD - 4;
+	if (SF.rap1_start > rap_start_max) SF.rap1_start = rap_start_max;
+	if (SF.rap1_start < rap_start_min) SF.rap1_start = rap_start_min;
+	printf("after,rap1_start=%d\n", SF.rap1_start);
+	beacon_attr.rap1_start = SF.rap1_start;
 
+	FOUT;
+	}
+
+/*-----
+ * 
+ *
+ */
+void map1_scheduling() {
+	int i = 0, j;
+	int slot_seq;
+	FIN(map1_scheduling);
+	calc_prio_hub();
+	// disable map1
+	if (SF.rap1_start == 0) {
+		FOUT;
+	}
 	// update free_slot
 	SF.free_slot = SF.first_free_slot;
 	// reset slot nid mapping
 	reset_slot_nid(SLOT_NUM);
 	reset_map1_sche_map();
 	reset_map1_pkt_thr(sv_beacon_seq);
+	/* reset MAP1 stat */
+	sv_st_map_hub[sv_beacon_seq % SF_NUM].slot = SF.map1_end - SF.free_slot + 1;
+	sv_st_map_hub[sv_beacon_seq % SF_NUM].thr = 0;
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		/* mapping to real nid */
 		j = sv_nid_rho[i].nid;
@@ -690,8 +731,8 @@ void map1_scheduling() {
 			continue;
 		}
 		// allocation
-		// printf("free_slot=%d,node=%s,slotnum=%d\n", \
-		// 	   SF.free_slot, nd_attrG[j].name,map1_sche_map[j].slotnum);
+		printf("free_slot=%d,node=%s,slotnum=%d\n", \
+			   SF.free_slot, nd_attrG[j].name,map1_sche_map[j].slotnum);
 		// cut off 
 		// if ((map1_sche_map[i].slotnum > slot_avg) && \
 		// 	(slot_req_total > SF.map1_len)) {
@@ -721,11 +762,12 @@ void map1_scheduling() {
 		} else {
 			map1_sche_map[j].slot_start = SF.free_slot;
 			map1_sche_map[j].slot_end = SF.map1_end;
+			SF.free_slot = map1_sche_map[j].slot_end + 1;
 		}
 		// printf("bid=%d,node=%s,slotnum=%d,", \
 		// 	    nd_attrG[j].bid, nd_attrG[j].name, map1_sche_map[j].slotnum);
 		// printf("rho=%f,", sv_nid_rho[i].rho);
-		// printf("slot_start=%d,slot_end=%d\n", map1_sche_map[j].slot_start,map1_sche_map[j].slot_end);
+		printf("slot_start=%d,slot_end=%d\n", map1_sche_map[j].slot_start,map1_sche_map[j].slot_end);
 	}
 	op_prg_odb_bkpt("map1_schedule");
 
@@ -1241,6 +1283,7 @@ static void wban_mac_interrupt_process() {
 						wban_battery_sleep_end(mac_state);
 					}else{
 						printf("beacon_seq=%d,hub=%s\n", sv_beacon_seq,nd_attrG[nodeid].name);
+
 						for (i = 0; i < NODE_ALL_MAX; ++i) {
 							if (nodeid == i) {
 								continue;
@@ -1252,9 +1295,10 @@ static void wban_mac_interrupt_process() {
 								printf("utility=%f\n", hp_avg_pkt_thr(i));
 							}
 						}
+						if (nd_attrG[nodeid].protocol_ver == PAPER1) {
+							resize_map_len();
+						}
 						op_prg_odb_bkpt("pkt_thr");
-						
-						
 						/* value for the next superframe. End Device will obtain this value from beacon */
 						wban_send_beacon_frame();
 					}
@@ -2530,7 +2574,7 @@ static void
 reset_map1_pkt_thr(int seq)
 	{
 	int i;
-	FIN(reset_pkt_snr_rx);
+	FIN(reset_map1_pkt_thr);
 	for (i = 0; i < NODE_ALL_MAX; ++i) {
 		// same BAN ID
 		if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {

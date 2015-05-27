@@ -217,5 +217,6 @@ static void reset_pkt_snr_rx(int seq);
 static void reset_slot_nid(int seq);
 static void reset_map1_sche_map(void);
 static void reset_map1_pkt_thr(int seq);
+static void resize_map_len(void);
 static double hp_tx_time (int ppdu_bits);
 static void wban_init_channel(Objid nodeidL);
