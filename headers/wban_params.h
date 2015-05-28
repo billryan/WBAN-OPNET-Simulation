@@ -20,8 +20,6 @@
 #define BEACON_PPDU_BITS   523
 #define pMaxFrameBodyLength_Bits (255*8) //0-255 octets
 
-#define I_ACK_TX_TIME (I_ACK_PPDU_BITS / 1000 * nd_attrG[nodeid].data_rate)
-
 /** PHY Layer constatns		**/
 // 802.15.6 PHY-dependent MAC sublayer for narrowband PHY
 // Symbol Rate
@@ -149,7 +147,7 @@ enum SF_STATES {
     SF_FREE_RX_ACCESS = 1013
 };
 
-enum AcknowledgementPolicy_type {
+enum ack_type {
     N_ACK_POLICY = 1,
     I_ACK_POLICY = 2,
     L_ACK_POLICY = 3,

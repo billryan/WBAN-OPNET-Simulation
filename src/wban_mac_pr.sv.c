@@ -61,14 +61,6 @@ char	\log_name[250];
 /* Log level */
 int	\log_level;
 
-/* the statistic vector */
-wban_statistic_vector	\stat_vec;
-
-wban_global_statistic_vector	\stat_vecG;
-
-/* Statistic handle for the total number of generated beacons. */
-Stathandle	\beacon_frame_hndl;
-
 /* sequence number of the received packet */
 int	\ack_seq_num;
 
@@ -120,7 +112,7 @@ double	\sv_t_rx_end;
 double	\sv_t_rx_duration;
 
 /* Stat for Data */
-data_stat_info	\data_stat_local[UP_ALL][DATA_STATE];
+data_stat_info	\sv_data_stat[UP_ALL][DATA_STATE];
 
 /* statistics of packet received for SNR */
 st_pkt_rx	\sv_st_pkt_rx[NODE_ALL_MAX][SF_NUM];
