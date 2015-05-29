@@ -261,7 +261,7 @@ wban_parse_incoming_frame ()
 	// int eap_indicator_fd;
 	int frame_type_fd;
 	int frame_subtype_fd, up;
-	int beacon2_enabled_fd;
+	// int beacon2_enabled_fd;
 	int sequence_number_fd;
 	// int inactive_fd;
 	int ppdu_bits;
@@ -295,7 +295,7 @@ wban_parse_incoming_frame ()
 			op_pk_nfd_get (frame_MPDU, "Frame Subtype", &frame_subtype_fd);
 			op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy_fd);
 			// op_pk_nfd_get (frame_MPDU, "EAP Indicator", &eap_indicator_fd);
-			op_pk_nfd_get (frame_MPDU, "B2", &beacon2_enabled_fd);
+			// op_pk_nfd_get (frame_MPDU, "B2", &beacon2_enabled_fd);
 			op_pk_nfd_get (frame_MPDU, "Sequence Number", &sequence_number_fd);
 			// op_pk_nfd_get (frame_MPDU, "Inactive", &inactive_fd);
 			if (!is_packet_for_me(frame_MPDU, ban_id, recipient_id, sender_id)) {
@@ -529,7 +529,7 @@ hp_avg_snr(int nodeid_l)
 	}
 	snr_avg /= SF_NUM;
 	snr_var = snr_var / SF_NUM - snr_avg * snr_avg;
-	if (sv_beacon_seq < SF_NUM) {
+	if ((int)op_sim_time() < 1) {
 		snr_var = 0;
 	}
 	snr_avg -= snr_var;
@@ -554,7 +554,7 @@ hp_avg_pkt_thr(int nodeid_l)
 	}
 	thr_avg /= SF_NUM;
 	thr_var = thr_var / SF_NUM - thr_avg * thr_avg;
-	if (sv_beacon_seq < SF_NUM) {
+	if ((int)op_sim_time() < 1) {
 		thr_var = 0;
 	}
 	// thr_avg = thr_var - thr_avg;
@@ -797,7 +797,7 @@ wban_send_beacon_frame ()
 	beacon_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
 	op_pk_nfd_set (beacon_MPDU, "Ack Policy", N_ACK_POLICY);
-	op_pk_nfd_set (beacon_MPDU, "EAP Indicator", 1); // EAP1 enabled
+	// op_pk_nfd_set (beacon_MPDU, "EAP Indicator", 1); // EAP1 enabled
 	op_pk_nfd_set (beacon_MPDU, "Frame Subtype", BEACON);
 	op_pk_nfd_set (beacon_MPDU, "Frame Type", MANAGEMENT);
 	// op_pk_nfd_set (beacon_MPDU, "B2", 1); // beacon2 enabled
@@ -851,8 +851,8 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	{
 	Packet* beacon_MSDU_rx;
 	int rcv_sender_id;
-	int eap_indicator_fd;
-	int beacon2_enabled_fd;
+	// int eap_indicator_fd;
+	// int beacon2_enabled_fd;
 	double beacon_frame_tx_time;
 	
 	/* Stack tracing enrty point */
@@ -861,8 +861,8 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	op_pk_nfd_get_pkt (beacon_MPDU_rx, "MAC Frame Payload", &beacon_MSDU_rx);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sender ID", &rcv_sender_id);
 	op_pk_nfd_get (beacon_MPDU_rx, "Sequence Number", &sv_beacon_seq);
-	op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
-	op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
+	// op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
+	// op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
 	if (nd_attrG[nodeid].bid + 15 != rcv_sender_id) {
 		FOUT;
 	}
@@ -1169,10 +1169,10 @@ wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_up, enum ack_type ac
 	/* create a MAC frame (MPDU) that encapsulates the data_frame payload (MSDU) */
 	data_frame_mpdu = op_pk_create_fmt ("wban_frame_MPDU_format");
 	op_pk_nfd_set (data_frame_mpdu, "Ack Policy", ack_policy);
-	op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
+	// op_pk_nfd_set (data_frame_mpdu, "EAP Indicator", 1); // EAP1 enabled
 	op_pk_nfd_set (data_frame_mpdu, "Frame Subtype", user_priority);
 	op_pk_nfd_set (data_frame_mpdu, "Frame Type", DATA);
-	op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
+	// op_pk_nfd_set (data_frame_mpdu, "B2", 1); // beacon2 enabled
 	op_pk_nfd_set (data_frame_mpdu, "Sequence Number", seq_num);
 	op_pk_nfd_set (data_frame_mpdu, "Inactive", beacon_attr.inactive_duration); // beacon and beacon2 frame used
 	op_pk_nfd_set (data_frame_mpdu, "Recipient ID", dest_id);
@@ -1655,7 +1655,7 @@ static void
 wban_extract_data_frame (Packet* frame_MPDU)
 	{
 	int ack_policy;
-	Packet* frame_MSDU;
+	// Packet* frame_MSDU;
 	// double ete_delay;
 	// int pk_size;
 	int slotnum;
@@ -1668,7 +1668,7 @@ wban_extract_data_frame (Packet* frame_MPDU)
 	op_pk_nfd_get (frame_MPDU, "Sender ID", &sender_id);
 	op_pk_nfd_get (frame_MPDU, "Frame Subtype", &up_prio);
 	op_pk_nfd_get (frame_MPDU, "slotnum", &slotnum);
-	op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
+	// op_pk_nfd_get_pkt (frame_MPDU, "MAC Frame Payload", &frame_MSDU);
 	/* check if any ACK is requested */
 	switch (ack_policy) {
 		case N_ACK_POLICY:
