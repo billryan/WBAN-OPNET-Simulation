@@ -19,7 +19,7 @@ wban_mac_init ()
 	int i, j;
 	/* APP Parameters */
 	// char str_int[2] = "", up_i_para[80] = "";
-	char up_msdu_inter[20] = "", up_msdu_size[20] = "";
+	char up_msdu_inter[50] = "", up_msdu_size[50] = "";
 	double up_start_t = -1, up_stop_t = -1;
 	// double t_send_beacon;
 
