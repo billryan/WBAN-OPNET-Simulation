@@ -15,8 +15,12 @@ wban_mac_init ()
 	Objid conn_req_attr_id;
 	Objid mac_attr_comp_id;
 	Objid mac_attr_id;
-	Objid srcid;
+	Objid appid, srcid, src_comp_id;
 	int i, j;
+	/* APP Parameters */
+	// char str_int[2] = "", up_i_para[80] = "";
+	char up_msdu_inter[20] = "", up_msdu_size[20] = "";
+	double up_start_t = -1, up_stop_t = -1;
 	// double t_send_beacon;
 
 	/* Stack tracing enrty point */
@@ -45,10 +49,10 @@ wban_mac_init ()
 	}
 	/* get the value of protocol version */
 	op_ima_obj_attr_get (nodeid, "Protocol Version", &nd_attrG[nodeid].protocol_ver);
-	/* obtain object ID of the Traffic Source node */
-	srcid = op_id_from_name(nodeid, OPC_OBJTYPE_PROC, "Traffic Source_UP");
+	/* obtain object ID of the Traffic Source node (APP Layer) */
+	appid = op_id_from_name(nodeid, OPC_OBJTYPE_PROC, "Traffic Source_UP");
 	/* obtain destination ID for data transmission */
-	op_ima_obj_attr_get (srcid, "Destination ID", &nd_attrG[nodeid].dest_id);
+	op_ima_obj_attr_get (appid, "Destination ID", &nd_attrG[nodeid].dest_id);
 	/* get the MAC settings */
 	op_ima_obj_attr_get (mac_attr.objid, "MAC Attributes", &mac_attr_id);
 	mac_attr_comp_id = op_topo_child (mac_attr_id, OPC_OBJTYPE_GENERIC, 0);
@@ -101,6 +105,33 @@ wban_mac_init ()
 		current_free_connected_NID++;
 		map1_sche_map[nodeid].nid = mac_attr.sendid;
 	}
+	/* obtain the APP Layer Parameters */
+	for (i = 0; i < UP_ALL; ++i) {
+		char str_int[2] = "", up_i_para[80] = "";
+		sprintf(str_int, "%d", i); /* convert int to str */
+		strcat (up_i_para, "User Priority ");
+		strcat (up_i_para, str_int);
+		strcat (up_i_para, " Traffic Parameters");
+		op_ima_obj_attr_get (appid, up_i_para, &srcid); 
+		src_comp_id = op_topo_child (srcid, OPC_OBJTYPE_GENERIC, 0);
+		/* Read the values of the up-MSDU generation parameters, 
+		 * i.e. the attribute values of the surrounding module. */
+		op_ima_obj_attr_get (src_comp_id, "MSDU Interval Time", up_msdu_inter);
+		op_ima_obj_attr_get (src_comp_id, "MSDU Size",          up_msdu_size);
+		op_ima_obj_attr_get (src_comp_id, "Start Time",         &up_start_t);
+		op_ima_obj_attr_get (src_comp_id, "Stop Time",          &up_stop_t);
+		log = fopen(log_name, "a");
+		fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+		fprintf(log, "nodeid=%d,init,src,nid=%d,", nodeid, mac_attr.sendid);
+		fprintf(log, "up=%d,", i);
+		fprintf(log, "msdu_interval_time=%s,msdu_size=%s,", up_msdu_inter, up_msdu_size);
+		fprintf(log, "start_time=%f,stop_time=%f\n", up_start_t, up_stop_t);
+		fclose(log);
+		// printf("UP=%d,", i);
+		// printf("MSDU Interval Time=%s,MSDU Size=%s,", up_msdu_inter, up_msdu_size);
+		// printf("Start Time=%f,Stop Time=%f\n", up_start_t, up_stop_t);
+	}
+
 	SF.SLEEP = OPC_TRUE;
 	SF.ENABLE_TX_NEW = OPC_FALSE;
 	pkt_to_be_sent.enable = OPC_FALSE;
@@ -776,7 +807,6 @@ wban_send_beacon_frame ()
 	op_pk_nfd_set (beacon_MPDU, "Sender ID", mac_attr.sendid);
 	op_pk_nfd_set (beacon_MPDU, "BAN ID",  mac_attr.bid);
 	op_pk_nfd_set_pkt (beacon_MPDU, "MAC Frame Payload", beacon_MSDU); // wrap beacon payload (MSDU) in MAC Frame (MPDU)
-
 	// update the superframe parameters
 	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
 	SF.BI = beacon_attr.beacon_period_length * (1+ beacon_attr.inactive_duration); // active and inactive superframe
@@ -788,20 +818,19 @@ wban_send_beacon_frame ()
 	SF.BI_Boundary = op_pk_creation_time_get (beacon_MPDU);
 	ppdu_bits = op_pk_total_size_get(beacon_MPDU) + MAC2PHY_BITS;
 	if(init_flag){
-		log = fopen(log_name, "a");
-		fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,INIT,NID=%d,", op_sim_time(), nd_attrG[nodeid].name, nodeid, mac_attr.sendid);
-		fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length);
-		fclose(log);
+		// log = fopen(log_name, "a");
+		// fprintf(log, "t=%f,node_name=%s,nodeid=%d,init,nid=%d,", op_sim_time(), nd_attrG[nodeid].name, nodeid, mac_attr.sendid);
+		// fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length);
+		// fclose(log);
 		init_flag = OPC_FALSE;
 		SF.slot_sec = (pAllocationSlotMin + beacon_attr.allocation_slot_length*pAllocationSlotResolution) * 0.000001;
 		// printf("\nt=%f,NODE_NAME=%s,NID=%d,INIT,MAC_STATE=%d\n", op_sim_time(), nd_attrG[nodeid].name, mac_attr.sendid, mac_state);
 		// printf("\t  SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// printf("\t  allocation_slot_length=%d,SF.slot_sec=%f\n", beacon_attr.allocation_slot_length, SF.slot_sec);
-		op_prg_odb_bkpt("init");
+		// op_prg_odb_bkpt("init");
 		SF.first_free_slot = 1 + (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
 	}
 	SF.current_slot = (int)(hp_tx_time(ppdu_bits) / SF.slot_sec);
-
 	/* send the MPDU to PHY and calculate the energy consuming */
 	wban_send_mac_pk_to_phy(beacon_MPDU);
 	wban_schedule_next_beacon();
@@ -1557,38 +1586,48 @@ wban_mac_interrupt_process()
 			subq_data_info_get();
 			log = fopen(log_name, "a");
 			for(i=0; i<UP_ALL; i++){
+				for (j = 0; j < DATA_STATE; ++j) {
+					fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+					fprintf(log, "nodeid=%d,stat,sv_data,", nodeid);
+					fprintf(log, "up=%d,state=%d,", i, j);
+					fprintf(log, "number=%f,", sv_data_stat[i][j].number);
+					fprintf(log, "ppdu_kbits=%f\n", sv_data_stat[i][j].ppdu_kbits);
+					if (IAM_BAN_HUB) {
+						fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+						fprintf(log, "nodeid=%d,stat,hb_data,", nodeid);
+						fprintf(log, "up=%d,state=%d,", i, j);
+						fprintf(log, "number=%f,", hb_data_stat[i][j].number);
+						fprintf(log, "ppdu_kbits=%f\n", hb_data_stat[i][j].ppdu_kbits);
+					}
+				}
 				if(IAM_BAN_HUB){
-					fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,STAT,LATENCY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
-					fprintf(log, "UP=%d,LATENCY_AVG=%f\n", i, latency_avg[i]);
+					fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+					fprintf(log, "nodeid=%d,stat,latency,", nodeid);
+					fprintf(log, "up=%d,latency_avg=%f\n", i, latency_avg[i]);
 					data_pkt_num += sv_data_stat[i][RCV].number;
 					data_pkt_ppdu_kbits += sv_data_stat[i][RCV].ppdu_kbits;
 					data_pkt_latency_total += latency_avg[i]*sv_data_stat[i][RCV].number;
 				}
-				for(j=0; j<DATA_STATE; j++){
-					fprintf(log, "t=%f,nodeid=%d,STAT,DATA,", op_sim_time(), nodeid);
-					if(IAM_BAN_HUB){
-						fprintf(log, "UP=%d,STATE=%d,NUMBER=%f,PPDU_KBITS=%f\n", i,j,hb_data_stat[i][j].number,hb_data_stat[i][j].ppdu_kbits);
-					}else{
-						fprintf(log, "UP=%d,STATE=%d,NUMBER=%f,PPDU_KBITS=%f\n", i,j,sv_data_stat[i][j].number,sv_data_stat[i][j].ppdu_kbits);
-					}
-				}
 			}
 			if(IAM_BAN_HUB){
 				thput_msdu_kbps = (data_pkt_ppdu_kbits - 0.001*data_pkt_num*HEADER_BITS)/(op_sim_time());
-				fprintf(log, "t=%f,nodeid=%d,STAT,THROUGHPUT,RCV_MSDU_kbps=%f\n", op_sim_time(), nodeid, thput_msdu_kbps);
-				fprintf(log, "t=%f,nodeid=%d,STAT,THROUGHPUT,RCV_PPDU_kbps=%f\n", op_sim_time(), nodeid, data_pkt_ppdu_kbits/(op_sim_time()));
+				fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+				fprintf(log, "nodeid=%d,stat,throughput,", nodeid);
+				fprintf(log, "rcv_msdu_kbps=%f,", thput_msdu_kbps);
+				fprintf(log, "rcv_ppdu_kbps=%f\n", data_pkt_ppdu_kbits / op_sim_time());
 				/* UP=8 means the UP in total */
 				data_pkt_latency_avg = data_pkt_latency_total / data_pkt_num;
-				fprintf(log, "t=%f,NODE_NAME=%s,nodeid=%d,STAT,LATENCY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
-				fprintf(log, "UP=8,LATENCY_AVG=%f\n", data_pkt_latency_avg);
+				fprintf(log, "t=%f,node_name=%s,nodeid=%d,stat,latency,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
+				fprintf(log, "up=8,latency_avg=%f\n", data_pkt_latency_avg);
 			}
 			/* Energy Statistics */
-			fprintf(log, "t=%f,NODE_NAME=%s,NODE_ID=%d,STAT,ENERGY,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
-			fprintf(log, "TX=%f,RX=%f,", bat_attrG[nodeid].engy_tx, bat_attrG[nodeid].engy_rx);
-			fprintf(log, "CCA=%f,IDLE=%f,", bat_attrG[nodeid].engy_cca, bat_attrG[nodeid].engy_idle);
-			fprintf(log, "SLEEP=%f,", bat_attrG[nodeid].engy_sleep);
-			fprintf(log, "REMAINNING=%f,", bat_attrG[nodeid].engy_remainning);
-			fprintf(log, "TOTAL=%f\n", bat_attrG[nodeid].engy_consumed);
+			fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+			fprintf(log, "node_id=%d,stat,energy,", nodeid);
+			fprintf(log, "tx=%f,rx=%f,", bat_attrG[nodeid].engy_tx, bat_attrG[nodeid].engy_rx);
+			fprintf(log, "cca=%f,idle=%f,", bat_attrG[nodeid].engy_cca, bat_attrG[nodeid].engy_idle);
+			fprintf(log, "sleep=%f,", bat_attrG[nodeid].engy_sleep);
+			fprintf(log, "remainning=%f,", bat_attrG[nodeid].engy_remainning);
+			fprintf(log, "total=%f\n", bat_attrG[nodeid].engy_consumed);
 			fclose(log);
 			// op_prg_odb_bkpt("debug_end");
 			// wban_battery_end();
