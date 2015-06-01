@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 from sys import argv
 import re
 
@@ -18,13 +19,16 @@ runsim_header = '''#!/usr/bin/sh
 
 
 def runsim_from_ef(ef, seed):
-    net_name = ef[:ef.find('-DES-')]
+    ef_real = os.path.basename(ef)
+    net_name = ef_real[:ef_real.find('-DES-')]
     ef_prefix = net_name + '-' + seed + '-DES-'
-    runsim_fn = "runsim_" + net_name + '-' + seed + '.sh'
+    runsim_dir = "runsim_src/"
+    runsim_fn = runsim_dir + "runsim_" + net_name + '-' + seed + '.sh'
     with open(runsim_fn, 'w') as runsim_fp:
         runsim_fp.writelines(runsim_header)
     for i, item in enumerate(msdu_interval):
         ef_fn = 'p' + ef_prefix + format(i + 1, '02d') + '.ef'
+        ef_fn = os.path.join('ef_src', ef_fn)
         runsim_line = 'op_runsim -net_name ' + net_name + \
             ' -noprompt -m32 -ef ' + ef_fn[:-3] + \
             ' -DESinfo ' + ef_fn[:-3] + \
