@@ -122,6 +122,7 @@ wban_mac_init ()
 		op_ima_obj_attr_get (src_comp_id, "Stop Time",          &up_stop_t);
 		log = fopen(log_name, "a");
 		fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+		fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 		fprintf(log, "nodeid=%d,init,src,nid=%d,", nodeid, mac_attr.sendid);
 		fprintf(log, "up=%d,", i);
 		fprintf(log, "msdu_interval_time=%s,msdu_size=%s,", up_msdu_inter, up_msdu_size);
@@ -1588,12 +1589,14 @@ wban_mac_interrupt_process()
 			for(i=0; i<UP_ALL; i++){
 				for (j = 0; j < DATA_STATE; ++j) {
 					fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+					fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 					fprintf(log, "nodeid=%d,stat,sv_data,", nodeid);
 					fprintf(log, "up=%d,state=%d,", i, j);
 					fprintf(log, "number=%f,", sv_data_stat[i][j].number);
 					fprintf(log, "ppdu_kbits=%f\n", sv_data_stat[i][j].ppdu_kbits);
 					if (IAM_BAN_HUB) {
 						fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+						fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 						fprintf(log, "nodeid=%d,stat,hb_data,", nodeid);
 						fprintf(log, "up=%d,state=%d,", i, j);
 						fprintf(log, "number=%f,", hb_data_stat[i][j].number);
@@ -1602,6 +1605,7 @@ wban_mac_interrupt_process()
 				}
 				if(IAM_BAN_HUB){
 					fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+					fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 					fprintf(log, "nodeid=%d,stat,latency,", nodeid);
 					fprintf(log, "up=%d,latency_avg=%f\n", i, latency_avg[i]);
 					data_pkt_num += sv_data_stat[i][RCV].number;
@@ -1612,16 +1616,20 @@ wban_mac_interrupt_process()
 			if(IAM_BAN_HUB){
 				thput_msdu_kbps = (data_pkt_ppdu_kbits - 0.001*data_pkt_num*HEADER_BITS)/(op_sim_time());
 				fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+				fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 				fprintf(log, "nodeid=%d,stat,throughput,", nodeid);
 				fprintf(log, "rcv_msdu_kbps=%f,", thput_msdu_kbps);
 				fprintf(log, "rcv_ppdu_kbps=%f\n", data_pkt_ppdu_kbits / op_sim_time());
 				/* UP=8 means the UP in total */
 				data_pkt_latency_avg = data_pkt_latency_total / data_pkt_num;
-				fprintf(log, "t=%f,node_name=%s,nodeid=%d,stat,latency,", op_sim_time(), nd_attrG[nodeid].name, nodeid);
+				fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+				fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
+				fprintf(log, "nodeid=%d,stat,latency,", nodeid);
 				fprintf(log, "up=8,latency_avg=%f\n", data_pkt_latency_avg);
 			}
 			/* Energy Statistics */
 			fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+			fprintf(log, "bid=%d,", nd_attrG[nodeid].bid);
 			fprintf(log, "node_id=%d,stat,energy,", nodeid);
 			fprintf(log, "tx=%f,rx=%f,", bat_attrG[nodeid].engy_tx, bat_attrG[nodeid].engy_rx);
 			fprintf(log, "cca=%f,idle=%f,", bat_attrG[nodeid].engy_cca, bat_attrG[nodeid].engy_idle);
