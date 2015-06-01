@@ -134,7 +134,7 @@ static int CWmax[8] = {64, 32, 32, 16, 16, 64, 8, 4};
 map1_schedule_map map1_sche_map[NODE_ALL_MAX];
 
 /* Global variables*/
-data_stat_info data_stat_all[UP_ALL][DATA_STATE];
+data_stat_info hb_data_stat[UP_ALL][DATA_STATE];
 
 /* State machine conditions */
 #define IAM_BAN_HUB (nd_attrG[nodeid].dev_mode == HUB)
@@ -208,7 +208,6 @@ static void subq_data_info_get(void);
 static int wban_norm_phy_bits(Packet* frame_MPDU);
 static void phy_to_radio(Packet* frame_MPDU);
 static void reset_map1_map(void);
-void calc_prio_node(void);
 void calc_prio_hub(void);
 static int hp_rfind_nodeid (int nid);
 static double hp_avg_snr(int node_id_l);
