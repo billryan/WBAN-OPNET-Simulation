@@ -10,6 +10,8 @@ from collections import OrderedDict
 import numpy as np
 from wban_pram import *
 
+nested_defaultdict = lambda: defaultdict(nested_defaultdict)
+
 
 def get_fn_info(trace):
     """get the *.trace info
@@ -66,7 +68,7 @@ def get_sv_data(line):
     Stat = namedtuple('Stat', 'num ppdu_kb')
     raw, basic_info = get_basic_info(line)
     ppdu_kb = float(raw[-1])
-    num = int(raw[-3])
+    num = float(raw[-3])
     stat = Stat._make((num, ppdu_kb))
     state = raw[-5]
     up = raw[-7]
@@ -80,7 +82,7 @@ def get_hb_data(line):
     Stat = namedtuple('Stat', 'num ppdu_kb')
     raw, basic_info = get_basic_info(line)
     ppdu_kb = float(raw[-1])
-    num = int(raw[-3])
+    num = float(raw[-3])
     stat = Stat._make((num, ppdu_kb))
     state = raw[-5]
     up = raw[-7]
@@ -120,11 +122,11 @@ def get_throughput(line):
     """get throughput of all up data packet"""
     Stat = namedtuple('Stat', 'msdu ppdu')
     raw, basic_info = get_basic_info(line)
-    ppdu_kb = raw[-1]
-    msdu_kb = raw[-3]
+    ppdu_kb = float(raw[-1])
+    msdu_kb = float(raw[-3])
     stat = Stat._make((msdu_kb, ppdu_kb))
     throughput = basic_info
-    throughput['throught'] = {'stat': stat}
+    throughput['throughput'] = {'stat': stat}
     return throughput
 
 
@@ -140,13 +142,11 @@ def is_hub(line):
 
 def get_stat(trace):
     """get statistics of trace files"""
-    trace_info = defaultdict(dict)
+    trace_info = nested_defaultdict()
     trace_info['scene'] = get_fn_info(trace)
     with open(trace, 'r') as f:
         for line in f:
-            print("line: %s") % line
             basic_info = get_basic_info(line)[1]
-            print("basic_info: %s") % basic_info
             bid = basic_info['bid']
             nid = basic_info['nid']
             trace_info[bid][nid]['t'] = basic_info['t']
@@ -154,7 +154,7 @@ def get_stat(trace):
             if re.search('init,src', line):
                 src = get_src(line)
                 up = src['src']['up']
-                trace_b_n['src'][up] = src['src']['stat']
+                trace_info[bid][nid]['src'][up] = src['src']['stat']
             elif re.search('stat,sv_data', line):
                 sv_data = get_sv_data(line)
                 up = sv_data['sv_data']['up']
