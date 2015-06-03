@@ -223,7 +223,7 @@ def dump_stat(raw_dir, stat_dir=None):
         print("!!!stat_dir %s is not a valid dir!!!") % stat_dir
         sys.exit(1)
     today = str(datetime.date.today())
-    stat_fn = 'stat_' + today + '.pkl'
+    stat_fn = 'stat_' + today + '.json'
     stat_path = os.path.join(stat_dir, stat_fn)
     print("stat_path: %s") % stat_path
     with open(stat_path, 'wb') as f:
