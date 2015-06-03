@@ -7,7 +7,8 @@ import re
 from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict
-import numpy as np
+import datetime
+import json
 from wban_pram import *
 
 nested_defaultdict = lambda: defaultdict(nested_defaultdict)
@@ -55,7 +56,7 @@ def get_src(line):
     tf_size_raw = filter(None, re.split('[(  )]', raw[-5]))
     tf_size = {'f': tf_size_raw[0], 'mean': float(tf_size_raw[1])}
     tf_interval_raw = filter(None, re.split('[(  )]', raw[-7]))
-    tf_interval = {'f': tf_size_raw[0], 'mean': float(tf_size_raw[1])}
+    tf_interval = {'f': tf_size_raw[0], 'mean': float(tf_interval_raw[1])}
     stat = Stat._make((tf_interval, tf_size, tf_start_t, tf_stop_t))
     up = raw[-9]
     src = basic_info
@@ -178,17 +179,17 @@ def get_stat(trace):
     return trace_info
 
 
-def get_trace_files(raw_path):
+def get_trace_files(raw_dir):
     """get trace files from raw_data path"""
-    if os.path.isfile(raw_path):
-        print "Usage: load_data.py raw_data_dir [stat_data_dir]"
+    if os.path.isfile(raw_dir):
+        print "Usage: dump_stat.py raw_data_dir [stat_dump_dir]"
         sys.exit(1)
     trace_files = []
-    subdir_files = os.listdir(raw_path)
+    subdir_files = os.listdir(raw_dir)
     for trace in subdir_files:
-        trace_path = os.path.join(raw_path, trace)
+        trace_path = os.path.join(raw_dir, trace)
         if os.path.isdir(trace_path):
-            print("!!! Skip trace_path: %s !!!") % trace_path
+            print("!!! Skip trace_dir: %s !!!") % trace_path
         elif re.search('.trace$', trace_path):
             trace_files.append(trace_path)
         else:
@@ -196,12 +197,50 @@ def get_trace_files(raw_path):
     return trace_files
 
 
+def get_trace_infos(raw_dir):
+    trace_files = get_trace_files(raw_dir)
+    trace_infos = []
+    for i, trace in enumerate(trace_files):
+        trace_fn = os.path.basename(trace)
+        progress = 1.0 * (i + 1) / len(trace_files)
+        print("progress %f, processing %s...") % (progress, trace_fn)
+        trace_infos.append(get_stat(trace))
+    return trace_infos
+
+
+def make_dir(path_in):
+    if not os.path.exists(path_in):
+        print("mkdir %s...") % path_in
+        os.makedirs(path_in)
+
+
+def dump_stat(raw_dir, stat_dir=None):
+    if not stat_dir:
+        stat_dir_par = os.path.abspath(os.path.join(raw_dir, os.pardir))
+        stat_dir = os.path.join(stat_dir_par, 'stat_dump')
+        make_dir(stat_dir)
+    if not os.path.isdir(stat_dir):
+        print("!!!stat_dir %s is not a valid dir!!!") % stat_dir
+        sys.exit(1)
+    today = str(datetime.date.today())
+    stat_fn = 'stat_' + today + '.pkl'
+    stat_path = os.path.join(stat_dir, stat_fn)
+    print("stat_path: %s") % stat_path
+    with open(stat_path, 'wb') as f:
+        trace_infos = get_trace_infos(raw_dir)
+        json.dump(trace_infos, f, indent=4)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 3 or len(sys.argv) == 1:
-        print "Usage: %s raw_data_dir [stat_data_dir]" % (sys.argv[0])
+        print "Usage: %s raw_data_dir [stat_dump_dir]" % (sys.argv[0])
         sys.exit(1)
     else:
-        raw_data_in = sys.argv[1]
-        if os.path.isfile(raw_data_in):
-            print "Usage: %s raw_data_dir [stat_data_dir]" % (sys.argv[0])
+        stat_dump_dir = None
+        raw_data_dir = sys.argv[1]
+        if os.path.isfile(raw_data_dir):
+            print "Usage: %s raw_data_dir [stat_dump_dir]" % (sys.argv[0])
             sys.exit(1)
+        if len(sys.argv) == 3:
+            stat_dump_dir = sys.argv[2]
+        dump_stat(raw_data_dir, stat_dump_dir)
