@@ -630,6 +630,9 @@ void calc_prio_hub()
 			gamma_i = (pkt_thr_util[i] - thr_min) / (thr_avg - thr_min);
 			gamma_i = gamma_i * gamma_i;
 			sv_rho_hub[i] = map1_sche_map[i].up + alpha * eta_i + beta * gamma_i;
+			if (nd_attrG[nodeid].protocol_ver == 2) {
+				sv_rho_hub[i] = map1_sche_map[i].up;
+			}
 		}
 	}
 	/* sort rho by nid */
@@ -663,7 +666,7 @@ resize_map_len()
 	int i;
 	int map_slots = 0, map_thr = 0;
 	int slot_req_total = 0;
-	double map_util = 0, epsilon1 = 0.70, epsilon2 = 0.85;
+	double map_util = 0, epsilon1 = 0.50, epsilon2 = 0.75;
 	int miu = 2, rap_start_min = 3, rap_start_max = 255;
 	FIN(resize_map_len);
 	// resize MAP after SF_NUM SF
@@ -1257,13 +1260,13 @@ wban_mac_interrupt_process()
 					// 	op_subq_flush (SUBQ_MAN);
 					// }
 					if(!IAM_BAN_HUB){
-						if (nd_attrG[nodeid].protocol_ver == PAPER1) {
+						if (nd_attrG[nodeid].protocol_ver >= PAPER1) {
 							// update map1_map slotnum
 							reset_map1_map();
 						}
 						wban_battery_sleep_end(mac_state);
 					}else{
-						if (nd_attrG[nodeid].protocol_ver == PAPER1) {
+						if (nd_attrG[nodeid].protocol_ver >= PAPER1) {
 							resize_map_len();
 						}
 						/* value for the next superframe. End Device will obtain this value from beacon */
