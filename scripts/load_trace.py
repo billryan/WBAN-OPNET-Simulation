@@ -115,7 +115,6 @@ def get_throughput(trace_info):
     # v1: trace_infos[0]['2']
     for (bid, v1) in trace_info.items():
         if bid == 'scene':
-            print("scene: %s") % v1
             continue
         # v2: trace_infs[0]['2']['33']
         for (nid, v2) in v1.items():
@@ -126,7 +125,6 @@ def get_throughput(trace_info):
             throughput['ppdu'].append(v2['throughput'][1])
     msdu_kb = float("{0:.6f}".format(np.mean(throughput['msdu'])))
     ppdu_kb = float("{0:.6f}".format(np.mean(throughput['ppdu'])))
-    print("bid: %s, nid: %s, msdu: %s") % (bid, nid, str(msdu_kb))
     return (msdu_kb, ppdu_kb)
 
 
@@ -141,14 +139,16 @@ def get_stat_lines(trace_infos):
         prefix = network + ' ' + scene + ' ' + tf_mode
         stat_line['prefix'] = prefix
         tf_rate = get_tf_rate(trace_info)
-        stat_line['tf_rate'] = tf_rate
+        stat_line['tf_rate'] = float("{0:.6f}".format(0.008 / tf_rate))
         latency = get_lat(trace_info)
         stat_line['latency'] = latency
         pkt_info = get_pkt_info(trace_info)
         pkt_gen = pkt_info['gen']
         pkt_rcv = pkt_info['rcv']
+        pkt_eta = 1.0 * pkt_rcv / pkt_gen
         stat_line['pkt_gen'] = pkt_gen
         stat_line['pkt_rcv'] = pkt_rcv
+        stat_line['pkt_eta'] = pkt_eta
         energy_total = get_energy(trace_info)
         stat_line['energy_total'] = energy_total
         thr_msdu = get_throughput(trace_info)[0]
@@ -193,8 +193,7 @@ def merge_stat_lines(stat_lines):
     # sort by key group
     # stat_lines_merged = sorted(stat_lines_merged, key=itemgetter('prefix'))
     stat_lines_sorted = sorted(
-        stat_lines_merged, key=lambda k:
-        k['prefix'] + str(k['tf_rate']), reverse=True)
+        stat_lines_merged, key=lambda k: k['prefix'] + str(k['tf_rate']))
     return stat_lines_sorted
 
 
@@ -214,6 +213,7 @@ def format_stat_lines(stat_lines):
         pkt_gen = str(pkt_gen).ljust(10)
         pkt_rcv = stat_line['pkt_rcv']
         pkt_rcv = str(pkt_rcv).ljust(10)
+        pkt_eta = "{0:.4f}".format(stat_line['pkt_eta']).ljust(8)
         energy_total = stat_line['energy_total']
         energy_total = "{0:.6f}".format(energy_total).ljust(12)
         thr_msdu = stat_line['thr_msdu']
@@ -221,7 +221,7 @@ def format_stat_lines(stat_lines):
         thr_ppdu = stat_line['thr_ppdu']
         thr_ppdu = "{0:.6f}".format(thr_ppdu).ljust(12)
         line = network + scene + tf_mode + tf_rate + latency + pkt_gen + \
-            pkt_rcv + energy_total + thr_msdu + thr_ppdu + '\n'
+            pkt_rcv + pkt_eta + energy_total + thr_msdu + thr_ppdu + '\n'
         stat_lines_formated.append(line)
     return stat_lines_formated
 
@@ -238,12 +238,13 @@ def output_stat(raw_json, stat_path=None):
     make_dir(stat_path)
     stat_path = os.path.join(stat_path, stat_fn)
     with open(stat_path, 'w') as f:
-        f.write('# network'.ljust(10) + 'scene'.ljust(6) +
-                'tf_mode'.ljust(8) + 'tf_rate'.ljust(10) +
-                'latency'.ljust(10) +
-                'pkt_gen'.ljust(10) + 'pkt_rcv'.ljust(10) +
-                'engy_total'.ljust(12) +
-                'thr_msdu'.ljust(12) + 'thr_ppdu'.ljust(12) + '\n')
+        f.write(
+            '# network'.ljust(10) + 'scene'.ljust(6) +
+            'tf_mode'.ljust(8) + 'tf_rate'.ljust(10) +
+            'latency'.ljust(10) +
+            'pkt_gen'.ljust(10) + 'pkt_rcv'.ljust(10) + 'pkt_eta'.ljust(8) +
+            'engy_total'.ljust(12) +
+            'thr_msdu'.ljust(12) + 'thr_ppdu'.ljust(12) + '\n')
         trace_infos = load_trace_infos(raw_json)
         stat_lines = get_stat_lines(trace_infos)
         stat_lines_sorted = merge_stat_lines(stat_lines)
