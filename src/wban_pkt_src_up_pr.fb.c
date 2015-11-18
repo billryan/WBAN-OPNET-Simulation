@@ -448,8 +448,8 @@ static void wban_up7_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 7);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -527,8 +527,8 @@ static void wban_up6_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 6);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -592,8 +592,8 @@ static void wban_up5_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 5);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -675,8 +675,8 @@ static void wban_up4_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 4);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -739,8 +739,8 @@ static void wban_up3_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 3);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -803,8 +803,8 @@ static void wban_up2_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 2);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -867,8 +867,8 @@ static void wban_up1_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 1);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
@@ -931,8 +931,8 @@ static void wban_up0_traffic_generate() {
 	msdu_ptr = op_pk_create (msdu_size);
 	/* create a App traffic frame that encapsulates the msdu packet */
 	app_traffic_ptr = op_pk_create_fmt ("wban_app_traffic_format");
-	/* increment the data sequence number by 1 at a time */
-	dataSN = (dataSN + 1) % 32768;
+	/* increment the data sequence number by 1 at a time and mod by 32767 */
+	dataSN = (dataSN++) & ((1 << 15) - 1);
 	op_pk_nfd_set (app_traffic_ptr, "App Sequence Number", dataSN);
 	op_pk_nfd_set (app_traffic_ptr, "User Priority", 0);
 	op_pk_nfd_set_pkt (app_traffic_ptr, "MSDU Payload", msdu_ptr); // wrap msdu in app traffic
