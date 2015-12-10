@@ -70,6 +70,7 @@ wban_mac_init ()
 	mac_state = MAC_SETUP;
 	init_flag = OPC_TRUE;
 	if (IAM_BAN_HUB) {
+		pkt_up = UP6;
 		nd_attrG[nodeid].nid = nd_attrG[nodeid].bid + 15; // set the value of HID=BAN ID + 15
 		mac_attr.sendid = nd_attrG[nodeid].bid + 15;
 		mac_attr.rcvid = BROADCAST_NID; // default value, usually overwritten
@@ -105,36 +106,39 @@ wban_mac_init ()
 		current_free_connected_NID++;
 		map1_sche_map[nodeid].nid = mac_attr.sendid;
 	}
-	/* obtain the APP Layer Parameters */
-	for (i = 0; i < UP_ALL; ++i) {
-		char str_int[2] = "", up_i_para[80] = "";
-		char up_msdu_inter[50] = "", up_msdu_size[50] = "";
-		double up_start_t = 0, up_stop_t = 0;
-		sprintf(str_int, "%d", i); /* convert int to str */
-		strcat (up_i_para, "User Priority ");
-		strcat (up_i_para, str_int);
-		strcat (up_i_para, " Traffic Parameters");
-		op_ima_obj_attr_get (appid, up_i_para, &srcid); 
-		src_comp_id = op_topo_child (srcid, OPC_OBJTYPE_GENERIC, 0);
-		/* Read the values of the up-MSDU generation parameters, 
-		 * i.e. the attribute values of the surrounding module. */
-		op_ima_obj_attr_get (src_comp_id, "MSDU Interval Time", up_msdu_inter);
-		op_ima_obj_attr_get (src_comp_id, "MSDU Size",          up_msdu_size);
-		op_ima_obj_attr_get (src_comp_id, "Start Time",         &up_start_t);
-		op_ima_obj_attr_get (src_comp_id, "Stop Time",          &up_stop_t);
-		/* override lower user priority */
-		if (up_start_t > 0.00001) app_up = i;
-		log = fopen(log_name, "a");
-		fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
-		fprintf(log, "bid=%d,nid=%d,", nd_attrG[nodeid].bid, nd_attrG[nodeid].nid);
-		fprintf(log, "nodeid=%d,init,src,", nodeid);
-		fprintf(log, "up=%d,", i);
-		fprintf(log, "msdu_interval_time=%s,msdu_size=%s,", up_msdu_inter, up_msdu_size);
-		fprintf(log, "start_time=%f,stop_time=%f\n", up_start_t, up_stop_t);
-		fclose(log);
-		// printf("UP=%d,", i);
-		// printf("MSDU Interval Time=%s,MSDU Size=%s,", up_msdu_inter, up_msdu_size);
-		// printf("Start Time=%f,Stop Time=%f\n", up_start_t, up_stop_t);
+	if (!IAM_BAN_HUB) {
+		/* obtain the APP Layer Parameters */
+		for (i = 0; i < UP_ALL; ++i) {
+			char str_int[2] = "", up_i_para[80] = "";
+			char up_msdu_inter[50] = "", up_msdu_size[50] = "";
+			double up_start_t = 0, up_stop_t = 0;
+			sprintf(str_int, "%d", i); /* convert int to str */
+			strcat (up_i_para, "User Priority ");
+			strcat (up_i_para, str_int);
+			strcat (up_i_para, " Traffic Parameters");
+			op_ima_obj_attr_get (appid, up_i_para, &srcid);
+			src_comp_id = op_topo_child (srcid, OPC_OBJTYPE_GENERIC, 0);
+			/* Read the values of the up-MSDU generation parameters, 
+			 * i.e. the attribute values of the surrounding module. */
+			op_ima_obj_attr_get (src_comp_id, "MSDU Interval Time", up_msdu_inter);
+			op_ima_obj_attr_get (src_comp_id, "MSDU Size",          up_msdu_size);
+			op_ima_obj_attr_get (src_comp_id, "Start Time",         &up_start_t);
+			op_ima_obj_attr_get (src_comp_id, "Stop Time",          &up_stop_t);
+			/* override lower user priority */
+			if (up_start_t > 0.00001) app_up = i;
+			log = fopen(log_name, "a");
+			fprintf(log, "t=%f,node_name=%s,", op_sim_time(), nd_attrG[nodeid].name);
+			fprintf(log, "bid=%d,nid=%d,", nd_attrG[nodeid].bid, nd_attrG[nodeid].nid);
+			fprintf(log, "nodeid=%d,init,src,", nodeid);
+			fprintf(log, "up=%d,", i);
+			fprintf(log, "msdu_interval_time=%s,msdu_size=%s,", up_msdu_inter, up_msdu_size);
+			fprintf(log, "start_time=%f,stop_time=%f\n", up_start_t, up_stop_t);
+			fclose(log);
+			// printf("UP=%d,", i);
+			// printf("MSDU Interval Time=%s,MSDU Size=%s,", up_msdu_inter, up_msdu_size);
+			// printf("Start Time=%f,Stop Time=%f\n", up_start_t, up_stop_t);
+		}
+		pkt_up = app_up;
 	}
 
 	SF.SLEEP = OPC_TRUE;
@@ -148,7 +152,7 @@ wban_mac_init ()
 	attemptingToTX = OPC_FALSE;
 	/* initialization for data_stat */
 	latency_avg_all = 0.0;
-	for(i=0; i<UP_ALL; i++){
+	for (i=0; i<UP_ALL; i++) {
 		latency_avg[i] = 0.0;
 		for(j=0; j<DATA_STATE; j++){
 			sv_data_stat[i][j].number = 0.0;
@@ -157,7 +161,7 @@ wban_mac_init ()
 			hb_data_stat[i][j].ppdu_kbits = 0.0;
 		}
 	}
-	for(i=0; i<NODE_MAX; i++){
+	for (i=0; i<NODE_MAX; i++) {
 		ack_seq_nid[i] = -1;
 	}
 	/* initialization for TX/RX STAT */
@@ -1153,15 +1157,15 @@ wban_extract_i_ack_frame (Packet* ack_frame)
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function: wban_encapsulate_and_enqueue_data_frame
  *
- * Description:	encapsulates the MSDU into a MAC frame and enqueues it.      
- *             
+ * Description:	encapsulates the MSDU into a MAC frame and enqueues it.
+ *
  * Input:	msdu - MSDU (MAC Frame Payload)
  *			ack - 
  *			dest_id - the destionation ID for packet
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_msdu, enum ack_type ack_policy, int dest_id)
 	{
@@ -1192,6 +1196,7 @@ wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_msdu, enum ack_type 
 	hb_data_stat[app_up][GEN].ppdu_kbits += 0.001*wban_norm_phy_bits(data_frame_mpdu);
 	// log = fopen(log_name, "a");
 	if (op_subq_pk_insert(SUBQ_DATA, data_frame_mpdu, OPC_QPOS_TAIL) == OPC_QINS_OK) {
+		pkt_up = app_up;
 		sv_data_stat[app_up][QUEUE_SUCC].number += 1;
 		sv_data_stat[app_up][QUEUE_SUCC].ppdu_kbits += 0.001*wban_norm_phy_bits(data_frame_mpdu);
 		hb_data_stat[app_up][QUEUE_SUCC].number += 1;
@@ -1237,7 +1242,7 @@ wban_mac_interrupt_process()
 	double thput_msdu_kbps;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
-	
+
 	switch (op_intrpt_type()) {
 		case OPC_INTRPT_STRM: // incomming packet
 		{
@@ -1466,9 +1471,9 @@ wban_mac_interrupt_process()
 						}
 						// double the Contention Window, after every second fail.
 						if (OPC_TRUE == csma.CW_double) {
-							csma.CW *=2;
-							if (csma.CW > CWmax[pkt_to_be_sent.user_priority]) {
-								csma.CW = CWmax[pkt_to_be_sent.user_priority];
+							csma.CW *= 2;
+							if (csma.CW > CWmax[app_up]) {
+								csma.CW = CWmax[app_up];
 							}
 							// printf("\t  csma.CW=%d doubled after pkt_tx_fail=%d\n", csma.CW, pkt_tx_fail);
 						}
@@ -1655,15 +1660,15 @@ wban_mac_interrupt_process()
 	FOUT;
 	}
 
-/*-----------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_extract_data_frame
  *
- * Description:	extract the data frame from the MAC frame received from the network
- *              
+ * Description:	extract the data frame from the MAC frame
+ *
  * Input :  frame_MPDU - the received MAC frame
- *-----------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
-wban_extract_data_frame (Packet* frame_MPDU)
+wban_extract_data_frame(Packet* frame_MPDU)
 	{
 	int ack_policy;
 	// Packet* frame_MSDU;
@@ -1699,15 +1704,15 @@ wban_extract_data_frame (Packet* frame_MPDU)
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function: wban_attempt_TX
  *
  * Description:	attempt to TX in all TX access states (EAP, RAP, MAP, CAP)
  * It will check whether we need to retransmit the current packet, or prepare
  * a new packet from the MAC data buffer to be sent.
- * 
- * Input: 
- *--------------------------------------------------------------------------------*/
+ *
+ * Input:
+ *--------------------------------------------------------------------------*/
 static void
 wban_attempt_TX()
 	{
@@ -1729,18 +1734,18 @@ wban_attempt_TX()
 	}
 	// If we are not in an appropriate state, return
 	switch (mac_state) {
-		case MAC_EAP1: 
-		case MAC_RAP1: 
-		case MAC_EAP2: 
-		case MAC_RAP2: 
-		case MAC_CAP: 
+		case MAC_EAP1:
+		case MAC_RAP1:
+		case MAC_EAP2:
+		case MAC_RAP2:
+		case MAC_CAP:
 			SF.IN_CAP_PHASE = OPC_TRUE;
 			SF.IN_MAP_PHASE = OPC_FALSE;
 			break;
 		case MAC_MAP1: 
-		case MAC_MAP2: 
-			SF.IN_MAP_PHASE = OPC_TRUE;
+		case MAC_MAP2:
 			SF.IN_CAP_PHASE = OPC_FALSE;
+			SF.IN_MAP_PHASE = OPC_TRUE;
 			break;
 		default: FOUT; // none of the valid state above
 	}
@@ -1754,7 +1759,7 @@ wban_attempt_TX()
 		// printf("Hub do not allow TX Data and Management Packet in MAP");
 		FOUT;
 	}
-	if((pkt_to_be_sent.enable) && (pkt_tx_total < max_packet_tries)){
+	if((pkt_to_be_sent.enable) && (pkt_tx_fail < max_packet_tries)){
 		/* A packet is drawn from queue but cannot tx in current phase */
 		if(!can_fit_TX(&pkt_to_be_sent)){
 			// printf("\t  Draw a packet from queue but cannot tx in current phase\n");
@@ -1789,6 +1794,7 @@ wban_attempt_TX()
 			hb_data_stat[pkt_to_be_sent.frame_subtype][FAIL].number += 1;
 			hb_data_stat[pkt_to_be_sent.frame_subtype][FAIL].ppdu_kbits += 0.001*pkt_to_be_sent.ppdu_bits;
 		}
+		op_pk_destroy(frame_MPDU_to_be_sent);
 	}
 
 	// Try to draw a new packet from the data or Management buffers.
@@ -1800,19 +1806,17 @@ wban_attempt_TX()
 		// }
 		frame_MPDU_to_be_sent = op_subq_pk_remove(SUBQ_MAN, OPC_QPOS_PRIO);
 		pkt_to_be_sent.enable = OPC_TRUE;
-		pkt_to_be_sent.user_priority = 6; //set up of managemant frame with 6
-		csma.CW = CWmin[pkt_to_be_sent.user_priority];
+		pkt_up = UP6; //set up of managemant frame with 6
+		csma.CW = CWmin[pkt_up];
 		// printf("\t  Draw managemant frame.\n");
 	} else if ((mac_attr.sendid != UNCONNECTED_NID) && (!op_subq_empty(SUBQ_DATA))) {
 		/* obtain the pointer to MAC frame (MPDU) stored in the adequate queue */
 		frame_MPDU_to_be_sent = op_subq_pk_access (SUBQ_DATA, OPC_QPOS_PRIO);
-		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &pkt_to_be_sent.user_priority);
-		if (SF.IN_EAP_PHASE) {
-			// printf("\t  Node %s is in EAP phase.\n", nd_attrG[nodeid].name);
-			if (7 != pkt_to_be_sent.user_priority) {
-				// printf("\t  UP7 packet in the SUBQ_DATA subqueue currently\n");
-				FOUT;
-			}
+		op_pk_nfd_get(frame_MPDU_to_be_sent, "Frame Subtype", &app_up);
+		if (SF.IN_EAP_PHASE && (7 != app_up)) {
+			// printf("\t  UP7 packet in the SUBQ_DATA subqueue currently\n");
+			op_pk_destroy(frame_MPDU_to_be_sent);
+			FOUT;
 		}
 		frame_MPDU_to_be_sent = op_subq_pk_remove(SUBQ_DATA, OPC_QPOS_PRIO);
 		// if((1 == nd_attrG[nodeid].protocol_ver) && (MAC_MAP1 == mac_state)){
@@ -1843,9 +1847,9 @@ wban_attempt_TX()
 		pkt_to_be_sent.rcvid = mac_attr.rcvid;
 		pkt_to_be_sent.sendid = mac_attr.sendid;
 	}
-	
+
 	// if we found a packet in any of the buffers, try to TX it.
-	if(pkt_to_be_sent.enable){
+	if (pkt_to_be_sent.enable) {
 		if(!can_fit_TX(&pkt_to_be_sent)){
 			pkt_tx_out_phase++;
 			pkt_tx_total++;
@@ -1856,7 +1860,7 @@ wban_attempt_TX()
 		pkt_tx_total = 0;
 		pkt_tx_fail = 0;
 		if(SF.IN_CAP_PHASE){
-			csma.CW = CWmin[pkt_to_be_sent.user_priority];
+			csma.CW = CWmin[pkt_up];
 			csma.CW_double = OPC_FALSE;
 			csma.backoff_counter = 0;
 			wban_attempt_TX_CSMA();
@@ -1871,26 +1875,26 @@ wban_attempt_TX()
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function: wban_attempt_TX_CSMA
  *
  * Description:	CSMA/CA for contention access period
- * 
+ *
  * Input:
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_attempt_TX_CSMA()
 	{
 	/* Stack tracing enrty point */
 	FIN(wban_attempt_TX_CSMA);
-	if(!can_fit_TX(&pkt_to_be_sent)){
+	if (!can_fit_TX(&pkt_to_be_sent)) {
 		FOUT;
 	}
-	wban_backoff_delay_set(pkt_to_be_sent.user_priority);
+	wban_backoff_delay_set(pkt_up);
 	attemptingToTX = OPC_TRUE;
 	//CCA
 	// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), CCA_START_CODE);
-	op_intrpt_schedule_self (op_sim_time(), CCA_START_CODE);
+	op_intrpt_schedule_self(op_sim_time(), CCA_START_CODE);
 	/* Stack tracing exit point */
 	FOUT;
 	}
@@ -1933,10 +1937,10 @@ wban_backoff_period_boundary_get ()
  * No parameters
  *--------------------------------------------------------------------------------*/
 static void
-wban_backoff_delay_set(int user_priority)
+wban_backoff_delay_set(int up)
 	{
 	double phase_remaining_time;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_backoff_delay_set);
 	// /* Ignore the non-zero backoff_counter*/

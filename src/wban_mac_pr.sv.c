@@ -67,6 +67,9 @@ int	\dataSN;
 /* App UP */
 int \app_up;
 
+/* Packet UP */
+int \pkt_up;
+
 /* sequence number of the received packet */
 int	\ack_seq_num;
 
