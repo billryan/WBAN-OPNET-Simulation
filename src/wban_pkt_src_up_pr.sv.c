@@ -1,3 +1,21 @@
+/* App layer traffic MSDU start time */
+double \msdu_start_t[UP_ALL];
+
+/* App layer traffic MSDU stop time */
+double \msdu_stop_t[UP_ALL];
+
+/* Distribution handler of the interarrival time of the generated up-MSDUs. */
+OmsT_Dist_Handle	\msdu_arrv_dist_handle[UP_ALL];
+
+/* Distribution handler of the sizes of generated up-MSDUs. */
+OmsT_Dist_Handle	\msdu_size_dist_handle[UP_ALL];
+
+/* PDF used to determine the interarrival times of the generated up-MSDUs. */
+char	\msdu_arrv_dist[UP_ALL][64];
+
+/* PDF used to determine the sizes of generated up-MSDUs. */
+char	\msdu_size_dist[UP_ALL][64];
+
 /* Time when this source will start its up7-MSDU generation activities. */
 double	\up7_start_time;
 
@@ -148,6 +166,9 @@ int	\destination_id;
 /* Sequence Number for App layer traffic packet */
 int	\dataSN;
 
+/* App UP */
+int \app_up;
+
 /* Name of the node */
 char	\node_name[30];
 
@@ -196,6 +217,9 @@ Stathandle	\up5_bits_sent_hndlG;
 Stathandle	\up5_msdus_hndl;
 
 Stathandle	\up5_msdus_hndlG;
+
+/* Event handle for the arrival of next user priority 7 MSDU. */
+Evhandle	\next_msdu_evh;
 
 /* Event handle for the arrival of next user priority 7 MSDU. */
 Evhandle	\up7_next_msdu_evh;

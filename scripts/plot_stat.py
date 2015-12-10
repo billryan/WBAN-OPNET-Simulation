@@ -29,10 +29,16 @@ def load_stat_log(stat_log, fig_dir):
         stat_log, dtype={'names': (
             'network', 'scene',
             'traffic arrival mode', 'traffic arrival rate',
-            'latency', 'packet number generated', 'packet number received',
+            'latency',
+            'packets generated', 'packets received', 'packets eta',
             'energy consumed',
             'throughput-msdu', 'throughput-ppdu'),
-            'formats': ('i', 'i', 'i', 'f', 'f', 'i', 'i', 'f', 'f', 'f')},
+            'formats': ('i', 'i',
+                        'i', 'f',
+                        'f',
+                        'i', 'i', 'f',
+                        'f',
+                        'f', 'f')},
         comments='#', unpack=True)
     network = stat_log_np[0]
     scene = stat_log_np[1]
@@ -41,107 +47,208 @@ def load_stat_log(stat_log, fig_dir):
     latency = stat_log_np[4]
     pkt_gen = stat_log_np[5]
     pkt_rcv = stat_log_np[6]
-    energy_total = stat_log_np[7]
-    thr_msdu = stat_log_np[8]
-    thr_ppdu = stat_log_np[9]
+    pkt_eta = stat_log_np[7]
+    energy_total = stat_log_np[8]
+    thr_msdu = stat_log_np[9]
+    thr_ppdu = stat_log_np[10]
     # n1: N4x2, s0: ver0_CSMA, m0: constant
-    cond = np.logical_and(network == 1, scene == 0, tf_mode == 0)
+    cond = np.logical_and.reduce((network == 1, scene == 0, tf_mode == 0))
     n1s0m0 = np.where(cond)
     # n1: N4x2, s1: ver0_TDMA, m0: constant
-    cond = np.logical_and(network == 1, scene == 1, tf_mode == 0)
+    cond = np.logical_and.reduce((network == 1, scene == 1, tf_mode == 0))
     n1s1m0 = np.where(cond)
     # n1: N4x2, s2: ver0_hybrid, m0: constant
-    cond = np.logical_and(network == 1, scene == 2, tf_mode == 0)
+    cond = np.logical_and.reduce((network == 1, scene == 2, tf_mode == 0))
     n1s2m0 = np.where(cond)
     # n1: N4x2, s3: ver1_hybrid, m0: constant
-    cond = np.logical_and(network == 1, scene == 3, tf_mode == 0)
+    cond = np.logical_and.reduce((network == 1, scene == 3, tf_mode == 0))
     n1s3m0 = np.where(cond)
-    # Draw Latency
-    # latency_ms = latency * 1000.0
-    # Latency
+    # n1: N4x2, s4: ver1_CSMA, m0: constant
+    cond = np.logical_and.reduce((network == 1, scene == 4, tf_mode == 0))
+    n1s4m0 = np.where(cond)
+    # n1: N4x2, s0: ver0_CSMA, m1: poisson
+    cond = np.logical_and.reduce((network == 1, scene == 0, tf_mode == 1))
+    n1s0m1 = np.where(cond)
+    # n1: N4x2, s1: ver0_TDMA, m1: poisson
+    cond = np.logical_and.reduce((network == 1, scene == 1, tf_mode == 1))
+    n1s1m1 = np.where(cond)
+    # n1: N4x2, s2: ver0_hybrid, m1: poisson
+    cond = np.logical_and.reduce((network == 1, scene == 2, tf_mode == 1))
+    n1s2m1 = np.where(cond)
+    # n1: N4x2, s3: ver1_hybrid, m1: poisson
+    cond = np.logical_and.reduce((network == 1, scene == 3, tf_mode == 1))
+    n1s3m1 = np.where(cond)
+    # n1: N4x2, s4: ver1_CSMA, m1: poisson
+    cond = np.logical_and.reduce((network == 1, scene == 4, tf_mode == 1))
+    n1s4m1 = np.where(cond)
+
+    # Draw Packet Ratio - Constant
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m0], pkt_eta[n1s0m0], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m0], pkt_eta[n1s1m0], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m0], pkt_eta[n1s2m0], 'o-',
+    #         linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m0], pkt_eta[n1s3m0], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m0], pkt_eta[n1s4m0], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Packet Receive Ratio")
+    plt.title('Packet Receive Ratio - Constant Packet Arrival')
+    plt.grid()
+    plt.legend(loc='lower left')
+    plt.show()
+    # plt.savefig(fig_dir + 'pkt_eta.png')
+    plt.clf()
+
+    # Draw Packet Ratio - Poisson
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m1], pkt_eta[n1s0m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m1], pkt_eta[n1s1m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m1], pkt_eta[n1s2m1], 'o-',
+    #          linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m1], pkt_eta[n1s3m1], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m1], pkt_eta[n1s4m1], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Packet Receive Ratio")
+    plt.title('Packet Receive Ratio - Poisson Packet Arrival')
+    plt.grid()
+    plt.legend(loc='lower left')
+    plt.show()
+    # plt.savefig(fig_dir + 'pkt_eta.png')
+    plt.clf()
+
+    # Draw Throughput - Constant
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m0], thr_msdu[n1s0m0], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m0], thr_msdu[n1s1m0], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m0], thr_msdu[n1s2m0], 'o-',
+    #         linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m0], thr_msdu[n1s3m0], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m0], thr_msdu[n1s4m0], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Throughput")
+    plt.title('Throughput - Constant Packet Arrival')
+    plt.grid()
+    plt.legend(loc='upper left')
+    plt.show()
+    # plt.savefig(fig_dir + 'thr_msdu.png')
+    plt.clf()
+
+    # Draw Throughput - Poisson
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m1], thr_msdu[n1s0m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m1], thr_msdu[n1s1m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m1], thr_msdu[n1s2m1], 'o-',
+    #          linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m1], thr_msdu[n1s3m1], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m1], thr_msdu[n1s4m1], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Throughput")
+    plt.title('Throughput - Poisson Packet Arrival')
+    plt.grid()
+    plt.legend(loc='upper left')
+    plt.show()
+    # plt.savefig(fig_dir + 'thr_msdu.png')
+    plt.clf()
+
+    # Draw Latency - Constant
     plt.figure(1)
     plt.plot(tf_rate[n1s0m0], latency[n1s0m0], 'o-',
              linewidth=2, label="IEEE 802.15.6 CSMA")
     plt.plot(tf_rate[n1s1m0], latency[n1s1m0], 'o-',
              linewidth=2, label="IEEE 802.15.6 TDMA")
-    plt.plot(tf_rate[n1s2m0], latency[n1s2m0], 'o-',
-             linewidth=2, label="IEEE 802.15.6 Hybrid")
+    # plt.plot(tf_rate[n1s2m0], latency[n1s2m0], 'o-',
+    #         linewidth=2, label="IEEE 802.15.6 Hybrid")
     plt.plot(tf_rate[n1s3m0], latency[n1s3m0], 'o-',
              linewidth=2, label="AI MAC")
-    plt.xlabel("Interval Time(s/packet)")
+    plt.plot(tf_rate[n1s4m0], latency[n1s4m0], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
     plt.ylabel("Latency(s)")
-    plt.title('Latency')
+    plt.title('Latency - Constant Packet Arrival')
     plt.grid()
     plt.legend(loc='upper left')
     plt.show()
     # plt.savefig(fig_dir + 'latency.png')
     plt.clf()
 
-    # Energy
+    # Draw Latency - Poisson
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m1], latency[n1s0m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m1], latency[n1s1m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m1], latency[n1s2m1], 'o-',
+    #          linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m1], latency[n1s3m1], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m1], latency[n1s4m1], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Latency(s)")
+    plt.title('Latency - Poisson Packet Arrival')
+    plt.grid()
+    plt.legend(loc='upper left')
+    plt.show()
+    # plt.savefig(fig_dir + 'latency.png')
+    plt.clf()
+
+    # Energy - Constant
     plt.figure(1)
     plt.plot(tf_rate[n1s0m0], energy_total[n1s0m0], 'o-',
              linewidth=2, label="IEEE 802.15.6 CSMA")
     plt.plot(tf_rate[n1s1m0], energy_total[n1s1m0], 'o-',
              linewidth=2, label="IEEE 802.15.6 TDMA")
-    plt.plot(tf_rate[n1s2m0], energy_total[n1s2m0], 'o-',
-             linewidth=2, label="IEEE 802.15.6 Hybrid")
+    # plt.plot(tf_rate[n1s2m0], energy_total[n1s2m0], 'o-',
+    #          linewidth=2, label="IEEE 802.15.6 Hybrid")
     plt.plot(tf_rate[n1s3m0], energy_total[n1s3m0], 'o-',
              linewidth=2, label="AI MAC")
-    plt.xlabel("Interval Time(s/packet)")
+    plt.plot(tf_rate[n1s4m0], energy_total[n1s4m0], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
     plt.ylabel("Energy(Joule)")
-    plt.title('Energy')
+    plt.title('Energy - Constant')
     plt.grid()
-    plt.legend(loc='upper left')
+    plt.legend(loc='lower right')
     plt.show()
     # plt.savefig(fig_dir + 'latency.png')
     plt.clf()
 
-    # Throughput
-    plt.figure(3)
-    plt.plot(rate[std_indices], thput[std_indices], 'o-',
-             linewidth=2, label="IEEE 802.15.6")
-    plt.plot(rate[proposal_indices], thput[proposal_indices], 'o-',
-             linewidth=2, label="Proposal")
-    plt.xlabel("Arrival Rate(kbps)")
-    plt.ylabel("Throughpu(kbps)")
-    plt.title('Throughput')
+    # Energy - Poisson
+    plt.figure(1)
+    plt.plot(tf_rate[n1s0m1], energy_total[n1s0m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 CSMA")
+    plt.plot(tf_rate[n1s1m1], energy_total[n1s1m1], 'o-',
+             linewidth=2, label="IEEE 802.15.6 TDMA")
+    # plt.plot(tf_rate[n1s2m1], energy_total[n1s2m1], 'o-',
+    #          linewidth=2, label="IEEE 802.15.6 Hybrid")
+    plt.plot(tf_rate[n1s3m1], energy_total[n1s3m1], 'o-',
+             linewidth=2, label="AI MAC")
+    plt.plot(tf_rate[n1s4m1], energy_total[n1s4m1], 'o-',
+             linewidth=2, label="AI MAC - without rho")
+    plt.xlabel("Interval Time(packet/slot)")
+    plt.ylabel("Energy(Joule)")
+    plt.title('Energy - Poisson')
     plt.grid()
-    plt.legend(loc='upper left')
-    # plt.show()
-    plt.savefig(fig_dir + 'throughput.png')
+    plt.legend(loc='lower right')
+    plt.show()
+    # plt.savefig(fig_dir + 'latency.png')
     plt.clf()
-
-    # Packet loss
-    plt.figure(4)
-    plt.plot(rate[std_indices], pkt_loss_ratio[std_indices], 'o-',
-             linewidth=2, label="IEEE 802.15.6")
-    plt.plot(rate[proposal_indices], pkt_loss_ratio[proposal_indices], 'o-',
-             linewidth=2, label="Proposal")
-    plt.xlabel("Arrival Rate(kbps)")
-    plt.ylabel("Packet loss rate ratio(%)")
-    plt.title('Packet Loss rate')
-    plt.grid()
-    plt.legend(loc='upper left')
-    # plt.show()
-    plt.savefig(fig_dir + 'packet_loss_rate.png')
-    plt.clf()
-
-    # Packet subq
-    plt.figure(5)
-    plt.plot(rate[std_indices], pkt_queue_ratio[std_indices], 'o-',
-             linewidth=2, label="IEEE 802.15.6")
-    plt.plot(rate[proposal_indices], pkt_queue_ratio[proposal_indices], 'o-',
-             linewidth=2, label="Proposal")
-    plt.xlabel("Arrival Rate(kbps)")
-    plt.ylabel("Packets in queue ratio(%)")
-    plt.title('Packet in queue')
-    plt.grid()
-    plt.legend(loc='upper left')
-    # plt.show()
-    plt.savefig(fig_dir + 'packet_in_subq.png')
-    plt.clf()
-    # plt.savefig('latency.png', dpi=120)
-    # plt.savefig(fig_dir+'latency.pdf', bbox_inches='tight')
 
 
 def make_dir(path_in):

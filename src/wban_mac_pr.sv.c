@@ -61,6 +61,15 @@ char	\log_name[250];
 /* Log level */
 int	\log_level;
 
+/* Sequence Number for App layer traffic packet */
+int	\dataSN;
+
+/* App UP */
+int \app_up;
+
+/* Packet UP */
+int \pkt_up;
+
 /* sequence number of the received packet */
 int	\ack_seq_num;
 

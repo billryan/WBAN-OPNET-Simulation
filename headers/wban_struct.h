@@ -24,6 +24,7 @@ typedef struct {
 	int dev_mode; // Device Mode, Hub(0) or Node(1)
 	int protocol_ver; //Protocol Version, 0 for 802.15.6, 1 for proposed protocol
 	int map_schedule; //Schedule strategy for MAP
+	/* APP Attributes */
 	int dest_id; // destination ID for Traffic
 	/* node activity */
 	Boolean is_idle;
