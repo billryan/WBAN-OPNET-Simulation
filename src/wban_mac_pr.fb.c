@@ -781,13 +781,13 @@ map1_scheduling()
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_send_beacon_frame
  *
  * Description:	Create a beacon frame and send it to the Radio
  *
  * No parameters
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_send_beacon_frame ()
 	{
@@ -806,7 +806,7 @@ wban_send_beacon_frame ()
 	op_pk_nfd_set (beacon_MSDU, "RAP1 Start", beacon_attr.rap1_start);
 	op_pk_nfd_set (beacon_MSDU, "RAP1 End", beacon_attr.rap1_end);
 	// op_pk_nfd_set (beacon_MSDU, "Inactive Duration", beacon_attr.inactive_duration);
-	
+
 	/* create a MAC frame (MPDU) that encapsulates the beacon payload (MSDU) */
 	beacon_MPDU = op_pk_create_fmt ("wban_frame_MPDU_format");
 
@@ -852,14 +852,14 @@ wban_send_beacon_frame ()
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_extract_beacon_frame
  *
- * Description:	extract the beacon frame from the MAC frame received from the network
- *              and schedule the next beacon frame
+ * Description:	extract the beacon frame from the MAC frame received from
+ * the network and schedule the next beacon frame
  *
  * Input :  mac_frame - the received MAC frame
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	{
@@ -868,7 +868,7 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	// int eap_indicator_fd;
 	// int beacon2_enabled_fd;
 	double beacon_frame_tx_time;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_extract_beacon_frame);
 	beacon_frame_tx_time = hp_tx_time(wban_norm_phy_bits(beacon_MPDU_rx));
@@ -904,14 +904,14 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 		 * and are only able to transmit in RAP periods.
 		 */
 		/* initialize the NID from 32 */
-		mac_attr.sendid = current_free_connected_NID++;  //current_free_connected_NID is global variable
+		//current_free_connected_NID is global variable
+		mac_attr.sendid = current_free_connected_NID++;  
 		// log = fopen(log_name, "a");
 		// fprintf(log, "t=%f,nodeid=%d,INIT,NODE_NAME=%s,NID=%d,", op_sim_time(), nodeid, nd_attrG[nodeid].name, mac_attr.sendid);
 		// fprintf(log, "SUPERFRAME_LENGTH=%d,RAP1_LENGTH=%d,B2_START=%d\n", beacon_attr.beacon_period_length, beacon_attr.rap1_length, beacon_attr.b2_start);
 		// fclose(log);
 		// printf("t=%f,nodeid=%d,INIT,NODE_NAME=%s,NID=%d\n", op_sim_time(), nodeid, nd_attrG[nodeid].name, mac_attr.sendid);
 		// op_prg_odb_bkpt("init");
-
 	}
 	// update the superframe parameters
 	SF.SD = beacon_attr.beacon_period_length; // the superframe duration(beacon preriod length) in slots
@@ -929,14 +929,15 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	FOUT;
 	}
 
-/*------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_schedule_next_beacon
  *
  * Description:	generates the self interupt for the next beacon transmission
- *              and a self interrupts to indicate the start/end of the EAP/RAP and end of sleep period
+ *              and a self interrupts to indicate the start/end of
+ *              the EAP/RAP and end of sleep period
  *
  * No parameters
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_schedule_next_beacon()
 	{
@@ -1053,13 +1054,13 @@ wban_schedule_next_beacon()
 	FOUT;
 	}
 
-/*-----------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_send_i_ack_frame
  *
  * Description:	send back to the sender ACK frame
  *
  * Input :  seq_num - expected sequence number
- *-----------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_send_i_ack_frame (int seq_num)
 	{
@@ -1094,14 +1095,14 @@ wban_send_i_ack_frame (int seq_num)
 	FOUT;
 	}
 
-/*-----------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function:	wban_extract_i_ack_frame
  *
- * Description:	check if the sequence number of the received I ACK frame is the
+ * Description:	check if the sequence number of the received frame is the
  *				expected one.
  *
  * Input :  ack_frame - the MAC ACK frame
- *-----------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_extract_i_ack_frame (Packet* ack_frame)
 	{
@@ -1113,6 +1114,7 @@ wban_extract_i_ack_frame (Packet* ack_frame)
 	FIN(wban_extract_i_ack_frame);
 	if((!pkt_to_be_sent.enable) || (0 == pkt_tx_total) || (!waitForACK)){
 		// printf("\t  No packet being TX while receive I-ACK.\n");
+		op_pk_destroy (ack_frame);
 		FOUT;
 	}
 	op_pk_nfd_get (ack_frame, "Sequence Number", &seq_num);
