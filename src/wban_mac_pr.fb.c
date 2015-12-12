@@ -17,6 +17,7 @@ wban_mac_init ()
 	Objid mac_attr_id;
 	Objid appid, srcid, src_comp_id;
 	int i, j;
+	int rand_bc;
 	/* APP Parameters */
 	// char str_int[2] = "", up_i_para[80] = "";
 	// char up_msdu_inter[50] = "", up_msdu_size[50] = "";
@@ -91,7 +92,10 @@ wban_mac_init ()
 		beacon_attr.rap1_length = beacon_attr.rap1_end - beacon_attr.rap1_start + 1;
 		// t_send_beacon = op_sim_time() + floor (op_dist_uniform(12)) * hp_tx_time(BEACON_PPDU_BITS);
 		// op_intrpt_schedule_self(t_send_beacon, BEACON_INTERVAL_CODE);
-		wban_send_beacon_frame ();
+		// wban_send_beacon_frame ();
+		csma.backoff_counter = 3;
+		rand_bc = floor (op_dist_uniform(4));
+		op_intrpt_schedule_self (op_sim_time() + rand_bc * pCSMASlotLength2Sec, BEACON_CCA_START_CODE);
 	} else { /* if the node is not Hub */
 		/* get the Connection Request for the Node */
 		op_ima_obj_attr_get (nodeid, "Connection Request", &conn_req_attr_id);
@@ -1109,7 +1113,7 @@ wban_extract_i_ack_frame (Packet* ack_frame)
 	int seq_num;
 	// int retry_times;
 	// Packet* mac_frame_dup;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_extract_i_ack_frame);
 	if((!pkt_to_be_sent.enable) || (0 == pkt_tx_total) || (!waitForACK)){
@@ -1118,7 +1122,7 @@ wban_extract_i_ack_frame (Packet* ack_frame)
 		FOUT;
 	}
 	op_pk_nfd_get (ack_frame, "Sequence Number", &seq_num);
-	
+
 	/* if I'm waiting for an ACK */
 	if (waitForACK) {
 		if (mac_attr.wait_ack_seq_num == seq_num) { /* yes, I have received my ACK */
@@ -1226,13 +1230,13 @@ wban_encapsulate_and_enqueue_data_frame (Packet* data_frame_msdu, enum ack_type 
 	FOUT;
 	}
 
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
  * Function: wban_mac_interrupt_process
  *
  * Description:	processes all the interrupts that occurs in an unforced state      
  * 
  * No parameters  
- *--------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------*/
 static void
 wban_mac_interrupt_process()
 	{
@@ -1242,6 +1246,7 @@ wban_mac_interrupt_process()
 	double data_pkt_latency_avg;
 	double data_pkt_ppdu_kbits;
 	double thput_msdu_kbps;
+	double rand_time;
 	/* Stack tracing enrty point */
 	FIN(wban_mac_interrupt_process);
 
@@ -1276,8 +1281,11 @@ wban_mac_interrupt_process()
 						if (nd_attrG[nodeid].protocol_ver >= PAPER1) {
 							resize_map_len();
 						}
-						/* value for the next superframe. End Device will obtain this value from beacon */
-						wban_send_beacon_frame();
+						/* Beacon CCA start */
+						csma.backoff_counter = 3;
+
+						rand_time = floor (op_dist_uniform(2)) * pCSMASlotLength2Sec;
+						op_intrpt_schedule_self (op_sim_time() + rand_time, BEACON_CCA_START_CODE);
 					}
 					mac_state = MAC_SETUP;
 
@@ -1287,6 +1295,11 @@ wban_mac_interrupt_process()
 					// op_prg_odb_bkpt ("beacon_end");
 					break;
 				};/*end of BEACON_INTERVAL_CODE */
+                
+                case START_TX_BEACON_CODE: {
+                	wban_send_beacon_frame();
+                	break;
+                }
 
 				// map1_scheduling via Hub
 				case MAP1_SCHEDULE: {
@@ -1412,7 +1425,7 @@ wban_mac_interrupt_process()
 					op_intrpt_schedule_self (op_sim_time() + pCCATime, CCA_EXPIRATION_CODE);
 					break;
 				};/*end of CCA_START_CODE */
-			
+
 				case CCA_EXPIRATION_CODE :/*At the end of the CCA */
 				{
 					wban_battery_cca(mac_state);
@@ -1447,9 +1460,58 @@ wban_mac_interrupt_process()
 					}
 					break;
 				};
-			
+
+				case BEACON_CCA_START_CODE: /*At the start of the BEACON_CCA */
+				{
+					/* do check if the channel is idle at the start of cca */
+					/* at the start the channel is assumed idle, any change to busy, the CCA will report a busy channel */
+					// printf ("\nt=%f,NODE_NAME=%s,NID=%d START CCA, CW=%d,bc=%d,tx_faile_times=%d,pkt_up=%d\n",op_sim_time(), nd_attrG[nodeid].name, mac_attr.sendid, csma.CW, csma.backoff_counter, pkt_tx_fail, pkt_to_be_sent.user_priority);
+					/* check at the beginning of CCA, if the channel is busy */
+					csma.CCA_CHANNEL_IDLE = OPC_TRUE;
+					if (op_stat_local_read (RX_BUSY_STAT) == 1.0) {
+						csma.CCA_CHANNEL_IDLE = OPC_FALSE;
+					}
+					op_intrpt_schedule_self (op_sim_time() + pCCATime, BEACON_CCA_EXP_CODE);
+					break;
+				};/*end of CCA_START_CODE */
+
+				case BEACON_CCA_EXP_CODE :/*At the end of the BEACON_CCA */
+				{
+					wban_battery_cca(mac_state);
+					/* bug with open-zigbee, for statwire interupt can sustain a duration */
+					if ((!csma.CCA_CHANNEL_IDLE) || (op_stat_local_read (RX_BUSY_STAT) == 1.0)) {
+						// printf("t=%f,%s CCA with BUSY\n", op_sim_time(), nd_attrG[nodeid].name);
+						// op_intrpt_schedule_self (csma.next_slot_start, BEACON_CCA_START_CODE);
+						op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime+2*pCSMASlotLength2Sec, BEACON_CCA_START_CODE);
+					} else {
+						csma.backoff_counter--;
+						// printf("t=%f,%s CCA with IDLE, backoff_counter decrement to %d\n", op_sim_time(), nd_attrG[nodeid].name, csma.backoff_counter);
+						if (csma.backoff_counter > 0) {
+							// printf("\t  CCA at next available backoff boundary=%f sec\n", op_sim_time()+pCSMAMACPHYTime);
+							// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), BEACON_CCA_START_CODE);
+							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, BEACON_CCA_START_CODE);
+						} else {
+							if(csma.backoff_counter < 0){
+								// if(waitForACK) printf("waitForACK=True,");
+								// if(attemptingToTX) printf("attemptingToTX=True,");
+								// if(TX_ING) printf("TX_ING=True\n");
+								// break;
+								// csma.backoff_counter = 0;
+								op_sim_end("ERROR : TRY TO SEND Beacon WHILE backoff_counter < 0","PK_SEND_CODE","","");
+							}
+							// printf("\t  backoff_counter decrement to 0, %s start transmission at %f.\n", nd_attrG[nodeid].name, op_sim_time()+pCSMAMACPHYTime);
+							// op_intrpt_schedule_self (csma.next_slot_start, START_TX_BEACON_CODE);
+							// op_prg_odb_bkpt("send_packet");
+							// op_intrpt_schedule_self (wban_backoff_period_boundary_get(), START_TX_BEACON_CODE);
+							op_intrpt_schedule_self (op_sim_time()+pCSMAMACPHYTime, START_TX_BEACON_CODE);
+							// wban_backoff_delay_set(pkt_to_be_sent.user_priority);
+						}
+					}
+					break;
+				};
+
 				case START_TRANSMISSION_CODE: /* successful end of backoff and CCA or MAP period */
-				{	
+				{
 					/*backoff_start_time is initialized in the "init_backoff" state*/
 					if(can_fit_TX(&pkt_to_be_sent)){
 						pkt_tx_total++;
@@ -1679,7 +1741,7 @@ wban_extract_data_frame(Packet* frame_MPDU)
 	int slotnum;
 	int up_prio;
 	int sender_id;
-	
+
 	/* Stack tracing enrty point */
 	FIN(wban_extract_data_frame);
 	op_pk_nfd_get (frame_MPDU, "Ack Policy", &ack_policy);
