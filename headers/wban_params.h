@@ -7,6 +7,11 @@
 // protocol version
 #define BASE0 0
 #define PAPER1 1
+#define THESIS3 3
+
+#define Wth 4
+#define Wmax 16
+#define W0 1
 
 /* recent SF number for statistics */
 #define SF_NUM 15

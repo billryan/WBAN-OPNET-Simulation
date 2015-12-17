@@ -497,6 +497,7 @@ reset_map1_map()
 	int slotnum, i;
 	double slot_bits, data_ack_bits, snr_db;
 	FIN(reset_map1_map);
+	if (nd_attrG[nodeid].protocol_ver == THESIS3) FOUT;
 
 	subq_info_get(SUBQ_DATA);
 	slot_bits = nd_attrG[nodeid].data_rate * SF.slot_sec;
@@ -680,9 +681,35 @@ resize_map_len()
 	int i;
 	int map_slots = 0, map_thr = 0;
 	int slot_req_total = 0;
-	double map_util = 0, epsilon1 = 0.50, epsilon2 = 0.75;
+	double map_util = 0, epsilon1 = 0.50, epsilon2 = 0.75, eta3 = 0.75;
 	int miu = 2, rap_start_min = 3, rap_start_max = 255;
 	FIN(resize_map_len);
+    if (nd_attrG[nodeid].protocol_ver == THESIS3) {
+	   	/* obtain the snr_max(thr_max) and snr_min(thr_min) */
+		for (i = 0; i < NODE_ALL_MAX; ++i) {
+			pkt_thr_util[i] = 0;
+			// ignore self
+			if (i == nodeid) {
+				continue;
+			}
+			// same BAN ID
+			if (nd_attrG[i].bid == nd_attrG[nodeid].bid) {
+				if (0 == sv_st_map_pkt[nodeid_l][0].slot) sv_st_map_pkt[nodeid_l][0].slot = 1;
+				map_util = sv_st_map_pkt[nodeid_l][0].thr / sv_st_map_pkt[nodeid_l][0].slot;
+				if (map_util > eta3) {
+					if (sv_st_map_pkt[nodeid_l][0].slot <= Wth) {
+
+					}
+				}
+				if (thr_avg_i <= thr_min) {
+					thr_min = thr_avg_i;
+				}
+			}
+		}
+    	beacon_attr.rap1_start = 255;
+    	FOUT;
+    }
+
 	// resize MAP after SF_NUM SF
 	if (sv_beacon_seq < SF_NUM) {
 		FOUT;
