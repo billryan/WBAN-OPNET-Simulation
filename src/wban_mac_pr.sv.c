@@ -61,6 +61,9 @@ char	\log_name[250];
 /* Log level */
 int	\log_level;
 
+/* Simulation parameters for thesis3 */
+double ETA3;
+
 /* Sequence Number for App layer traffic packet */
 int	\dataSN;
 

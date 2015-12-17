@@ -13,8 +13,7 @@
 #define Wmax 16
 #define W0 1
 
-/* recent SF number for statistics */
-#define SF_NUM 15
+#define SF_NUM 8
 /* Maximum slot number in a Superframe */
 #define SLOT_NUM 255
 /* slot required by Node */

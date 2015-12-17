@@ -882,6 +882,8 @@ wban_extract_beacon_frame (Packet* beacon_MPDU_rx)
 	// op_pk_nfd_get (beacon_MPDU_rx, "EAP Indicator", &eap_indicator_fd);
 	// op_pk_nfd_get (beacon_MPDU_rx, "B2", &beacon2_enabled_fd);
 	if (nd_attrG[nodeid].bid + 15 != rcv_sender_id) {
+		op_pk_destroy (beacon_MSDU_rx);
+		op_pk_destroy (beacon_MPDU_rx);
 		FOUT;
 	}
 	op_pk_nfd_get (beacon_MSDU_rx, "Sender Address", &beacon_attr.send_addr);
